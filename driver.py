@@ -50,7 +50,7 @@ if __name__ == '__main__':
     socatflagE = ['D:/Data/_DataSets/SOCAT/v2023','SOCATv2023_FlagE.tsv']
 
     data_file = 'D:/ESA_CONTRACT/neural_network_input.nc'
-    fluxengine_config = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/Python/fluxengine_config_night.conf'
+    fluxengine_config = 'fluxengine_config/fluxengine_config_night.conf'
     coare_out = 'D:/ESA_CONTRACT/coare'
     start_yr = 1985
     end_yr = 2022

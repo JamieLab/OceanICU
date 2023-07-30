@@ -7,7 +7,7 @@ Date: 05/2023
 from neural_network_train import load_data
 from construct_input_netcdf import save_netcdf
 import numpy as np
-import coare35vn as co
+import noaa_coare.coare35vn as co
 import Data_Loading.data_utils as du
 from netCDF4 import Dataset
 import os

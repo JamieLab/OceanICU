@@ -9,8 +9,8 @@ if __name__ == '__main__':
     import os
 
     create_inp =False
-    run_neural = True
-    run_flux = False
+    run_neural = False
+    run_flux = True
     plot_final = False
     coare = False
     # Vars should have each entry as [Extra_Name, netcdf_variable_name,data_location]
@@ -84,13 +84,13 @@ if __name__ == '__main__':
     if run_flux:
         import fluxengine_driver as fl
         print('Running flux calculations....')
-        fl.GCB_remove_prov17(model_save_loc)
+        #fl.GCB_remove_prov17(model_save_loc)
         fl.fluxengine_netcdf_create(model_save_loc,input_file = data_file,tsub='CCI_SST_analysed_sst',ws = 'CCMP_w',seaice = 'CCI_SST_sea_ice_fraction',
             sal='CMEMS_so',msl = 'ERA5_msl',xCO2 = 'NOAA_ERSL_xCO2',start_yr=start_yr,end_yr=end_yr, coare_out = coare_out, tair = 'ERA5_t2m', dewair = 'ERA5_d2m',
             rs = 'ERA5_msdwswrf', rl = 'ERA5_msdwlwrf', zi = 'ERA5_blh',coolskin = 'COARE3.5')
-        fl.fluxengine_run(model_save_loc,fluxengine_config,start_yr,end_yr)
-        import custom_flux_av.ofluxghg_flux_budgets as bud
-        bud.run_flux_budgets(indir = os.path.join(model_save_loc,'flux'),outroot=model_save_loc+'/')
+        #fl.fluxengine_run(model_save_loc,fluxengine_config,start_yr,end_yr)
+        #import custom_flux_av.ofluxghg_flux_budgets as bud
+        #bud.run_flux_budgets(indir = os.path.join(model_save_loc,'flux'),outroot=model_save_loc+'/')
 
     if plot_final:
         import fluxengine_driver as fl

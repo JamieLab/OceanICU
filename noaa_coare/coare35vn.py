@@ -124,26 +124,39 @@ def coare35vn(u, t, rh, ts, P=1015, Rs=150, Rl=370, zu=18, zt=18, zq=18, lat=45,
 
     Code history:
 
-    1) 12/14/05 - created based on scalar version coare26sn.m with input
-       on vectorization from C. Moffat.
-    2) 12/21/05 - sign error in psiu_26 corrected, and code added to use
-       variable values from the first pass through the iteration loop for the
-       stable case with very thin M-O length relative to zu (zetu>50) (as is
-       done in the scalar coare26sn and COARE3 codes).
-    3) 7/26/11 - S = dt was corrected to read S = ut.
-    4) 7/28/11 - modification to roughness length parameterizations based
-       on the CLIMODE, MBL, Gasex and CBLAST experiments are incorporated
-    5) Python translation by BWB, Oct 2014.  Modified to allow user specified
-       vectors for lat and zi.  Defaults added for zu, zt, zq.
-    """
+    1) 12/14/05 - created based on scalar version coare26sn.m with input
+
+       on vectorization from C. Moffat.
+
+    2) 12/21/05 - sign error in psiu_26 corrected, and code added to use
+
+       variable values from the first pass through the iteration loop for the
+
+       stable case with very thin M-O length relative to zu (zetu>50) (as is
+
+       done in the scalar coare26sn and COARE3 codes).
+
+    3) 7/26/11 - S = dt was corrected to read S = ut.
+
+    4) 7/28/11 - modification to roughness length parameterizations based
+
+       on the CLIMODE, MBL, Gasex and CBLAST experiments are incorporated
+
+    5) Python translation by BWB, Oct 2014.  Modified to allow user specified
+
+       vectors for lat and zi.  Defaults added for zu, zt, zq.
+
+    """
+
+    import numpy as np
+
+    import noaa_coare.meteo as meteo
+    import noaa_coare.util as util
 
-    import numpy as np
-    import meteo
-    import util
-
-    # be sure array inputs are ndarray floats
-    # if inputs are already ndarray float this does nothing
-    # otherwise copies are created in the local namespace
+    # be sure array inputs are ndarray float
+    # if inputs are already ndarray float this does nothing
+    # otherwise copies are created in the local namespace
+
     u = np.copy(np.asarray(u, dtype=float))
     t = np.copy(np.asarray(t, dtype=float))
     rh = np.copy(np.asarray(rh, dtype=float))

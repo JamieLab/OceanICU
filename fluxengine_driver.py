@@ -125,7 +125,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020):
     # Add the concentration unc in quadrature and then convert to a percentage.
     conc_unc = np.sqrt(skin_conc_unc**2 + subskin_conc_unc**2) / dconc
     # Flux uncertainity is the percentage unc added and then converted to absolute units (not percentage)
-    flux_unc = (conc_unc + k_perunc) * flux
+    flux_unc = np.sqrt(conc_unc**2 + k_perunc**2) * np.abs(flux)
 
     # Remove the fill values....
     flux_unc[flux<-900] = np.nan

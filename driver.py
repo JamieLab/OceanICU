@@ -8,9 +8,9 @@ Date: 03/2023
 if __name__ == '__main__':
     import os
 
-    create_inp =True
+    create_inp =False
     run_neural = False
-    run_flux = False
+    run_flux = True
     plot_final = False
     coare = False
     # Vars should have each entry as [Extra_Name, netcdf_variable_name,data_location]
@@ -88,9 +88,10 @@ if __name__ == '__main__':
         import fluxengine_driver as fl
         print('Running flux calculations....')
         #fl.GCB_remove_prov17(model_save_loc)
-        fl.fluxengine_netcdf_create(model_save_loc,input_file = data_file,tsub='CCI_SST_analysed_sst',ws = 'CCMP_w',seaice = 'CCI_SST_sea_ice_fraction',
-            sal='CMEMS_so',msl = 'ERA5_msl',xCO2 = 'NOAA_ERSL_xCO2',start_yr=start_yr,end_yr=end_yr, coare_out = coare_out, tair = 'ERA5_t2m', dewair = 'ERA5_d2m',
-            rs = 'ERA5_msdwswrf', rl = 'ERA5_msdwlwrf', zi = 'ERA5_blh',coolskin = 'COARE3.5')
+        # fl.fluxengine_netcdf_create(model_save_loc,input_file = data_file,tsub='CCI_SST_analysed_sst',ws = 'CCMP_w',seaice = 'CCI_SST_sea_ice_fraction',
+        #     sal='CMEMS_so',msl = 'ERA5_msl',xCO2 = 'NOAA_ERSL_xCO2',start_yr=start_yr,end_yr=end_yr, coare_out = coare_out, tair = 'ERA5_t2m', dewair = 'ERA5_d2m',
+        #     rs = 'ERA5_msdwswrf', rl = 'ERA5_msdwlwrf', zi = 'ERA5_blh',coolskin = 'COARE3.5')
+        fl.flux_uncertainty_calc(model_save_loc,start_yr = start_yr,end_yr=end_yr)
         #fl.fluxengine_run(model_save_loc,fluxengine_config,start_yr,end_yr)
         #import custom_flux_av.ofluxghg_flux_budgets as bud
         #bud.run_flux_budgets(indir = os.path.join(model_save_loc,'flux'),outroot=model_save_loc+'/')
@@ -100,4 +101,4 @@ if __name__ == '__main__':
         #fl.plot_annual_flux('temporal_flux.png',['D:/ESA_CONTRACT/NN/xCO2_SST','D:/ESA_CONTRACT/NN/xCO2_SST_SSS','D:/ESA_CONTRACT/NN/xCO2_SST_SSS_MLD','D:/ESA_CONTRACT/NN/GCB_2023_Watson'],['xCO2_atm+CCI_SST','xCO2_atm+CCI_SST+CMEMS_SSS','xCO2_atm+CCI_SST+CMEMS_SSS+CMEMS_MLD','GCB_Watson_2023'])
         # fl.plot_annual_flux('GCB_submissions.png',['D:/ESA_CONTRACT/NN/GCB_2023_Watson','D:/ESA_CONTRACT/NN/GCB_2023_Watson_Ens5','D:/ESA_CONTRACT/NN/GCB_2023_CCISSTv3','D:/ESA_CONTRACT/NN/GCB_2023_Prelim'],
         #     ['GCB_Watson_2023_CCI_SSTv2','GCB_Watson_2023_OISST','GCB_Watson_2023_CCI_SSTv3','GCB_2023_Prelim (SOCATv2023)'])
-        fl.plot_annual_flux('temporal_flux.png',['D:/ESA_CONTRACT/NN/GCB_2023_Prelim_Ens3','D:/ESA_CONTRACT/NN/NEW_TESTING'],['Watson et al. GCB submission','Ford nerual network version'])
+        #fl.plot_annual_flux('temporal_flux.png',['D:/ESA_CONTRACT/NN/GCB_2023_Prelim_Ens3','D:/ESA_CONTRACT/NN/NEW_TESTING'],['Watson et al. GCB submission','Ford nerual network version'])

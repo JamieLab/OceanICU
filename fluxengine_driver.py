@@ -82,6 +82,95 @@ def fluxengine_run(model_save_loc,config_file = None,start_yr = 1990, end_yr = 2
     returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True)
     os.chdir(return_path)
 
+def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020):
+    """
+    Function to calculate the time and space varying air-sea CO2 flux uncertainties
+    """
+    print('Calculating air-sea CO2 flux uncertainty...')
+    fluxloc = model_save_loc+'/flux'
+    k_perunc = 0.1 # k percentage uncertainty
+    atm_unc = 1 # Atmospheric pco2 unc
+    # Flux is k([CO2(atm)] - CO2[sw])
+    # So we want to know the [CO2] uncertainity. For the moment I assume no uncertainity in the solubility, so the [CO2] uncertainity is the fractional uncertainty of the fCO2 (as we are multipling)
+    # [CO2(atm)] - CO2(sw) is a combination in quadrature.
+    # k*[CO2] is a fractional uncertainty.
+    # So I need k, fCO2 fields, [CO2] fields from the fluxengine output + the fCO2 unc from the output file.
+
+    #Start with the fCO2 fields as this will give us the time lengths required for load_flux var.
+    c = Dataset(model_save_loc+'/output.nc','r')
+    fco2_sw = np.array(c.variables['fco2'])
+    fco2_tot_unc = np.array(c.variables['fco2_tot_unc'])
+    c.close()
+    fco2sw_perunc = fco2_tot_unc / fco2_sw
+
+    #Load the flux
+    flux = load_flux_var(fluxloc,'OF',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    flux = np.flip(np.transpose(flux,(1,0,2)),axis=1)
+
+    #Load the fco2 atm field and convert to percentage unc
+    fco2_atm = load_flux_var(fluxloc,'pgas_air',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    fco2_atm = np.flip(np.transpose(fco2_atm,(1,0,2)),axis=1)
+    fco2atm_perunc = atm_unc / fco2_atm
+    # Load the subskin and skin concentrations
+    subskin_conc = load_flux_var(fluxloc,'OSFC',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    subskin_conc = np.flip(np.transpose(subskin_conc,(1,0,2)),axis=1)
+    skin_conc = load_flux_var(fluxloc,'OIC1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    skin_conc = np.flip(np.transpose(skin_conc,(1,0,2)),axis=1)
+    # Calculate the concentration uncertainty in units (not percentage)
+    skin_conc_unc = skin_conc * fco2atm_perunc
+    subskin_conc_unc = subskin_conc * fco2sw_perunc
+
+    dconc = load_flux_var(fluxloc,'Dconc',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    dconc = np.flip(np.transpose(dconc,(1,0,2)),axis=1)
+    # Add the concentration unc in quadrature and then convert to a percentage.
+    conc_unc = np.sqrt(skin_conc_unc**2 + subskin_conc_unc**2) / dconc
+    # Flux uncertainity is the percentage unc added and then converted to absolute units (not percentage)
+    flux_unc = (conc_unc + k_perunc) * flux
+
+    # Remove the fill values....
+    flux_unc[flux<-900] = np.nan
+    flux[flux<-900] = np.nan
+
+    #Save to the output netcdf
+    c = Dataset(model_save_loc+'/output.nc','a')
+    keys = c.variables.keys()
+    if 'flux' in keys:
+        c.variables['flux'][:] = flux
+    else:
+        var_o = c.createVariable('flux','f4',('longitude','latitude','time'))
+        var_o[:] = flux
+    if 'flux_unc' in keys:
+        c.variables['flux_unc'][:] = flux_unc
+    else:
+        var_o = c.createVariable('flux_unc','f4',('longitude','latitude','time'))
+        var_o[:] = flux_unc
+    c.close()
+
+def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel):
+    """
+    Load variables out of the fluxengine monthly output files into a single variable.
+    """
+    import glob
+    out = np.zeros((latl,lonl,timel))
+    out[:] = np.nan
+    yr = start_yr
+    mon = 1
+    t=0
+    while yr <= end_yr:
+        fil = os.path.join(loc,str(yr),du.numstr(mon),'*.nc')
+        print(fil)
+        g = glob.glob(fil)
+        #print(g)
+        c = Dataset(g[0])
+        op = np.squeeze(np.array(c[var]))
+        out[:,:,t] = op
+        mon = mon+1
+        t = t+1
+        if mon == 13:
+            yr = yr+1
+            mon = 1
+    return out
+
 def load_annual_flux(model_save_loc):
     data = pd.read_csv(os.path.join(model_save_loc,'_global.txt'))
     data_year = data[data['MONTH'] == 'ALL'].copy()

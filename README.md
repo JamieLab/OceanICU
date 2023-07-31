@@ -17,4 +17,7 @@ Josh Blannin
 Andy Watson  
 
 # Funding
-This code and analysis was funded through the OceanICU project (https://ocean-icu.eu/)
+This code and analysis was funded through the OceanICU project (https://ocean-icu.eu/)  
+
+# References
+Bariteau Ludovic, Blomquist Byron, Fairall Christopher, Thompson Elizabeth, Edson Jim, & Pincus Robert. (2021). Python implementation of the COARE 3.5 Bulk Air-Sea Flux algorithm (v1.1). Zenodo. https://doi.org/10.5281/zenodo.5110991

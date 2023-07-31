@@ -8,39 +8,39 @@ Date: 03/2023
 if __name__ == '__main__':
     import os
 
-    create_inp =False
+    create_inp =True
     run_neural = False
-    run_flux = True
+    run_flux = False
     plot_final = False
     coare = False
     # Vars should have each entry as [Extra_Name, netcdf_variable_name,data_location]
     # vars = [['CCI_OC','chlor_a','D:/Data/OC-CCI/monthly/chlor_a/1DEG']]
-    vars = [['CCI_SST','analysed_sst','D:/Data/SST-CCI/MONTHLY_1DEG',1]
-        ,['CCI_SSTv3','analysed_sst','D:/Data/SST-CCI/v3/MONTHLY_1_DEG',1]
-        ,['NOAA_ERSL','xCO2','D:/Data/NOAA_ERSL/DATA/MONTHLY',1]
-        ,['CCI_OC','chlor_a','D:/Data/OC-CCI/monthly/chlor_a/1DEG',0]
-        ,['CCI_SST','sea_ice_fraction','D:/Data/SST-CCI/MONTHLY_1DEG',0]
-        ,['CCI_SSTv3','sea_ice_fraction','D:/Data/SST-CCI/v3/MONTHLY_1_DEG',0]
-        ,['OI_SST','sst','D:/Data/OISSTv2_1/monthly',1]
-        ,['GEBCO','elevation','D:/Data/Bathymetry/LOWER_RES',0]
-        ,['PROV','longhurst','D:/Data/Longhurst',0]
-        ,['ERA5','si10','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['ERA5','msl','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['CMEMS','so','D:/Data/CMEMS/SSS/MONTHLY/1DEG',1]
-        ,['CMEMS','mlotst','D:/Data/CMEMS/MLD/MONTHLY/1DEG',1]
-        ,['ERA5','blh','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['ERA5','d2m','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['ERA5','t2m','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['ERA5','msdwlwrf','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['ERA5','msdwswrf','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['Takahashi','taka','D:/Data/Takahashi_Clim/monthly',0]
-        ,['BICEP','pp','D:/Data/BICEP/marine_primary_production/v4.2/monthly/1DEG',0]
-        ,['BICEP','POC','D:/Data/BICEP/particulate_organic_carbon/v5.0/monthly/GEO/1DEG',0]
-        ,['BICEP','EP_Dunne','D:/Data/BICEP/oceanic_export_production/v1.0/monthly/1DEG',0]
-        ,['BICEP','EP_Li','D:/Data/BICEP/oceanic_export_production/v1.0/monthly/1DEG',0]
-        ,['BICEP','EP_Henson','D:/Data/BICEP/oceanic_export_production/v1.0/monthly/1DEG',0]
-        ,['Watson','biome','C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/GCB_Submission_Watsonetal/GCB_Dan_Ford/output/networks/monthly',0]
-        ,['CCMP','w','D:/Data/CCMP/v3.0/monthly/1DEG',0]]
+    vars = [['CCI_SST','analysed_sst','D:/Data/SST-CCI/MONTHLY_1DEG',1]]
+        # ,['CCI_SSTv3','analysed_sst','D:/Data/SST-CCI/v3/MONTHLY_1_DEG',1]
+        # ,['NOAA_ERSL','xCO2','D:/Data/NOAA_ERSL/DATA/MONTHLY',1]
+        # ,['CCI_OC','chlor_a','D:/Data/OC-CCI/monthly/chlor_a/1DEG',0]
+        # ,['CCI_SST','sea_ice_fraction','D:/Data/SST-CCI/MONTHLY_1DEG',0]
+        # ,['CCI_SSTv3','sea_ice_fraction','D:/Data/SST-CCI/v3/MONTHLY_1_DEG',0]
+        # ,['OI_SST','sst','D:/Data/OISSTv2_1/monthly',1]
+        # ,['GEBCO','elevation','D:/Data/Bathymetry/LOWER_RES',0]
+        # ,['PROV','longhurst','D:/Data/Longhurst',0]
+        # ,['ERA5','si10','D:/Data/ERA5/MONTHLY/1DEG',0]
+        # ,['ERA5','msl','D:/Data/ERA5/MONTHLY/1DEG',0]
+        # ,['CMEMS','so','D:/Data/CMEMS/SSS/MONTHLY/1DEG',1]
+        # ,['CMEMS','mlotst','D:/Data/CMEMS/MLD/MONTHLY/1DEG',1]
+        # ,['ERA5','blh','D:/Data/ERA5/MONTHLY/1DEG',0]
+        # ,['ERA5','d2m','D:/Data/ERA5/MONTHLY/1DEG',0]
+        # ,['ERA5','t2m','D:/Data/ERA5/MONTHLY/1DEG',0]
+        # ,['ERA5','msdwlwrf','D:/Data/ERA5/MONTHLY/1DEG',0]
+        # ,['ERA5','msdwswrf','D:/Data/ERA5/MONTHLY/1DEG',0]
+        # ,['Takahashi','taka','D:/Data/Takahashi_Clim/monthly',0]
+        # ,['BICEP','pp','D:/Data/BICEP/marine_primary_production/v4.2/monthly/1DEG',0]
+        # ,['BICEP','POC','D:/Data/BICEP/particulate_organic_carbon/v5.0/monthly/GEO/1DEG',0]
+        # ,['BICEP','EP_Dunne','D:/Data/BICEP/oceanic_export_production/v1.0/monthly/1DEG',0]
+        # ,['BICEP','EP_Li','D:/Data/BICEP/oceanic_export_production/v1.0/monthly/1DEG',0]
+        # ,['BICEP','EP_Henson','D:/Data/BICEP/oceanic_export_production/v1.0/monthly/1DEG',0]
+        # ,['Watson','biome','C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/GCB_Submission_Watsonetal/GCB_Dan_Ford/output/networks/monthly',0]
+        # ,['CCMP','w','D:/Data/CCMP/v3.0/monthly/1DEG',0]]
 
     reanal = [['CCI_SST','D:/Data/SST-CCI/MONTHLY_1DEG', '_ESA_CCI_MONTHLY_SST_1_DEG.nc','D:/ESA_CONTRACT/reanalysis/SST_CCI_S2023'],
         ['OI_SST','D:/Data/OISSTv2_1/monthly', '_OISSTv2.nc','D:/ESA_CONTRACT/reanalysis/OI_SST_S2023'],
@@ -58,6 +58,9 @@ if __name__ == '__main__':
         import construct_input_netcdf as cinp
         import run_reanalysis as rean
         cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr)
+        rean.load_prereanalysed(input_file='D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023_ESACCI.nc', output_file=data_file,
+            start_yr = start_yr,end_yr =end_yr,name='CCI2')
+
         #CCI SST v2.1
         rean.reanalyse(socat_dir=socat[0],socat_files=[socat[1]],sst_dir=reanal[0][1],sst_tail=reanal[0][2],out_dir = reanal[0][3],
             force_reanalyse=False,start_yr = start_yr,end_yr = end_yr,outfile=data_file,name=reanal[0][0],var='analysed_sst')

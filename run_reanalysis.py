@@ -16,6 +16,10 @@ import numpy as np
 
 def reanalyse(socat_dir=None,socat_files=None,sst_dir=None,sst_tail=None,out_dir=None,force_reanalyse=False,
     start_yr = 1990,end_yr = 2020,name = '',outfile = None, var = None):
+    """
+    Function to run the fluxengine reanalysis code in custom_reanalysis. DJF to put a pull request into FluxEngine with
+    the updates made within the custom code.
+    """
     #if __name__ == '__main__':
     if not os.path.exists(out_dir):
         print('No reanalysis done previously - running reanalysis...')
@@ -33,7 +37,34 @@ def reanalyse(socat_dir=None,socat_files=None,sst_dir=None,sst_tail=None,out_dir
     fco2,fco2_std = retrieve_fco2(out_dir,start_yr = start_yr,end_yr=end_yr)
     append_to_file(outfile,fco2,fco2_std,name,socat_files[0])
 
+def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=''):
+    """
+    Function loads the reanlysed fCO2 data produced by JamieLab, instead of running the reanalysis process.
+    """
+    c = Dataset(input_file)
+    ti = np.array(c.variables['tmnth'])
+    time = []
+    for t in ti:
+        time.append((datetime.datetime(1970,1,1) + datetime.timedelta(days=int(t))).year)
+    time = np.array(time)
+    #print(time)
+    fco2 = np.array(c.variables['fco2_reanalysed_ave_weighted'])
+    fco2_std = np.array(c.variables['fco2_reanalysed_std_weighted'])
+    c.close()
+    f = np.where((time <= end_yr) & (time >= start_yr))
+    #print(fco2.shape)
+    fco2 = np.transpose(fco2[f[0],:,:],(2,1,0))
+    fco2_std = np.transpose(fco2_std[f[0],:,:],(2,1,0))
+
+    fco2[fco2<0] = np.nan
+    fco2_std[fco2_std<0] = np.nan
+    #print(fco2.shape)
+    append_to_file(output_file,fco2,fco2_std,name,input_file)
+
 def append_to_file(output_file,fco2,fco2_std,name,socat_files):
+    """
+    Function to append the reanalysed fCO2 to the neural network input file
+    """
     c = Dataset(output_file,'a',format='NETCDF4_CLASSIC')
     var_o = c.createVariable(name+'_reanalysed_fCO2_sw','f4',('longitude','latitude','time'))
     var_o[:] = fco2
@@ -51,6 +82,9 @@ def append_to_file(output_file,fco2,fco2_std,name,socat_files):
     c.close()
 
 def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020):
+    """
+    Function to iteratively load the fCO2sw from the reanalysis folder (i.e one netcdf per month_year combo)
+    """
     print('Retrieving fCO2 from reanlysis')
     months = (end_yr-start_yr+1)*12
     yr = start_yr

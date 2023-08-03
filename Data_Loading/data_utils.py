@@ -148,6 +148,17 @@ def netcdf_create_basic(file,var,var_name,lat,lon):
     lon_o[:] = lon
     outp.close()
 
+def lon_switch(var):
+    temp = np.zeros((var.shape))
+    temp[:,:,0:180] = var[:,:,180:]
+    temp[:,:,180:] = var[:,:,0:180]
+    return temp
+
+def lon_switch_2d(var):
+    temp = np.zeros((var.shape))
+    temp[:,0:180] = var[:,180:]
+    temp[:,180:] = var[:,0:180]
+    return temp
 def inpoly2(vert, node, edge=None, ftol=5.0e-14):
     """
     INPOLY2: compute "points-in-polygon" queries.

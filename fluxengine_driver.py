@@ -13,6 +13,8 @@ from construct_input_netcdf import save_netcdf
 import Data_Loading.data_utils as du
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+import cmocean
 
 def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,seaice=None,sal=None,msl=None,xCO2=None,coolskin='Donlon02',start_yr=1990, end_yr = 2020,
     coare_out=None,tair=None,dewair=None,rs=None,rl=None,zi=None):
@@ -88,8 +90,9 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020):
     """
     print('Calculating air-sea CO2 flux uncertainty...')
     fluxloc = model_save_loc+'/flux'
-    k_perunc = 0.1 # k percentage uncertainty
-    atm_unc = 1 # Atmospheric pco2 unc
+    k_perunc = 0.2 # k percentage uncertainty
+    atm_unc = 1 # Atmospheric fco2 unc (1 uatm)
+
     # Flux is k([CO2(atm)] - CO2[sw])
     # So we want to know the [CO2] uncertainity. For the moment I assume no uncertainity in the solubility, so the [CO2] uncertainity is the fractional uncertainty of the fCO2 (as we are multipling)
     # [CO2(atm)] - CO2(sw) is a combination in quadrature.
@@ -101,12 +104,13 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020):
     fco2_sw = np.array(c.variables['fco2'])
     fco2_tot_unc = np.array(c.variables['fco2_tot_unc'])
     c.close()
+    # fco2_tot_unc = np.zeros((fco2_sw.shape))
+    # fco2_tot_unc[:] = 10
     fco2sw_perunc = fco2_tot_unc / fco2_sw
 
     #Load the flux
     flux = load_flux_var(fluxloc,'OF',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
     flux = np.flip(np.transpose(flux,(1,0,2)),axis=1)
-
     #Load the fco2 atm field and convert to percentage unc
     fco2_atm = load_flux_var(fluxloc,'pgas_air',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
     fco2_atm = np.flip(np.transpose(fco2_atm,(1,0,2)),axis=1)
@@ -123,13 +127,11 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020):
     dconc = load_flux_var(fluxloc,'Dconc',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
     dconc = np.flip(np.transpose(dconc,(1,0,2)),axis=1)
     # Add the concentration unc in quadrature and then convert to a percentage.
-    conc_unc = np.sqrt(skin_conc_unc**2 + subskin_conc_unc**2) / dconc
+    conc_unc = np.sqrt(skin_conc_unc**2 + subskin_conc_unc**2) / np.abs(dconc)
     # Flux uncertainity is the percentage unc added and then converted to absolute units (not percentage)
     flux_unc = np.sqrt(conc_unc**2 + k_perunc**2) * np.abs(flux)
-
-    # Remove the fill values....
-    flux_unc[flux<-900] = np.nan
-    flux[flux<-900] = np.nan
+    conc_unc = conc_unc* np.abs(flux)
+    gas_unc = k_perunc* np.abs(flux)
 
     #Save to the output netcdf
     c = Dataset(model_save_loc+'/output.nc','a')
@@ -144,6 +146,30 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020):
     else:
         var_o = c.createVariable('flux_unc','f4',('longitude','latitude','time'))
         var_o[:] = flux_unc
+
+    if 'flux_unc_conc' in keys:
+        c.variables['flux_unc_conc'][:] = conc_unc
+    else:
+        var_o = c.createVariable('flux_unc_conc','f4',('longitude','latitude','time'))
+        var_o[:] = conc_unc
+
+    if 'flux_unc_k' in keys:
+        c.variables['flux_unc_k'][:] = gas_unc
+    else:
+        var_o = c.createVariable('flux_unc_k','f4',('longitude','latitude','time'))
+        var_o[:] = gas_unc
+
+    if 'fco2_perc_unc' in keys:
+        c.variables['fco2_perc_unc'][:] = fco2sw_perunc
+    else:
+        var_o = c.createVariable('fco2_perc_unc','f4',('longitude','latitude','time'))
+        var_o[:] = fco2sw_perunc
+
+    if 'fco2atm_perc_unc' in keys:
+        c.variables['fco2atm_perc_unc'][:] = fco2atm_perunc
+    else:
+        var_o = c.createVariable('fco2atm_perc_unc','f4',('longitude','latitude','time'))
+        var_o[:] = fco2atm_perunc
     c.close()
 
 def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel):
@@ -158,7 +184,7 @@ def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel):
     t=0
     while yr <= end_yr:
         fil = os.path.join(loc,str(yr),du.numstr(mon),'*.nc')
-        print(fil)
+        #print(fil)
         g = glob.glob(fil)
         #print(g)
         c = Dataset(g[0])
@@ -169,7 +195,120 @@ def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel):
         if mon == 13:
             yr = yr+1
             mon = 1
+    out[out<-998] = np.nan
     return out
+
+def flux_split(flux,flux_unc,f,g):
+    f = f[:,np.newaxis]
+    g = g[np.newaxis,:]
+    flux = flux[f,g,:]
+    flux_unc = flux_unc[f,g,:]
+    out = []
+    out_unc = []
+    for i in range(0,flux.shape[2],12):
+        out.append(np.nansum(flux[:,:,i:i+12]))
+        out_unc.append(np.nansum(flux_unc[:,:,i:i+12])/2)
+
+    return np.array(out),np.array(out_unc)
+
+def calc_annual_flux(model_save_loc,land_mask= 'custom_flux_av/data/onedeg_land.nc'):
+    """
+    OceanICU version of the fluxengine budgets tool that allows for the uncertainities to be propagated...
+    """
+    import matplotlib.transforms
+    font = {'weight' : 'normal',
+            'size'   : 19}
+    matplotlib.rc('font', **font)
+
+    lon,lat = du.reg_grid()
+    area = du.area_grid(lat=1,lon=1) * 1e6
+
+    c = Dataset(land_mask,'r')
+    land = np.abs(np.flipud(np.squeeze(np.array(c.variables['land_proportion'])-1)))
+    c.close()
+
+    c = Dataset(model_save_loc+'/output.nc','r')
+    flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
+    print(flux.shape)
+    flux_unc = np.transpose(np.array(c.variables['flux_unc']),(1,0,2))
+    c.close()
+    for i in range(0,flux.shape[2]):
+        flux[:,:,i] = (flux[:,:,i] * area * land * 30.5) /1e15
+        flux_unc[:,:,i] = (flux_unc[:,:,i] * area * land * 30.5) / 1e15
+
+    year = list(range(1985,2022+1,1))
+    out = []
+    out_unc = []
+    for i in range(0,flux.shape[2],12):
+        out.append(np.nansum(flux[:,:,i:i+12]))
+        out_unc.append(np.nansum(flux_unc[:,:,i:i+12])/2)
+
+    fig = plt.figure(figsize=(15,15))
+    gs = GridSpec(3,2, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.1,right=0.98)
+    ax = [fig.add_subplot(gs[0,0]),fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,0]),fig.add_subplot(gs[1,1]),fig.add_subplot(gs[2,0]),fig.add_subplot(gs[2,1])]
+
+    ax[0].errorbar(year,out,yerr = out_unc)
+    ax[0].errorbar(year,out,yerr = np.ones((len(out)))*0.6)
+
+    f = np.squeeze(np.where(lat >= 30)); g = np.arange(0,len(lon));
+    out,out_unc = flux_split(flux,flux_unc,f,g)
+    ax[1].errorbar(year,out,yerr = out_unc)
+    ax[1].plot(year,out_unc*-1)
+
+    f = np.squeeze(np.where(lat <= -30)); g = np.arange(0,len(lon));
+    out,out_unc = flux_split(flux,flux_unc,f,g)
+    ax[2].errorbar(year,out,yerr = out_unc)
+    ax[2].plot(year,out_unc*-1)
+
+    f = np.squeeze(np.where((lat > -30) & (lat < 30))); g = np.arange(0,len(lon));
+    out,out_unc = flux_split(flux,flux_unc,f,g)
+    ax[3].errorbar(year,out,yerr = out_unc)
+    ax[3].plot(year,out_unc*-1)
+
+    f = np.squeeze(np.where((lat > 65))); g = np.arange(0,len(lon));
+    out,out_unc = flux_split(flux,flux_unc,f,g)
+    ax[4].errorbar(year,out,yerr = out_unc)
+    ax[4].plot(year,out_unc*-1)
+
+    f = np.squeeze(np.where((lat > 70) & (lat < 71))); g = np.squeeze(np.where((lon < 27) & (lon>26)));
+    print(f)
+    print(g)
+    print(np.arange(1985,2023,1/12).shape)
+    ax[5].plot(np.arange(1985,2023,1/12),flux[f,g,:])
+    ax[5].plot(np.arange(1985,2023,1/12),flux_unc[f,g,:]*-1)
+
+    ax[0].set_title('Global')
+    ax[1].set_title('30N - 90N')
+    ax[2].set_title('30S - 90S')
+    ax[3].set_title('30N - 30S')
+    ax[4].set_title('65N - 90N')
+    ax[5].set_title('70.5N 26.5E')
+    for i in range(0,6):
+        ax[i].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
+    fig.savefig(os.path.join(model_save_loc,'plots','global_flux_unc.png'))
+
+def plot_example_flux(model_save_loc):
+    lon,lat = du.reg_grid()
+    c = Dataset(model_save_loc+'/output.nc','r')
+    flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
+    print(flux.shape)
+    flux_unc = np.transpose(np.array(c.variables['flux_unc']),(1,0,2))
+    c.close()
+
+    fig = plt.figure(figsize=(21,7))
+    gs = GridSpec(1,2, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.05,right=0.95)
+    ax1 = fig.add_subplot(gs[0,0]);
+    pc = ax1.pcolor(lon,lat,np.nanmean(flux[:,:,-12:],axis=2),cmap=cmocean.cm.balance)
+    cbar = plt.colorbar(pc,ax=ax1)
+    cbar.set_label('Air-sea CO$_{2}$ flux (g C m$^{-2}$ d$^{-1}$)');
+    pc.set_clim([-0.2,0.2])
+
+    ax2 = fig.add_subplot(gs[0,1]);
+    pc = ax2.pcolor(lon,lat,np.nanmean(flux_unc[:,:,-12:],axis=2),cmap=cmocean.cm.thermal)
+    cbar = plt.colorbar(pc,ax=ax2)
+    cbar.set_label('Air-sea CO$_{2}$ flux uncertainty (g C m$^{-2}$ d$^{-1}$)');
+    pc.set_clim([0,0.2])
+    fig.savefig(os.path.join(model_save_loc,'plots','mapped_flux_example.png'),format='png',dpi=300)
 
 def load_annual_flux(model_save_loc):
     data = pd.read_csv(os.path.join(model_save_loc,'_global.txt'))

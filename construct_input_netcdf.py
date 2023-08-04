@@ -308,7 +308,7 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False):
     c = Dataset(save_loc,'w',format='NETCDF4_CLASSIC')
     #c.code_used = 'construct_input_netcdf.py'
     c.date_created = datetime.datetime.now().strftime(('%d/%m/%Y'))
-    c.created_by = 'Daniel J. Ford (d.ford@exeter.ac.uk)'
+    c.code_by = 'Daniel J. Ford (d.ford@exeter.ac.uk)'
 
     c.createDimension('longitude',lon.shape[0])
     c.createDimension('latitude',lat.shape[0])
@@ -333,3 +333,13 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False):
     lon_o.standard_name = 'Longitude'
     lon_o[:] = lon
     c.close()
+
+def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False):
+    c = Dataset(save_loc,'a',format='NETCDF4_CLASSIC')
+    for var in list(direct.keys()):
+        if flip:
+            var_o = c.createVariable(var,'f4',('latitude','longitude','time'))#,**copts)
+            var_o[:] = direct[var].transpose(1,0,2)
+        else:
+            var_o = c.createVariable(var,'f4',('longitude','latitude','time'))#,**copts)
+            var_o[:] = direct[var]

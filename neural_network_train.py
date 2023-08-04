@@ -54,7 +54,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
 
     for v in var:
         vars.append(v)
-    tabl,output_size,lon,lat = load_data(data_file,vars)
+    tabl,output_size,lon,lat = load_data(data_file,vars,model_save_loc)
     if not sea_ice == None:
         print(f'Setting where sea ice is greater than 95% to nan...')
         tabl[tabl[sea_ice] > 0.95] = np.nan
@@ -94,25 +94,25 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     for v in np.unique(tabl[vars[2]]):
         print(str(v) + ' : '+str(np.argwhere(np.array(tabl[vars[2]]) == v).shape))
 
-    run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc)
-
-    # flag_e_validation(data_file,fco2_sst = fco2_sst, prov = prov, var = var, model_save_loc = model_save_loc,bath = bath,bath_cutoff=bath_cutoff,fco2_cutoff_low=fco2_cutoff_low,
-    #     fco2_cutoff_high = fco2_cutoff_high,unc = unc)
-
-    # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
-    # (propagated input parameter uncertainties)
-    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
-    # Then we save the fCO2 data
-    save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat)
-    # Once saved the validation can be extracted, and used to determine the validation uncertainty for each province,
-    # which can then be mapped. This function produces validation statistics for the training/validation, test and all data together
-    # using both weighted and unweighted statistics.
-    plot_total_validation_unc(input_file = data_file,fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice)
-    add_validation_unc(model_save_loc)
-    # This then produces the total uncertainty (combine parameter, network and validation uncertainties in quadrature)
-    add_total_unc(model_save_loc)
-    # Plot the mean of the last year of the timeseries for a sanity check.
-    plot_mapped(model_save_loc)
+    # run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc)
+    #
+    # # flag_e_validation(data_file,fco2_sst = fco2_sst, prov = prov, var = var, model_save_loc = model_save_loc,bath = bath,bath_cutoff=bath_cutoff,fco2_cutoff_low=fco2_cutoff_low,
+    # #     fco2_cutoff_high = fco2_cutoff_high,unc = unc)
+    #
+    # # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
+    # # (propagated input parameter uncertainties)
+    # mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
+    # # Then we save the fCO2 data
+    # save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat)
+    # # Once saved the validation can be extracted, and used to determine the validation uncertainty for each province,
+    # # which can then be mapped. This function produces validation statistics for the training/validation, test and all data together
+    # # using both weighted and unweighted statistics.
+    # plot_total_validation_unc(input_file = data_file,fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice)
+    # add_validation_unc(model_save_loc)
+    # # This then produces the total uncertainty (combine parameter, network and validation uncertainties in quadrature)
+    # add_total_unc(model_save_loc)
+    # # Plot the mean of the last year of the timeseries for a sanity check.
+    # plot_mapped(model_save_loc)
 
 """
 Flag E valdiation needs updating to the new construct. Treat this as a independent test dataset (29/07/2023).
@@ -185,17 +185,19 @@ Need to work out why reanalysis script currently doesn't work for SOCAT2023...
 #             # print(y_test_preds)
 #             dump([y_test,y_test_preds], open(os.path.join(model_save_loc,'validation',f'prov_{v}_validation_Eflag.pkl'), 'wb'))
 
-def load_data(load_loc,vars):
+def load_data(load_loc,vars,output_loc):
     """
     Function to load the data variables into a pandas dataframe for use in the neural
     network training.
     """
+    from construct_input_netcdf import save_netcdf
     print('Loading data...')
     c = Dataset(load_loc,'r')
     lon = np.array(c.variables['longitude'][:])
     lat = np.array(c.variables['latitude'][:])
     t = 0
     # This loop cycles through the netcdf variables and loads the ones defined in vars
+    ins_save = {}
     for v in vars:
         data = np.squeeze(np.array(c.variables[v][:]))
         if t == 0:
@@ -204,7 +206,10 @@ def load_data(load_loc,vars):
             output = np.empty((d))
             output[:] = np.nan
         output[:,:,:,t] = data
+        ins_save[v] = data
         t += 1
+
+    save_netcdf(os.path.join(output_loc,'input_values.nc'),ins_save,lon,lat,output.shape[2])
     # Reshape the 3d numpy arrays into a single colum and put into a dataframe.
     for i in range(0,len(vars)):
         if i == 0:
@@ -565,13 +570,14 @@ def weighted(x,y,weights,ax,c):
     ax.text(0.02,0.95,f'Weighted Stats\nRMSD = {rmsd} $\mu$atm\nBias = {bias} $\mu$atm\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
     return h1
 
-def plot_total_validation_unc(input_file=False,fco2_sst=False,model_save_loc=False, save_file=False,fco2_cutoff_low = 50,fco2_cutoff_high = 750,ice = None,per_prov=True):
+def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=False,fco2_cutoff_low = 50,fco2_cutoff_high = 750,ice = None,per_prov=True):
     """
     Function to produce validation statistics with respect to the train/validation/test datasets. This step is extremely sensitive to the indexes used, see note below as to
     a change needed in the code to stop issues.
     DJF - need to save all the input parameters used in the neural network within the neural network folder so that issue of mismatched inputs in the construct_input_netcdf netcdf file,
     don't propagate through to the validaiton step.
     """
+    input_file = os.path.join(model_save_loc,'input_values.nc')
     # Here we create the save file names if they arent defined.
     if not save_file:
         save_file = os.path.join(model_save_loc,'plots','total_validation.png')

@@ -23,6 +23,7 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,se
     standard names.
     Here we define the cool skin deviation and calculate Tskin from Tsubskin.
     """
+    from construct_input_netcdf import append_netcdf
     print('Generating fluxengine netcdf files...')
     lon,lat = du.load_grid(input_file)
     timesteps =((end_yr-start_yr)+1)*12
@@ -43,7 +44,7 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,se
             rs = rs, rl = rl, zi = zi,start_yr=start_yr,end_yr=end_yr)
         direct['t_skin'] = direct['t_subskin'] - dt_coare
 
-
+    append_netcdf(os.path.join(model_save_loc,'input_values.nc'),direct,lon,lat,timesteps)
     direct['wind_speed_2'] = direct['wind_speed'] ** 2
     direct['wind_speed_3'] = direct['wind_speed'] ** 3
 

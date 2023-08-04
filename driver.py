@@ -82,19 +82,19 @@ if __name__ == '__main__':
     if run_neural:
         import neural_network_train as nnt
         # nnt.driver(data_file,fco2_sst = 'CCI_SST', prov = 'Watson_biome',var = ['CCI_SST_analysed_sst','NOAA_ERSL_xCO2','CMEMS_so','CMEMS_mlotst','CCI_SST_analysed_sst_anom','NOAA_ERSL_xCO2_anom','CMEMS_so_anom','CMEMS_mlotst_anom'],
-        #   model_save_loc = model_save_loc +'/',unc =[0.4,1,0.1,0.05,0.4,1,0.1,0.05],bath = 'GEBCO_elevation',bath_cutoff = None,fco2_cutoff_low = 50,fco2_cutoff_high = 750,sea_ice = 'CCI_SST_sea_ice_fraction')
-        nnt.plot_total_validation_unc(input_file = data_file,fco2_sst = 'CCI_SST',model_save_loc = model_save_loc,ice = 'CCI_SST_sea_ice_fraction')
+        #    model_save_loc = model_save_loc +'/',unc =[0.4,1,0.1,0.05,0.4,1,0.1,0.05],bath = 'GEBCO_elevation',bath_cutoff = None,fco2_cutoff_low = 50,fco2_cutoff_high = 750,sea_ice = 'CCI_SST_sea_ice_fraction')
+        nnt.plot_total_validation_unc(fco2_sst = 'CCI_SST',model_save_loc = model_save_loc,ice = 'CCI_SST_sea_ice_fraction')
     if run_flux:
         import fluxengine_driver as fl
         print('Running flux calculations....')
         #fl.GCB_remove_prov17(model_save_loc)
-        # fl.fluxengine_netcdf_create(model_save_loc,input_file = data_file,tsub='CCI_SST_analysed_sst',ws = 'CCMP_w',seaice = 'CCI_SST_sea_ice_fraction',
-        #      sal='CMEMS_so',msl = 'ERA5_msl',xCO2 = 'NOAA_ERSL_xCO2',start_yr=start_yr,end_yr=end_yr, coare_out = coare_out, tair = 'ERA5_t2m', dewair = 'ERA5_d2m',
-        #      rs = 'ERA5_msdwswrf', rl = 'ERA5_msdwlwrf', zi = 'ERA5_blh',coolskin = 'COARE3.5')
+        fl.fluxengine_netcdf_create(model_save_loc,input_file = data_file,tsub='CCI_SST_analysed_sst',ws = 'CCMP_w',seaice = 'CCI_SST_sea_ice_fraction',
+             sal='CMEMS_so',msl = 'ERA5_msl',xCO2 = 'NOAA_ERSL_xCO2',start_yr=start_yr,end_yr=end_yr, coare_out = coare_out, tair = 'ERA5_t2m', dewair = 'ERA5_d2m',
+             rs = 'ERA5_msdwswrf', rl = 'ERA5_msdwlwrf', zi = 'ERA5_blh',coolskin = 'COARE3.5')
         # fl.fluxengine_run(model_save_loc,fluxengine_config,start_yr,end_yr)
         #fl.flux_uncertainty_calc(model_save_loc,start_yr = start_yr,end_yr=end_yr)
-        fl.calc_annual_flux(model_save_loc)
-        fl.plot_example_flux(model_save_loc)
+        # fl.calc_annual_flux(model_save_loc)
+        # fl.plot_example_flux(model_save_loc)
         #import custom_flux_av.ofluxghg_flux_budgets as bud
         #bud.run_flux_budgets(indir = os.path.join(model_save_loc,'flux'),outroot=model_save_loc+'/')
 

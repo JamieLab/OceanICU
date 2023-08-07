@@ -41,9 +41,10 @@ def download_era5(loc,start_yr=1990,end_yr=2023):
             ye = ye+1
             mon = 1
 
-def era5_average(loc,outloc,start_yr=1990,end_yr=2023,res=1,var=None):
+def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None):
     du.makefolder(outloc)
-    log,lag = du.reg_grid(lon=res,lat=res)
+    #log,lag = du.reg_grid(lon=res,lat=res)
+    res = np.abs(log[0]-log[1])
     yr = start_yr
     mon = 1
     t = 0

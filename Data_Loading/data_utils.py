@@ -34,13 +34,15 @@ def oneDegreeArea(latDegrees):
     erd = earth_radius * dtor
     return erd * erd * cosLat
 
-def reg_grid(lat=1,lon=1):
+def reg_grid(lat=1,lon=1,latm = [-90,90],lonm = [-180,180]):
     """
     Definition of a regular grid of resolution in degrees. Able to specify the resolution
-    for potential future higher spatial resoltions. Defaults to 1 deg.
+    for potential future higher spatial resoltions. Defaults to 1 deg, global grid.
+    latm and lonm allows for regional grids to be constructed, i.e regular grid defined
+    between latm, lonm
     """
-    lat_g = np.arange(-90+(lat/2),90-(lat/2)+lat,lat)
-    lon_g = np.arange(-180.0+(lon/2),180-(lon/2)+lon,lon)
+    lat_g = np.arange(latm[0]+(lat/2),latm[1]-(lat/2)+lat,lat)
+    lon_g = np.arange(lonm[0]+(lon/2),lonm[1]-(lon/2)+lon,lon)
     return lon_g,lat_g
 
 def area_grid(lat=1,lon=1):

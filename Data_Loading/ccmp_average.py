@@ -14,7 +14,7 @@ import numpy as np
 def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag=''):
     du.makefolder(outloc)
     #log,lag = du.reg_grid(lon=res,lat=res)
-    res = np.round(np.abs(log[0]-log[1]))
+    res = np.abs(log[0]-log[1])
     yr = start_yr
     mon = 1
     t = 0

@@ -11,9 +11,10 @@ import os
 from netCDF4 import Dataset
 import numpy as np
 
-def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,res=1):
+def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag=''):
     du.makefolder(outloc)
-    log,lag = du.reg_grid(lon=res,lat=res)
+    #log,lag = du.reg_grid(lon=res,lat=res)
+    res = np.round(np.abs(log[0]-log[1]))
     yr = start_yr
     mon = 1
     t = 0
@@ -29,7 +30,7 @@ def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,res=1):
                 lon,lat = du.load_grid(file)
             c = Dataset(file,'r')
             va_da = np.transpose(np.squeeze(np.array(c.variables['w'][:])))
-            va_da[va_da <= 0.0] = np.nan
+            va_da[va_da < 0.0] = np.nan
             lon,va_da = du.grid_switch(lon,va_da)
             # va_da = np.log10(va_da)
             # va_da[va_da > 10] = np.nan

@@ -149,7 +149,12 @@ def netcdf_create_basic(file,var,var_name,lat,lon):
     lon_o.standard_name = 'Longitude'
     lon_o[:] = lon
     outp.close()
-
+def netcdf_append_basic(file,var,var_name):
+    outp = Dataset(file,'a',format='NETCDF4_CLASSIC')
+    sst_o = outp.createVariable(var_name,'f4',('lon','lat'))
+    sst_o[:] = var
+    outp.close()
+    
 def lon_switch(var):
     temp = np.zeros((var.shape))
     temp[:,:,0:180] = var[:,:,180:]

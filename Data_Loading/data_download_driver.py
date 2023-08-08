@@ -7,11 +7,17 @@ end_yr = 2022
 
 noaa = False
 era5 = False
-cmems = True
+cmems = False
 bicep = False
 ccmp = False
 oisst = False
 cci = False
+gebco = True
+
+if gebco:
+    import gebco_resample as ge
+    lon,lat = du.reg_grid()
+    ge.gebco_resample('D:/Data/Bathymetry/GEBCO_2023.nc',lon,lat)
 
 if noaa:
     import interpolate_noaa_ersl as noa

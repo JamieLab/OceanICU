@@ -1,2 +1,4 @@
 *.pyc
 /plots/*
+/Data_Loading/examples/*
+/Data_Loading/examples

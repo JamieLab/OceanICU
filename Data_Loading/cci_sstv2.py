@@ -88,11 +88,12 @@ def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023):
             for j in range(len(files)):
                 print(files[j])
                 c = Dataset(os.path.join(fold,files[j]),'r')
-                sst_t = np.array(c.variables['analysed_sst'][:])
+                sst_t = np.array(c.variables['analysed_sst'][:]); sst_t[sst_t < 0 ] = np.nan
                 sst_t = np.transpose(sst[0,:,:])
-                ice_t = np.array(c.variables['sea_ice_fraction'][:])
+
+                ice_t = np.array(c.variables['sea_ice_fraction'][:]); ice[ice < 0] = np.nan
                 ice_t = np.transpose(ice[0,:,:])
-                ice[ice < -0] = np.nan
+
                 c.close()
 
                 sst[:,:,j] = sst_t

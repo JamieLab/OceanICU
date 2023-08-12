@@ -62,7 +62,7 @@ def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,org
             va_da = np.transpose(np.squeeze(np.array(c.variables[var][:])))
             c.close()
             lon,va_da=du.grid_switch(lon,va_da)
-            
+
             if res > orgi_res:
                 # If we are averaging to a 1 deg grid for example then we use the grid averaging.
                 # However if the new grid is higher resolution then we need to spatially interpolate.
@@ -72,6 +72,7 @@ def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,org
                 va_da_out = du.grid_average(va_da,lo_grid,la_grid)
             else:
                 va_da_out = du.grid_interp(lon,lat,va_da,log,lag)
+                t = 1
             du.netcdf_create_basic(outfile,va_da_out,var,lag,log)
         mon = mon+1
         if mon == 13:

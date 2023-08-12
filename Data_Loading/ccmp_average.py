@@ -11,10 +11,9 @@ import os
 from netCDF4 import Dataset
 import numpy as np
 
-def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag=''):
+def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0.25):
     du.makefolder(outloc)
-    #log,lag = du.reg_grid(lon=res,lat=res)
-    res = np.abs(log[0]-log[1])
+    res = np.round(np.abs(log[0]-log[1]),2)
     yr = start_yr
     mon = 1
     t = 0
@@ -32,16 +31,18 @@ def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag=''):
             va_da = np.transpose(np.squeeze(np.array(c.variables['w'][:])))
             va_da[va_da < 0.0] = np.nan
             lon,va_da = du.grid_switch(lon,va_da)
-            # va_da = np.log10(va_da)
-            # va_da[va_da > 10] = np.nan
-            #print(va_da)
             c.close()
-            #lon,va_da=du.grid_switch(lon,va_da)
 
-            if t == 0:
-                lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
-                t = 1
-            va_da_out = du.grid_average(va_da,lo_grid,la_grid)
+            if res > orgi_res:
+                # If we are averaging to a 1 deg grid for example then we use the grid averaging.
+                # However if the new grid is higher resolution then we need to spatially interpolate.
+                if t == 0:
+                    lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
+                    t = 1
+                va_da_out = du.grid_average(va_da,lo_grid,la_grid)
+            else:
+                va_da_out = du.grid_interp(lon,lat,va_da,log,lag)
+                t=1
             du.netcdf_create_basic(outfile,va_da_out,'w',lag,log)
         mon = mon+1
         if mon == 13:

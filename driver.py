@@ -7,10 +7,12 @@ Date: 03/2023
 #This is needed or the code crashes with the reanalysis step...
 if __name__ == '__main__':
     import os
-
-    create_inp =False
+    import Data_Loading.data_utils as du
+    import sys
+    sys.path.append(os.path.join(os.getcwd(),'Data_Loading'))
+    create_inp =True
     run_neural = False
-    run_flux = True
+    run_flux = False
     plot_final = False
     coare = False
     # Vars should have each entry as [Extra_Name, netcdf_variable_name,data_location]
@@ -52,14 +54,38 @@ if __name__ == '__main__':
     data_file = 'D:/ESA_CONTRACT/neural_network_input.nc'
     fluxengine_config = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/OceanICU/fluxengine_config/fluxengine_config_night.conf'
     coare_out = 'D:/ESA_CONTRACT/coare'
+
+    model_save_loc = 'D:/ESA_CONTRACT/NN/NEW_INPUT'
     start_yr = 1985
     end_yr = 2022
+    log,lag = du.reg_grid(lat=0.1,lon=0.1,latm=[-50,-20],lonm=[-45,-5])
     if create_inp:
-        import construct_input_netcdf as cinp
-        import run_reanalysis as rean
-        cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr)
-        rean.load_prereanalysed(input_file='D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023_ESACCI.nc', output_file=data_file,
-            start_yr = start_yr,end_yr =end_yr,name='CCI_SST')
+        from neural_network_train import make_save_tree
+        make_save_tree(model_save_loc)
+        cur = os.getcwd()
+        os.chdir('Data_Loading')
+        inps = os.path.join(model_save_loc,'inputs')
+        # from Data_Loading.cmems_glorysv12_download import cmems_average
+
+        # cmems_average('D:/Data/CMEMS/SSS/MONTHLY',os.path.join(inps,'SSS'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag,variable='so')
+        # #cmems_average('D:/Data/CMEMS/MLD/MONTHLY',os.path.join(inps,'MLD'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag,variable='mlotst',log_av = True)
+        #
+        # from Data_Loading.cci_sstv2 import cci_sst_spatial_average
+        # cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',out_loc=os.path.join(inps,'SST'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag)
+        #
+        # from Data_Loading.interpolate_noaa_ersl import interpolate_noaa
+        # interpolate_noaa('D:/Data/NOAA_ERSL/2023_download.txt',grid_lon = log,grid_lat = lag,out_dir = os.path.join(inps,'xco2atm'),start_yr=start_yr,end_yr = end_yr)
+
+        from Data_Loading.ERA5_data_download import era5_average
+        era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'msl'),log=log,lag=lag,var='si10',start_yr = start_yr,end_yr =end_yr)
+        # # Assume the data has already been downloaded...
+        # Here we perform the averaging onto a regular grid defined above
+        #
+        # import construct_input_netcdf as cinp
+        # import run_reanalysis as rean
+        # cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr)
+        # rean.load_prereanalysed(input_file='D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023_ESACCI.nc', output_file=data_file,
+        #     start_yr = start_yr,end_yr =end_yr,name='CCI_SST')
 
         # #CCI SST v2.1
         # rean.reanalyse(socat_dir=socat[0],socat_files=[socat[1]],sst_dir=reanal[0][1],sst_tail=reanal[0][2],out_dir = reanal[0][3],
@@ -78,7 +104,7 @@ if __name__ == '__main__':
         # rean.reanalyse(socat_dir=socat[0],socat_files=[socat[1]],sst_dir=reanal[3][1],sst_tail=reanal[3][2],out_dir = reanal[3][3],
         #     force_reanalyse=False,start_yr = start_yr,end_yr = end_yr,outfile=data_file,name=reanal[3][0],var='analysed_sst')
 
-    model_save_loc = 'D:/ESA_CONTRACT/NN/NEW_TESTING'
+
     if run_neural:
         import neural_network_train as nnt
         # nnt.driver(data_file,fco2_sst = 'CCI_SST', prov = 'Watson_biome',var = ['CCI_SST_analysed_sst','NOAA_ERSL_xCO2','CMEMS_so','CMEMS_mlotst','CCI_SST_analysed_sst_anom','NOAA_ERSL_xCO2_anom','CMEMS_so_anom','CMEMS_mlotst_anom'],

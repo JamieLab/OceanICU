@@ -243,6 +243,9 @@ def make_save_tree(model_save_loc):
     unc = os.path.join(model_save_loc,'unc_lut')
     if not os.path.isdir(unc):
         os.mkdir(unc)
+    inputs = os.path.join(model_save_loc,'inputs')
+    if not os.path.isdir(inputs):
+        os.mkdir(inputs)
 
 def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10):
     """

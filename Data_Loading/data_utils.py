@@ -149,7 +149,7 @@ def netcdf_create_basic(file,var,var_name,lat,lon):
     lon_o.standard_name = 'Longitude'
     lon_o[:] = lon
     outp.close()
-    
+
 def netcdf_append_basic(file,var,var_name):
     outp = Dataset(file,'a',format='NETCDF4_CLASSIC')
     sst_o = outp.createVariable(var_name,'f4',('lon','lat'))
@@ -167,6 +167,19 @@ def lon_switch_2d(var):
     temp[:,0:180] = var[:,180:]
     temp[:,180:] = var[:,0:180]
     return temp
+
+def grid_interp(o_lon,o_lat,o_data,n_lon,n_lat):
+    import scipy.interpolate as interp
+    o_lon,o_lat = np.meshgrid(o_lon,o_lat)
+
+    n_lon,n_lat = np.meshgrid(n_lon,n_lat)
+    s = n_lon.shape
+    points = np.stack([o_lon.ravel(),o_lat.ravel()],-1)
+    out = interp.griddata(points,np.transpose(o_data).ravel(),(n_lon.ravel(),n_lat.ravel()))
+    out = np.transpose(out.reshape(s))
+    return out
+
+
 def inpoly2(vert, node, edge=None, ftol=5.0e-14):
     """
     INPOLY2: compute "points-in-polygon" queries.

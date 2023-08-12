@@ -26,7 +26,7 @@ class MotuOptions:
         except KeyError:
             return None
 
-def motu_option_parser(script_template, usr, pwd, output_filename,output_directory,date_min,date_max,vari):
+def motu_option_parser(script_template, usr, pwd, output_filename,output_directory,date_min,date_max,vari,product):
     dictionary = dict(
         [e.strip().partition(" ")[::2] for e in script_template.split('--')])
     #dictionary['variable'] = [value for (var, value) in [e.strip().partition(" ")[::2] for e in script_template.split('--')] if var == 'variable']  # pylint: disable=line-too-long
@@ -45,6 +45,8 @@ def motu_option_parser(script_template, usr, pwd, output_filename,output_directo
             dictionary[k] = date_min
         if v == '<DATEMAX>':
             dictionary[k] = date_max
+        if v == '<PRODUCTID>':
+            dictionary[k] = product
         if k in ['longitude-min', 'longitude-max', 'latitude-min',
                  'latitude-max', 'depth-min', 'depth-max']:
             dictionary[k] = float(v)
@@ -59,7 +61,7 @@ def script_fore():
     script_template_fore = 'python -m motuclient \
     --motu https://my.cmems-du.eu/motu-web/Motu \
     --service-id GLOBAL_MULTIYEAR_PHY_001_030-TDS \
-    --product-id cmems_mod_glo_phy_my_0.083_P1M-m \
+    --product-id <PRODUCTID> \
     --longitude-min -180 --longitude-max 180 \
     --latitude-min -90 --latitude-max 90 \
     --date-min <DATEMIN> --date-max <DATEMAX> \
@@ -67,13 +69,14 @@ def script_fore():
     --variable <VAR> \
     --out-dir <OUTPUT_DIRECTORY> --out-name <OUTPUT_FILENAME> \
     --user <USERNAME> --pwd <PASSWORD>'
-    return script_template_fore
+    product = 'cmems_mod_glo_phy_my_0.083_P1M-m'
+    return script_template_fore, product
 
-def script_aft():
+def script_aft(variable):
     script_template_nrt = 'python -m motuclient \
     --motu https://nrt.cmems-du.eu/motu-web/Motu \
     --service-id GLOBAL_ANALYSISFORECAST_PHY_001_024-TDS \
-    --product-id cmems_mod_glo_phy-so_anfc_0.083deg_P1M-m \
+    --product-id <PRODUCTID> \
     --longitude-min -180 --longitude-max 180 \
     --latitude-min -90 --latitude-max 90 \
     --date-min <DATEMIN> --date-max <DATEMAX> \
@@ -81,7 +84,17 @@ def script_aft():
     --variable <VAR> \
     --out-dir <OUTPUT_DIRECTORY> --out-name <OUTPUT_FILENAME> \
     --user <USERNAME> --pwd <PASSWORD>'
-    return script_template_nrt
+    if variable == 'thetao':
+        product = 'cmems_mod_glo_phy-thetao_anfc_0.083deg_P1M-m'
+    elif variable == 'so':
+        product = 'cmems_mod_glo_phy-so_anfc_0.083deg_P1M-m'
+    elif variable == 'uo':
+        product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1M-m'
+    elif variable == 'vo':
+        product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1M-m'
+    else:
+        product = 'cmems_mod_glo_phy_anfc_0.083deg_P1M-m'
+    return script_template_nrt,product
 
 def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
     """
@@ -107,10 +120,10 @@ def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
         print(OUTPUT_FILENAME)
         if not du.checkfileexist(os.path.join(OUTPUT_TEMP,OUTPUT_FILENAME)):
             if yr > transition_yr:
-                script_template = script_aft()
+                script_template,product = script_aft(variable)
             else:
-                script_template = script_fore()
-            data_request_options_dict_automated = motu_option_parser(script_template, USERNAME, PASSWORD, OUTPUT_FILENAME,OUTPUT_TEMP,date_min,date_max,variable)
+                script_template,product = script_fore()
+            data_request_options_dict_automated = motu_option_parser(script_template, USERNAME, PASSWORD, OUTPUT_FILENAME,OUTPUT_TEMP,date_min,date_max,variable,product)
             #print(data_request_options_dict_automated)
             motuclient.motu_api.execute_request(MotuOptions(data_request_options_dict_automated))
         mon = mon+1

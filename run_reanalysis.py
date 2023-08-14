@@ -13,6 +13,11 @@ import datetime
 from netCDF4 import Dataset
 import Data_Loading.data_utils as du
 import numpy as np
+import pandas as pd
+import multiprocessing
+
+statvariables=['fCO2_Tym','pCO2_Tym','fCO2_SST','pCO2_SST']
+
 
 def reanalyse(socat_dir=None,socat_files=None,sst_dir=None,sst_tail=None,out_dir=None,force_reanalyse=False,
     start_yr = 1990,end_yr = 2020,name = '',outfile = None, var = None):
@@ -121,3 +126,390 @@ def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020):
     fco2[fco2<0] = np.nan
     fco2_std[fco2_std<0] = np.nan
     return fco2,fco2_std
+
+def read_socat(file):
+    data=pd.read_csv(file,sep='\t',skiprows=7302)#,low_memory=False)#,usecols=list(range(3,36)))
+    lon = data['longitude [dec.deg.E]']
+    lon[lon>180] = lon[lon>180] - 360
+    data['longitude [dec.deg.E]'] = lon
+    return data
+
+def find_socat(data,lat,lon):
+    mlat = [np.min(lat),np.max(lat)]
+    print(mlat)
+    mlon = [np.min(lon),np.max(lon)]
+    print(mlon)
+    soclat = data['latitude [dec.deg.N]']
+    #print(soclat)
+    soclon = data['longitude [dec.deg.E]']
+    d = data[(soclat > mlat[0]) & (soclat < mlat[1]) & (soclon > mlon[0]) & (soclon < mlon[1])]
+    return d
+
+def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = []):
+    import custom_reanalysis.combine_nc_files as combine_nc_files
+    import glob
+    save_fold = os.path.join(save_loc,'socat')
+    du.makefolder(save_fold)
+    if du.checkfileexist(os.path.join(save_fold,'socat.tsv')):
+        data = pd.read_table(os.path.join(save_fold,'socat.tsv'),sep='\t')
+    else:
+        data = read_socat(file)
+        data = find_socat(data,latg,long)
+        data.to_csv(os.path.join(save_fold,'socat.tsv'),sep='\t')
+    #print(data)
+    print(data.columns)
+    result=np.recarray((np.array(data['yr']).size,),dtype=[('yr',np.int32),
+                                         ('mon',np.int32),
+                                         ('day', np.int32),
+                                         ('hh', np.int32),
+                                         ('mm', np.int32),
+                                         ('ss', np.int32),
+                                         ('lat',np.float64),
+                                         ('lon',np.float64),
+                                         ('SST_C',np.float64),
+                                         ('Tcl_C',np.float64),
+                                         ('fCO2_SST',np.float64),
+                                         ('fCO2_Tym',np.float64),
+                                         ('pCO2_SST',np.float64),
+                                         ('pCO2_Tym',np.float64),
+                                         ('expocode',np.dtype('O'))]);
+    result['yr']=data['yr'];
+    result['mon']=data['mon'];
+    result['day']=data['day'];
+    result['hh']=data['hh'];
+    result['mm']=data['mm'];
+    result['ss']=data['ss'];
+    result['lat']=data['latitude [dec.deg.N]']
+    result['lon']=data['longitude [dec.deg.E]']
+    result['SST_C']=data['SST [deg.C]']
+    result['Tcl_C']=data['T_reynolds [C]']
+    result['fCO2_SST']=data['fCO2rec [uatm]']
+    result['fCO2_Tym']=data['fCO2_reanalysed [uatm]']
+    result['pCO2_SST']=data['pCO2_SST [uatm]']
+    result['pCO2_Tym']=data['pCO2_reanalysed [uatm]']
+    result['expocode'] = data['Expocode']
+
+    du.makefolder(os.path.join(save_fold,'data'))
+    for yrs in set(result['yr']):
+        year_data = result[np.where(result['yr'] == yrs)]
+        for mon in set(year_data['mon']):
+            print(f'Year: {yrs} - Month: {mon}')
+            month_data = year_data[np.where(year_data['mon'] == mon)]
+            data_loc = os.path.join(save_fold,'data',"%02d"%mon)
+
+            data_loc_per = os.path.join(data_loc,'per_cruise')
+            du.makefolder(data_loc)
+            du.makefolder(data_loc_per)
+            outputfile='GL_from_%s_to_%s_%02d.nc'%(yrs,yrs,mon)
+
+            final_output_path = os.path.join(data_loc,outputfile)
+            for expo in set(month_data['expocode']):
+                print(expo)
+                output_cruise_file=os.path.join(data_loc_per,outputfile.replace('.nc','-%s.nc'%expo))
+                expo_indices=np.where(month_data['expocode']==expo)
+                expo_data=month_data[expo_indices]
+                variabledictionary=CreateBinnedData(expo_data,latg,long)
+                #print(variabledictionary)
+                half_days_in_month=15.5
+                datadate=datetime.datetime(yrs,mon,int(half_days_in_month),0,0,0)
+                # myprocess=multiprocessing.Process(target=WriteOutToNCAsGrid,args=(variabledictionary,output_cruise_file,None,long,latg,datadate))
+                # myprocess.start()
+                # myprocess.join()
+            common_prefix=outputfile.replace('.nc','')
+            cruise_files=glob.glob("%s/%s*"%(data_loc_per,common_prefix))
+            if len(cruise_files) !=0:
+               print()
+               print("Combining cruises from region, year and month: ",cruise_files)
+               print()
+               combine_nc_files.FromFilelist(filelist=cruise_files,output=final_output_path,
+                                             weighting="cruise-weighted",outputtime=datadate)
+
+               #get the binned data for the whole month to add to the nc file as other variables
+               allnewvars=CreateBinnedData(month_data,latg,long)
+               newvars={v : allnewvars[v] for v in statvariables+['stds']}
+               combine_nc_files.AddNewVariables(filename=final_output_path,newvars=newvars)
+
+def geo_idx(dd, dd_array):
+    """
+     - dd - the decimal degree (latitude or longitude)
+     - dd_array - the list of decimal degrees to search.
+     search for nearest decimal degree in an array of decimal degrees and return the index.
+     np.argmin returns the indices of minium value along an axis.
+     so subtract dd from all values in dd_array, take absolute value and find index of minium.
+
+     From: https://stackoverflow.com/questions/43777853/
+   """
+    geo_idx = (np.abs(dd_array - dd)).argmin()
+    return geo_idx
+
+def CreateBinnedData(month_data,latg,long):
+    """
+
+    """
+    import custom_reanalysis.netcdf_helper as netcdf_helper
+    #import pandas as pd;
+    #allData = pd.DataFrame(month_data);
+
+    #grid information
+    nlon = len(long) # number of longitude pixels
+    lon0 = long[0] # start longitude
+    lon1 = long[-1] # end longitude
+    nlat = len(latg) # number of latitude pixels
+    lat0 = latg[0] # start latitude
+    lat1 = latg[-1] # end latitude
+    dlon = (lon1 - lon0) / nlon
+    print(dlon)
+    dlat = (lat1 - lat0) / nlat
+    print(dlat)
+    #Set up arrays with default values
+    dTs = np.zeros((nlat,nlon))+netcdf_helper.MISSINGDATAVALUE
+    fCO2_Tyms = np.zeros((nlat,nlon))+netcdf_helper.MISSINGDATAVALUE
+    fCO2_SSTs = np.zeros((nlat,nlon))+netcdf_helper.MISSINGDATAVALUE
+    dFs = np.zeros((nlat,nlon))+netcdf_helper.MISSINGDATAVALUE
+    pCO2_Tyms = np.zeros((nlat,nlon))+netcdf_helper.MISSINGDATAVALUE
+    pCO2_SSTs = np.zeros((nlat,nlon))+netcdf_helper.MISSINGDATAVALUE
+    dPs = np.zeros((nlat,nlon))+netcdf_helper.MISSINGDATAVALUE
+    ndata = np.zeros((nlat,nlon))# keep track of multiple entries
+
+    maximums={}
+    minimums={}
+    stds={}
+    #Other data we want to keep track of
+    for var in statvariables:
+      maximums[var]=np.zeros((nlat,nlon))+netcdf_helper.MISSINGDATAVALUE
+      minimums[var]=np.zeros((nlat,nlon))+netcdf_helper.MISSINGDATAVALUE
+      stds[var]=np.zeros((nlat,nlon))+netcdf_helper.MISSINGDATAVALUE
+
+    #Calculate differences of data for this month
+    #Difference in temperature
+    dT=month_data['Tcl_C'] - month_data['SST_C']
+    #Difference in fugacity
+    dF=month_data['fCO2_Tym'] - month_data['fCO2_SST']
+    #Difference in partial pressure
+    dP=month_data['pCO2_Tym'] - month_data['pCO2_SST']
+
+    #Have changed method here as with previous one if lat data was an integer
+    #then it fell into the wrong grid cell.
+    #i.e. grid cells were 0<x<=1, 1<x<=2, ...
+    #and we wanted 0<=x<1, 1<=x<2, ...
+    #so round down to integer first, then subtract 1 [for lats only]
+    ilons = []
+    ilats = []
+    for i in range(0,len(month_data['lon'])):
+        ilons.append(geo_idx(month_data['lon'][i],long))
+        ilats.append(geo_idx(month_data['lat'][i],latg))
+    ilons = np.array(ilons); ilats = np.array(ilats);
+    #indicies where the ilons,ilats are within the grid bounds
+    w=np.where((ilons >= 0)&(ilons < nlon)&(ilats >= 0)&(ilats < nlat))
+    w=w[0]
+    if w.size==0: return
+    #update ilons,ilats to ones which fall in grid (all of them?)
+    if len(w)>1:
+      ilons, ilats = ilons[w], ilats[w]
+    else:
+      #edge case where w only has 1 element - in which case ilons/ilats are scalars not arrays
+      #to fix it we convert them to a list of 1 element
+      ilons=[ilons[0]]
+      ilats=[ilats[0]]
+    #update these data points to 0 (from -999) for all output arrays
+    dTs[ilats,ilons]=0
+    fCO2_Tyms[ilats, ilons] = 0.
+    fCO2_SSTs[ilats,ilons]=0
+    pCO2_Tyms[ilats, ilons] = 0.
+    pCO2_SSTs[ilats,ilons]=0
+    for var in statvariables:
+      maximums[var][ilats,ilons]=0
+      minimums[var][ilats,ilons]=0
+      stds[var][ilats,ilons]=0
+
+    #get a list of all the lat,lon pairs we have
+    indices=list(set(zip(ilats,ilons)))
+    for index in indices:
+      #for each index in this list find all the points that fall into that grid cell index
+      points=np.where(((ilats==index[0])&(ilons==index[1])))
+      #Now we can bin these data into the grid cell
+      fCO2_Tyms[index] += np.mean(month_data['fCO2_Tym'][points])
+      pCO2_Tyms[index] += np.mean(month_data['pCO2_Tym'][points])
+      fCO2_SSTs[index] += np.mean(month_data['fCO2_SST'][points])
+      pCO2_SSTs[index] += np.mean(month_data['pCO2_SST'][points])
+      dTs[index] += np.mean(dT[points])
+      ndata[index] += points[0].size
+
+      dFs[index]=fCO2_Tyms[index] - fCO2_SSTs[index]
+      dPs[index]=pCO2_Tyms[index] - pCO2_SSTs[index]
+      for var in statvariables:
+         maximums[var][index]=np.nanmax(month_data[var][points])
+         minimums[var][index]=np.nanmin(month_data[var][points])
+         #we use ddof=1 to get the unbiased estimator (i.e. divide by N-1 in stdev formula)
+         #unless only 1 element then set std = NAN (so that std are consistent)
+         if len(points[0])>1:
+            stds[var][index]=np.std(month_data[var][points],ddof=1)
+         else:
+            stds[var][index]=np.nan
+
+    vardict={}
+    vardict['fCO2_Tym']=fCO2_Tyms
+    vardict['pCO2_Tym']=pCO2_Tyms
+    vardict['fCO2_SST']=fCO2_SSTs
+    vardict['pCO2_SST']=pCO2_SSTs
+    vardict['dT']=dTs
+    vardict['dF']=dFs
+    vardict['dP']=dPs
+    vardict['ndata']=ndata
+    vardict['maximums']=maximums
+    vardict['minimums']=minimums
+    vardict['stds']=stds
+
+    return vardict
+
+def WriteOutToNCAsGrid(vardict,outputfile,extrapolatetoyear,long,latg,outputtime=1e9):
+    import custom_reanalysis.netcdf_helper as netcdf_helper
+    #Write out the data into a netCDF file
+    print("Writing to: %s"%outputfile)
+    #Test directory exists
+    if not os.path.exists(os.path.dirname(outputfile)):
+      raise Exception("Directory to write file to does not exist: %s"%(os.path.dirname(outputfile)))
+
+
+    #update ndata in order to put as a variable in output file
+    vardict['ndata']=np.where(vardict['ndata']==0,netcdf_helper.MISSINGDATAVALUE,vardict['ndata'])
+
+    with Dataset(outputfile, 'w', format = 'NETCDF4') as ncfile:
+      #Add the standard dims and variables
+      netcdf_helper.standard_setup_SOCAT(ncfile,timedata=outputtime,londata=long,
+                                          latdata=latg)
+      #set output names to allow extrapolation to any year or no extrapolation
+      #so that the variable names make sense in the netcdf file
+      if extrapolatetoyear is None:
+         varext=""
+         nameext=""
+      else:
+         varext="_%d"%extrapolatetoyear
+         nameext=" extrapolated to %d"%extrapolatetoyear
+
+      #Add the newly calculated fugacity, partial pressures and differences
+      fCO2_SST_data = ncfile.createVariable('fCO2_SST','f4',('time','latitude','longitude'),fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      fCO2_SST_data[:] = vardict['fCO2_SST']
+      fCO2_SST_data.units = 'uatm'
+      fCO2_SST_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      fCO2_SST_data.valid_min = 0.
+      fCO2_SST_data.valid_max = 1e6
+      fCO2_SST_data.scale_factor = 1.
+      fCO2_SST_data.add_offset = 0.
+      fCO2_SST_data.standard_name = "fCO2_SST"
+      fCO2_SST_data.long_name = "CO2 fugacity using SOCAT methodology"
+
+      fCO2_Tym_data = ncfile.createVariable('fCO2_Tym'+varext,'f4',('time','latitude','longitude'),fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      fCO2_Tym_data[:] = vardict['fCO2_Tym']
+      fCO2_Tym_data.units = 'uatm'
+      fCO2_Tym_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      fCO2_Tym_data.valid_min = 0.
+      fCO2_Tym_data.valid_max = 1e6
+      fCO2_Tym_data.scale_factor = 1.
+      fCO2_Tym_data.add_offset = 0.
+      fCO2_Tym_data.standard_name = "fCO2_Tym"+varext
+      fCO2_Tym_data.long_name = "CO2 fugacity using OC-FLUX methodology"+nameext
+
+      pCO2_SST_data = ncfile.createVariable('pCO2_SST','f4',('time','latitude','longitude'),fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      pCO2_SST_data[:] = vardict['pCO2_SST']
+      pCO2_SST_data.units = 'uatm'
+      pCO2_SST_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      pCO2_SST_data.valid_min = 0.
+      pCO2_SST_data.valid_max = 1e6
+      pCO2_SST_data.scale_factor = 1.
+      pCO2_SST_data.add_offset = 0.
+      pCO2_SST_data.standard_name = "pCO2_SST"
+      pCO2_SST_data.long_name = "CO2 partial pressure using SOCAT methodology"
+
+      pCO2_Tym_data = ncfile.createVariable('pCO2_Tym'+varext,'f4',('time','latitude','longitude'),fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      pCO2_Tym_data[:] = vardict['pCO2_Tym']
+      pCO2_Tym_data.units = 'uatm'
+      pCO2_Tym_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      pCO2_Tym_data.valid_min = 0.
+      pCO2_Tym_data.valid_max = 1e6
+      pCO2_Tym_data.scale_factor = 1.
+      pCO2_Tym_data.add_offset = 0.
+      pCO2_Tym_data.standard_name = "pCO2_Tym"+varext
+      pCO2_Tym_data.long_name = "CO2 partial pressure using OC-FLUX methodology"+nameext
+
+      dT_data = ncfile.createVariable('dT','f4',('time','latitude','longitude'),fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      dT_data[:] = vardict['dT']
+      dT_data.units = 'Degree C'
+      dT_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      dT_data.valid_min = -999.
+      dT_data.valid_max = 999.
+      dT_data.scale_factor = 1.
+      dT_data.add_offset = 0.
+      dT_data.standard_name = "dT"
+      dT_data.long_name = "difference Tym - SST"
+
+      dfCO2_data = ncfile.createVariable('dfCO2','f4',('time','latitude','longitude'),fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      dfCO2_data[:] = vardict['dF']
+      dfCO2_data.units = 'uatm'
+      dfCO2_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      dfCO2_data.valid_min = -999.
+      dfCO2_data.valid_max = 999.
+      dfCO2_data.scale_factor = 1.
+      dfCO2_data.add_offset = 0.
+      dfCO2_data.standard_name = "dfCO2"
+      dfCO2_data.long_name = "difference fCO2,Tym - fCO2,SST"
+
+      dpCO2_data = ncfile.createVariable('dpCO2','f4',('time','latitude','longitude'),fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      dpCO2_data[:] = vardict['dP']
+      dpCO2_data.units = 'uatm'
+      dpCO2_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      dpCO2_data.valid_min = -999.
+      dpCO2_data.valid_max = 999.
+      dpCO2_data.scale_factor = 1.
+      dpCO2_data.add_offset = 0.
+      dpCO2_data.standard_name = "dpCO2"
+      dpCO2_data.long_name = "difference pCO2,Tym - pCO2,SST"
+
+      N_data = ncfile.createVariable('count_nobs','f4',('time','latitude','longitude'),fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      N_data[:] = vardict['ndata']
+      N_data.units = 'count'
+      N_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      N_data.valid_min = 0.
+      N_data.valid_max = 10000000.
+      N_data.scale_factor = 1.
+      N_data.add_offset = 0.
+      N_data.standard_name = "count_nobs"
+      N_data.long_name = "Number of observations mean-averaged in cell"
+
+      for var in statvariables:
+         if var in ['fCO2_Tym','pCO2_Tym']:
+            stats_varext=varext
+         else:
+            stats_varext=""
+         minf_data = ncfile.createVariable('min_'+var+stats_varext,'f4',('time','latitude','longitude'),fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+         minf_data[:] = vardict['minimums'][var]
+         minf_data.units = 'uatm'
+         minf_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+         minf_data.valid_min = 0.
+         minf_data.valid_max = 1000000.
+         minf_data.scale_factor = 1.
+         minf_data.add_offset = 0.
+         minf_data.standard_name = "min_"+var+stats_varext
+         minf_data.long_name = "Minimum "+var+stats_varext+" occupying binned cell"
+
+         maxf_data = ncfile.createVariable('max_'+var+stats_varext,'f4',('time','latitude','longitude'),fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+         maxf_data[:] = vardict['maximums'][var]
+         maxf_data.units = 'uatm'
+         maxf_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+         maxf_data.valid_min = 0.
+         maxf_data.valid_max = 1000000.
+         maxf_data.scale_factor = 1.
+         maxf_data.add_offset = 0.
+         maxf_data.standard_name = "max_"+var+stats_varext
+         maxf_data.long_name = "Maximum "+var+stats_varext+" occupying binned cell"
+
+         stdf_data = ncfile.createVariable('std_'+var+stats_varext,'f4',('time','latitude','longitude'),fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+         stdf_data[:] = vardict['stds'][var]
+         stdf_data.units = 'uatm'
+         stdf_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+         stdf_data.valid_min = 0.
+         stdf_data.valid_max = 1000000.
+         stdf_data.scale_factor = 1.
+         stdf_data.add_offset = 0.
+         stdf_data.standard_name = "stdev_"+var+stats_varext
+         stdf_data.long_name = "Standard deviation of "+var+stats_varext+" occupying binned cell"

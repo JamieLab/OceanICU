@@ -76,8 +76,11 @@ if __name__ == '__main__':
         # from Data_Loading.interpolate_noaa_ersl import interpolate_noaa
         # interpolate_noaa('D:/Data/NOAA_ERSL/2023_download.txt',grid_lon = log,grid_lat = lag,out_dir = os.path.join(inps,'xco2atm'),start_yr=start_yr,end_yr = end_yr)
 
-        from Data_Loading.ERA5_data_download import era5_average
-        era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'msl'),log=log,lag=lag,var='si10',start_yr = start_yr,end_yr =end_yr)
+        # from Data_Loading.ERA5_data_download import era5_average
+        # era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'msl'),log=log,lag=lag,var='si10',start_yr = start_yr,end_yr =end_yr)
+
+        import run_reanalysis as rean
+        rean.regrid_fco2_data('D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv',latg=lag,long=log,save_loc=inps)
         # # Assume the data has already been downloaded...
         # Here we perform the averaging onto a regular grid defined above
         #

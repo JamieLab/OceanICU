@@ -35,7 +35,7 @@ def oneDegreeArea(latDegrees):
     erd = earth_radius * dtor
     return erd * erd * cosLat
 
-def reg_grid(lat=1,lon=1,latm = [-90,90],lonm = [-180,180]):
+def reg_grid(lat=1,lon=1,latm = [-90,90],lonm = [-180,180],pad = False):
     """
     Definition of a regular grid of resolution in degrees. Able to specify the resolution
     for potential future higher spatial resoltions. Defaults to 1 deg, global grid.
@@ -44,6 +44,11 @@ def reg_grid(lat=1,lon=1,latm = [-90,90],lonm = [-180,180]):
     """
     lat_g = np.arange(latm[0]+(lat/2),latm[1]-(lat/2)+lat,lat)
     lon_g = np.arange(lonm[0]+(lon/2),lonm[1]-(lon/2)+lon,lon)
+
+    if pad:
+        lat_g = lat_g - (lat/2); lat_g = np.append(lat_g,latm[1])
+        lon_g = lon_g - (lon/2)
+
     return lon_g,lat_g
 
 def area_grid(lat=1,lon=1):
@@ -86,7 +91,14 @@ def grid_average(var,lo_grid,la_grid):
             if (la_grid[j][0].size == 0) or (lo_grid[i][0].size == 0):
                 var_o[i,j] = np.nan
             else:
-                var_o[i,j] = np.nanmean(var[lo_grid[i],la_grid[j]])
+                # print(lo_grid[i][0])
+                # print(la_grid[j][0])
+                temp_lo,temp_la = np.meshgrid(lo_grid[i],la_grid[j])
+                temp_lo = temp_lo.ravel(); temp_la = temp_la.ravel()
+                # print(temp_lo)
+                # print(temp_la)
+                # print(var[temp_lo,temp_la])
+                var_o[i,j] = np.nanmean(var[temp_lo,temp_la])
     return var_o
 
 def grid_switch(lon,var):

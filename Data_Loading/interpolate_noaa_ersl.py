@@ -51,7 +51,8 @@ def interpolate_noaa(file,lat=1,lon=1,grid_lat=[],grid_lon=[],grid_time=[],out_d
         out = np.matlib.repmat(interp_vals[:,i],len(grid_lon),1)
         #print(out.shape)
         file_o = os.path.join(out_dir,date_ti[i].strftime('%Y'),date_ti[i].strftime('%Y_%m_NOAA_ERSL_xCO2.nc'))
-        du.netcdf_create_basic(file_o,out,'xCO2',grid_lat_vec,grid_lon)
+        if du.checkfileexist(file_o) == 0:
+            du.netcdf_create_basic(file_o,out,'xCO2',grid_lat_vec,grid_lon)
     if (end_yr != []):
         print('Extending data beyond NOAA ERSL end year! End year = ' + date_ti[-1].strftime('%Y'))
         yr = int(date_ti[-1].strftime('%Y')) + 1

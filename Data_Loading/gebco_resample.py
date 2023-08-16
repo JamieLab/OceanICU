@@ -3,10 +3,13 @@ from netCDF4 import Dataset
 import numpy as np
 import data_utils as du
 
-def gebco_resample(file,log,lag):
-    res = np.abs(log[0] - log[1])
-    file_p = file.split('.')
-    file_o = file_p[0] + f'_{res}_deg.' + file_p[1]
+def gebco_resample(file,log,lag,save_loc = False):
+    res = np.round(np.abs(log[0]-log[1]),2)
+    if not save_loc:
+        file_p = file.split('.')
+        file_o = file_p[0] + f'_{res}_deg.' + file_p[1]
+    else:
+        file_o = save_loc
 
     print(file_o)
 

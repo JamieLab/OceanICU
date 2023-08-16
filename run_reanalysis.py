@@ -86,7 +86,7 @@ def append_to_file(output_file,fco2,fco2_std,name,socat_files):
     var_o.created_from = socat_files
     c.close()
 
-def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020):
+def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GLO-1M-100-SOCAT-CONV.nc'):
     """
     Function to iteratively load the fCO2sw from the reanalysis folder (i.e one netcdf per month_year combo)
     """
@@ -98,7 +98,7 @@ def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020):
     inits = 0
     while yr <= end_yr:
         da = datetime.datetime(yr,mon,1)
-        loc = os.path.join(rean_dir,'reanalysed_global',da.strftime('%m'),da.strftime('%Y%m01-OCF-CO2-GLO-1M-100-SOCAT-CONV.nc'))
+        loc = os.path.join(rean_dir,'reanalysed_global',da.strftime('%m'),da.strftime(prefix))
         print(loc)
         if du.checkfileexist(loc):
             #print('True')
@@ -195,7 +195,7 @@ def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = []):
         for mon in set(year_data['mon']):
             print(f'Year: {yrs} - Month: {mon}')
             month_data = year_data[np.where(year_data['mon'] == mon)]
-            data_loc = os.path.join(save_fold,'data',"%02d"%mon)
+            data_loc = os.path.join(save_fold,'reanalysed_global',"%02d"%mon)
 
             data_loc_per = os.path.join(data_loc,'per_cruise')
             du.makefolder(data_loc)
@@ -212,9 +212,9 @@ def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = []):
                 #print(variabledictionary)
                 half_days_in_month=15.5
                 datadate=datetime.datetime(yrs,mon,int(half_days_in_month),0,0,0)
-                # myprocess=multiprocessing.Process(target=WriteOutToNCAsGrid,args=(variabledictionary,output_cruise_file,None,long,latg,datadate))
-                # myprocess.start()
-                # myprocess.join()
+                myprocess=multiprocessing.Process(target=WriteOutToNCAsGrid,args=(variabledictionary,output_cruise_file,None,long,latg,datadate))
+                myprocess.start()
+                myprocess.join()
             common_prefix=outputfile.replace('.nc','')
             cruise_files=glob.glob("%s/%s*"%(data_loc_per,common_prefix))
             if len(cruise_files) !=0:

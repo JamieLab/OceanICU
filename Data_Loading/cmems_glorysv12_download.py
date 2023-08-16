@@ -133,7 +133,7 @@ def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
 
 def cmems_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable='',log_av=False):
     du.makefolder(outloc)
-    res = np.abs(log[0] - log[1])
+    res = np.round(np.abs(log[0]-log[1]),2)
     #log,lag = du.reg_grid(lon=res,lat=res)
     yr = start_yr
     mon = 1

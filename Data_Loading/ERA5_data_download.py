@@ -55,8 +55,8 @@ def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,org
         file = os.path.join(loc,str(yr),str(yr)+'_'+du.numstr(mon)+'_ERA5.nc')
         outfile = os.path.join(outloc,str(yr),str(yr)+'_'+du.numstr(mon)+f'_ERA5_{var}_'+str(res)+'_deg.nc')
         if du.checkfileexist(file) and not du.checkfileexist(outfile):
-            if t == 0:
-                lon,lat = du.load_grid(file)
+            #if t == 0:
+            lon,lat = du.load_grid(file)
 
             c = Dataset(file,'r')
             va_da = np.transpose(np.squeeze(np.array(c.variables[var][:])))
@@ -73,6 +73,7 @@ def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,org
             else:
                 va_da_out = du.grid_interp(lon,lat,va_da,log,lag)
                 t = 1
+            #print(va_da_out)
             du.netcdf_create_basic(outfile,va_da_out,var,lag,log)
         mon = mon+1
         if mon == 13:

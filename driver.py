@@ -58,54 +58,38 @@ if __name__ == '__main__':
     model_save_loc = 'D:/ESA_CONTRACT/NN/NEW_INPUT'
     start_yr = 1985
     end_yr = 2022
-    log,lag = du.reg_grid(lat=0.1,lon=0.1,latm=[-50,-20],lonm=[-45,-5])
+    log,lag = du.reg_grid(lat=0.1,lon=0.1,latm=[-55,-30],lonm=[-70,-50])
     if create_inp:
         from neural_network_train import make_save_tree
         make_save_tree(model_save_loc)
         cur = os.getcwd()
         os.chdir('Data_Loading')
         inps = os.path.join(model_save_loc,'inputs')
-        # from Data_Loading.cmems_glorysv12_download import cmems_average
+        from Data_Loading.cmems_glorysv12_download import cmems_average
 
-        # cmems_average('D:/Data/CMEMS/SSS/MONTHLY',os.path.join(inps,'SSS'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag,variable='so')
-        # #cmems_average('D:/Data/CMEMS/MLD/MONTHLY',os.path.join(inps,'MLD'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag,variable='mlotst',log_av = True)
+        cmems_average('D:/Data/CMEMS/SSS/MONTHLY',os.path.join(inps,'SSS'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag,variable='so')
+        cmems_average('D:/Data/CMEMS/MLD/MONTHLY',os.path.join(inps,'MLD'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag,variable='mlotst',log_av = True)
         #
-        # from Data_Loading.cci_sstv2 import cci_sst_spatial_average
-        # cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',out_loc=os.path.join(inps,'SST'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag)
+        from Data_Loading.cci_sstv2 import cci_sst_spatial_average
+        cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',out_loc=os.path.join(inps,'SST'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag)
         #
-        # from Data_Loading.interpolate_noaa_ersl import interpolate_noaa
-        # interpolate_noaa('D:/Data/NOAA_ERSL/2023_download.txt',grid_lon = log,grid_lat = lag,out_dir = os.path.join(inps,'xco2atm'),start_yr=start_yr,end_yr = end_yr)
+        from Data_Loading.interpolate_noaa_ersl import interpolate_noaa
+        interpolate_noaa('D:/Data/NOAA_ERSL/2023_download.txt',grid_lon = log,grid_lat = lag,out_dir = os.path.join(inps,'xco2atm'),start_yr=start_yr,end_yr = end_yr)
 
-        # from Data_Loading.ERA5_data_download import era5_average
-        # era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'msl'),log=log,lag=lag,var='si10',start_yr = start_yr,end_yr =end_yr)
+        from Data_Loading.ERA5_data_download import era5_average
+        era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'msl'),log=log,lag=lag,var='msl',start_yr = start_yr,end_yr =end_yr)
+        era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'blh'),log=log,lag=lag,var='blh',start_yr = start_yr,end_yr =end_yr)
+        era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'d2m'),log=log,lag=lag,var='d2m',start_yr = start_yr,end_yr =end_yr)
+        era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'t2m'),log=log,lag=lag,var='t2m',start_yr = start_yr,end_yr =end_yr)
+        era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'msdwlwrf'),log=log,lag=lag,var='msdwlwrf',start_yr = start_yr,end_yr =end_yr)
+        era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'msdwswrf'),log=log,lag=lag,var='msdwswrf',start_yr = start_yr,end_yr =end_yr)
+
+        import Data_Loading.gebco_resample as ge
+        ge.gebco_resample('D:/Data/Bathymetry/GEBCO_2023.nc',log,lag,save_loc = os.path.join(inps,'bath'))
 
         import run_reanalysis as rean
         rean.regrid_fco2_data('D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv',latg=lag,long=log,save_loc=inps)
-        # # Assume the data has already been downloaded...
-        # Here we perform the averaging onto a regular grid defined above
-        #
-        # import construct_input_netcdf as cinp
-        # import run_reanalysis as rean
-        # cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr)
-        # rean.load_prereanalysed(input_file='D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023_ESACCI.nc', output_file=data_file,
-        #     start_yr = start_yr,end_yr =end_yr,name='CCI_SST')
 
-        # #CCI SST v2.1
-        # rean.reanalyse(socat_dir=socat[0],socat_files=[socat[1]],sst_dir=reanal[0][1],sst_tail=reanal[0][2],out_dir = reanal[0][3],
-        #     force_reanalyse=False,start_yr = start_yr,end_yr = end_yr,outfile=data_file,name=reanal[0][0],var='analysed_sst')
-        # rean.reanalyse(socat_dir=socatflagE[0],socat_files=[socatflagE[1]],sst_dir=reanal[0][1],sst_tail=reanal[0][2],out_dir = reanal[0][3]+'_FlagE',
-        #     force_reanalyse=False,start_yr = start_yr,end_yr = end_yr,outfile=data_file,name=reanal[0][0]+'_FlagE',var='analysed_sst')
-        #OISST v2.1
-        # rean.reanalyse(socat_dir=socat[0],socat_files=[socat[1]],sst_dir=reanal[1][1],sst_tail=reanal[1][2],out_dir = reanal[1][3],
-        #     force_reanalyse=False,start_yr = start_yr,end_yr = end_yr,outfile=data_file,name=reanal[1][0],var='sst')
-        # rean.reanalyse(socat_dir=socatflagE[0],socat_files=[socatflagE[1]],sst_dir=reanal[1][1],sst_tail=reanal[1][2],out_dir = reanal[1][3]+'_FlagE',
-        #     force_reanalyse=False,start_yr = start_yr,end_yr = end_yr,outfile=data_file,name=reanal[1][0]+'_FlagE',var='sst')
-
-        # rean.reanalyse(socat_dir=socat[0],socat_files=[socat[1]],sst_dir=reanal[2][1],sst_tail=reanal[2][2],out_dir = reanal[2][3],
-        #     force_reanalyse=False,start_yr = start_yr,end_yr = end_yr,outfile=data_file,name=reanal[2][0],var='analysed_sst')
-        #
-        # rean.reanalyse(socat_dir=socat[0],socat_files=[socat[1]],sst_dir=reanal[3][1],sst_tail=reanal[3][2],out_dir = reanal[3][3],
-        #     force_reanalyse=False,start_yr = start_yr,end_yr = end_yr,outfile=data_file,name=reanal[3][0],var='analysed_sst')
 
 
     if run_neural:

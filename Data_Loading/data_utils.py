@@ -9,6 +9,7 @@ import datetime
 import os
 from netCDF4 import Dataset
 import numpy as np
+import scipy.interpolate as interp
 
 def load_netcdf_var(file, variable):
     """
@@ -169,7 +170,7 @@ def lon_switch_2d(var):
     return temp
 
 def grid_interp(o_lon,o_lat,o_data,n_lon,n_lat):
-    import scipy.interpolate as interp
+
     o_lon,o_lat = np.meshgrid(o_lon,o_lat)
 
     n_lon,n_lat = np.meshgrid(n_lon,n_lat)

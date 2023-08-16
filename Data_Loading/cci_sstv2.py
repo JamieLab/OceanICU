@@ -111,7 +111,7 @@ def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023):
 
 def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_yr=2023,out_loc='',log='',lag=''):
     du.makefolder(out_loc)
-    res = np.abs(log[0] - log[1])
+    res = np.round(np.abs(log[0]-log[1]),2)
     if start_yr < 1981:
         ye = 1981
         mon= 9

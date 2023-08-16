@@ -60,6 +60,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
         tabl[tabl[sea_ice] > 0.95] = np.nan
 
     mapping_data = tabl
+    print(mapping_data)
     # Where the std_dev is 0 but an fCO2 value exists indicates a single cruise. So we input a stddev of 0 for
     # these values, so then we can combine the measurement unc (assumed to be ~5uatm from Bakker et al. 2016) later.
     tabl[vars[1]][((np.isnan(tabl[vars[0]]) == 0) & (np.isnan(tabl[vars[1]]) == 1))] = 0
@@ -94,25 +95,25 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     for v in np.unique(tabl[vars[2]]):
         print(str(v) + ' : '+str(np.argwhere(np.array(tabl[vars[2]]) == v).shape))
 
-    # run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc)
-    #
-    # # flag_e_validation(data_file,fco2_sst = fco2_sst, prov = prov, var = var, model_save_loc = model_save_loc,bath = bath,bath_cutoff=bath_cutoff,fco2_cutoff_low=fco2_cutoff_low,
-    # #     fco2_cutoff_high = fco2_cutoff_high,unc = unc)
-    #
-    # # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
-    # # (propagated input parameter uncertainties)
-    # mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
-    # # Then we save the fCO2 data
-    # save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat)
-    # # Once saved the validation can be extracted, and used to determine the validation uncertainty for each province,
-    # # which can then be mapped. This function produces validation statistics for the training/validation, test and all data together
-    # # using both weighted and unweighted statistics.
-    # plot_total_validation_unc(input_file = data_file,fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice)
-    # add_validation_unc(model_save_loc)
-    # # This then produces the total uncertainty (combine parameter, network and validation uncertainties in quadrature)
-    # add_total_unc(model_save_loc)
-    # # Plot the mean of the last year of the timeseries for a sanity check.
-    # plot_mapped(model_save_loc)
+    #run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc)
+
+    # flag_e_validation(data_file,fco2_sst = fco2_sst, prov = prov, var = var, model_save_loc = model_save_loc,bath = bath,bath_cutoff=bath_cutoff,fco2_cutoff_low=fco2_cutoff_low,
+    #     fco2_cutoff_high = fco2_cutoff_high,unc = unc)
+
+    # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
+    # (propagated input parameter uncertainties)
+    #mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
+    # Then we save the fCO2 data
+    #save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat)
+    # Once saved the validation can be extracted, and used to determine the validation uncertainty for each province,
+    # which can then be mapped. This function produces validation statistics for the training/validation, test and all data together
+    # using both weighted and unweighted statistics.
+    plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov)
+    add_validation_unc(model_save_loc,prov)
+    # This then produces the total uncertainty (combine parameter, network and validation uncertainties in quadrature)
+    add_total_unc(model_save_loc)
+    # Plot the mean of the last year of the timeseries for a sanity check.
+    plot_mapped(model_save_loc)
 
 """
 Flag E valdiation needs updating to the new construct. Treat this as a independent test dataset (29/07/2023).
@@ -573,7 +574,7 @@ def weighted(x,y,weights,ax,c):
     ax.text(0.02,0.95,f'Weighted Stats\nRMSD = {rmsd} $\mu$atm\nBias = {bias} $\mu$atm\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
     return h1
 
-def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=False,fco2_cutoff_low = 50,fco2_cutoff_high = 750,ice = None,per_prov=True):
+def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=False,fco2_cutoff_low = 50,fco2_cutoff_high = 750,ice = None,per_prov=True,prov = None):
     """
     Function to produce validation statistics with respect to the train/validation/test datasets. This step is extremely sensitive to the indexes used, see note below as to
     a change needed in the code to stop issues.
@@ -616,8 +617,8 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     soc[soc > fco2_cutoff_high] = np.nan
 
     # Load the provinces so we can do the per province evaluation for the validation uncertainty.
-    c = Dataset(os.path.join(model_save_loc,'networks','biomes.nc'))
-    prov = c.variables['prov'][:]
+    c = Dataset(input_file,'r')
+    prov = c.variables[prov][:]
     prov = np.reshape(prov,(-1,1))
     c.close()
 
@@ -723,14 +724,14 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     if per_prov:
         fig2.savefig(save_file_p,format='png',dpi=300)
 
-def add_validation_unc(model_save_loc):
+def add_validation_unc(model_save_loc,prov):
     """
     Function to take the independent test rmsd values produced in plot_total_validation_unc and produce a array within the output netcdf
     with the validation uncertainity for each province mapped
     """
     # Load the province data
-    c = Dataset(os.path.join(model_save_loc,'networks','biomes.nc'))
-    prov = c.variables['prov'][:]
+    c = Dataset(os.path.join(model_save_loc,'input_values.nc'))
+    prov = c.variables[prov][:]
     s = prov.shape
     prov = np.reshape(prov,(-1,1))
     c.close()
@@ -740,7 +741,10 @@ def add_validation_unc(model_save_loc):
     val_unc = np.zeros((prov.shape))
     val_unc[:] = np.nan
     for v in range(0,val.shape[0]):
-        val_unc[prov == v+1] = val[v,1] # For each province we put the validaiton RMSD as the value...
+        if val.shape[0] == 2:
+            val_unc[prov == v+1] = val[1]
+        else:
+            val_unc[prov == v+1] = val[v,1] # For each province we put the validaiton RMSD as the value...
     val_unc = np.reshape(val_unc,s)
 
     # Need to add a check if the fCO2_val_unc variable has been created already - if it has we just overwrite with the new data...

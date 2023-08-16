@@ -207,3 +207,10 @@ def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False):
         else:
             var_o = c.createVariable(var,'f4',('longitude','latitude','time'))#,**copts)
             var_o[:] = direct[var]
+
+def single_province(save_loc,var,lon,lat,start_yr,end_yr):
+    timesteps =((end_yr-start_yr)+1)*12
+    prov = np.ones((len(lon),len(lat),timesteps))
+    direct = {}
+    direct[var] = prov
+    append_netcdf(save_loc,direct,lon,lat,timesteps)

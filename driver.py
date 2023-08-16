@@ -10,39 +10,11 @@ if __name__ == '__main__':
     import Data_Loading.data_utils as du
     import sys
     sys.path.append(os.path.join(os.getcwd(),'Data_Loading'))
-    create_inp =True
-    run_neural = False
+    create_inp =False
+    run_neural = True
     run_flux = False
     plot_final = False
     coare = False
-    # Vars should have each entry as [Extra_Name, netcdf_variable_name,data_location]
-    # vars = [['CCI_OC','chlor_a','D:/Data/OC-CCI/monthly/chlor_a/1DEG']]
-    vars = [['CCI_SST','analysed_sst','D:/Data/SST-CCI/MONTHLY_1DEG',1]
-        ,['CCI_SSTv3','analysed_sst','D:/Data/SST-CCI/v3/MONTHLY_1_DEG',1]
-        ,['NOAA_ERSL','xCO2','D:/Data/NOAA_ERSL/DATA/MONTHLY',1]
-        ,['CCI_OC','chlor_a','D:/Data/OC-CCI/monthly/chlor_a/1DEG',0]
-        ,['CCI_SST','sea_ice_fraction','D:/Data/SST-CCI/MONTHLY_1DEG',0]
-        ,['CCI_SSTv3','sea_ice_fraction','D:/Data/SST-CCI/v3/MONTHLY_1_DEG',0]
-        ,['OI_SST','sst','D:/Data/OISSTv2_1/monthly',1]
-        ,['GEBCO','elevation','D:/Data/Bathymetry/LOWER_RES',0]
-        ,['PROV','longhurst','D:/Data/Longhurst',0]
-        ,['ERA5','si10','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['ERA5','msl','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['CMEMS','so','D:/Data/CMEMS/SSS/MONTHLY/1DEG',1]
-        ,['CMEMS','mlotst','D:/Data/CMEMS/MLD/MONTHLY/1DEG',1]
-        ,['ERA5','blh','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['ERA5','d2m','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['ERA5','t2m','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['ERA5','msdwlwrf','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['ERA5','msdwswrf','D:/Data/ERA5/MONTHLY/1DEG',0]
-        ,['Takahashi','taka','D:/Data/Takahashi_Clim/monthly',0]
-        ,['BICEP','pp','D:/Data/BICEP/marine_primary_production/v4.2/monthly/1DEG',0]
-        ,['BICEP','POC','D:/Data/BICEP/particulate_organic_carbon/v5.0/monthly/GEO/1DEG',0]
-        ,['BICEP','EP_Dunne','D:/Data/BICEP/oceanic_export_production/v1.0/monthly/1DEG',0]
-        ,['BICEP','EP_Li','D:/Data/BICEP/oceanic_export_production/v1.0/monthly/1DEG',0]
-        ,['BICEP','EP_Henson','D:/Data/BICEP/oceanic_export_production/v1.0/monthly/1DEG',0]
-        ,['Watson','biome','C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/GCB_Submission_Watsonetal/GCB_Dan_Ford/output/networks/monthly',0]
-        ,['CCMP','w','D:/Data/CCMP/v3.0/monthly/1DEG',0]]
 
     reanal = [['CCI_SST','D:/Data/SST-CCI/MONTHLY_1DEG', '_ESA_CCI_MONTHLY_SST_1_DEG.nc','D:/ESA_CONTRACT/reanalysis/SST_CCI_S2023'],
         ['OI_SST','D:/Data/OISSTv2_1/monthly', '_OISSTv2.nc','D:/ESA_CONTRACT/reanalysis/OI_SST_S2023'],
@@ -61,9 +33,7 @@ if __name__ == '__main__':
     start_yr = 1985
     end_yr = 2022
     log,lag = du.reg_grid(lat=0.1,lon=0.1,latm=[-55,-30],lonm=[-70,-50])
-    #log,lag = du.reg_grid(lat=1,lon=1,pad=False)
-    # print(log)
-    # print(lag)
+
     if create_inp:
         from neural_network_train import make_save_tree
         make_save_tree(model_save_loc)
@@ -96,6 +66,7 @@ if __name__ == '__main__':
         socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
         # rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps)
         import construct_input_netcdf as cinp
+        #Vars should have each entry as [Extra_Name, netcdf_variable_name,data_location,produce_anomaly]
         vars = [['CCI_SST','analysed_sst',os.path.join(inps,'SST','%Y','%Y%m*.nc'),1]
         ,['CCI_SST','sea_ice_fraction',os.path.join(inps,'SST','%Y','%Y%m*.nc'),1]
         ,['NOAA_ERSL','xCO2',os.path.join(inps,'xco2atm','%Y','%Y_%m*.nc'),1]
@@ -105,18 +76,18 @@ if __name__ == '__main__':
         ,['ERA5','msdwswrf',os.path.join(inps,'msdwswrf','%Y','%Y_%m*.nc'),0]
         ,['ERA5','msl',os.path.join(inps,'msl','%Y','%Y_%m*.nc'),0]
         ,['ERA5','t2m',os.path.join(inps,'t2m','%Y','%Y_%m*.nc'),0]
-        ,['CMEMS','so',os.path.join(inps,'SAL','%Y','%Y_%m*.nc'),1]
+        ,['CMEMS','so',os.path.join(inps,'SSS','%Y','%Y_%m*.nc'),1]
         ,['CMEMS','mlotst',os.path.join(inps,'MLD','%Y','%Y_%m*.nc'),1]
         ]
-        #cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr,lon = log,lat = lag)
+        cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr,lon = log,lat = lag)
         rean.reanalyse(name='CCI-SST',out_dir=os.path.join(inps,'socat'),outfile = data_file,start_yr = start_yr,end_yr = end_yr,prefix = 'GL_from_%Y_to_%Y_%m.nc',socat_files = [socat_file],flip = False)
-        
+        cinp.single_province(data_file,'si_prov',log,lag,start_yr,end_yr)
 
     if run_neural:
         import neural_network_train as nnt
-        # nnt.driver(data_file,fco2_sst = 'CCI_SST', prov = 'Watson_biome',var = ['CCI_SST_analysed_sst','NOAA_ERSL_xCO2','CMEMS_so','CMEMS_mlotst','CCI_SST_analysed_sst_anom','NOAA_ERSL_xCO2_anom','CMEMS_so_anom','CMEMS_mlotst_anom'],
-        #    model_save_loc = model_save_loc +'/',unc =[0.4,1,0.1,0.05,0.4,1,0.1,0.05],bath = 'GEBCO_elevation',bath_cutoff = None,fco2_cutoff_low = 50,fco2_cutoff_high = 750,sea_ice = 'CCI_SST_sea_ice_fraction')
-        nnt.plot_total_validation_unc(fco2_sst = 'CCI_SST',model_save_loc = model_save_loc,ice = 'CCI_SST_sea_ice_fraction')
+        nnt.driver(data_file,fco2_sst = 'CCI-SST', prov = 'si_prov',var = ['CCI_SST_analysed_sst','NOAA_ERSL_xCO2','CMEMS_so','CMEMS_mlotst'],
+           model_save_loc = model_save_loc +'/',unc =[0.4,1,0.1,0.05],bath = 'GEBCO_elevation',bath_cutoff = None,fco2_cutoff_low = 50,fco2_cutoff_high = 750,sea_ice = 'CCI_SST_sea_ice_fraction')
+        #nnt.plot_total_validation_unc(fco2_sst = 'CCI_SST',model_save_loc = model_save_loc,ice = 'CCI_SST_sea_ice_fraction')
     if run_flux:
         import fluxengine_driver as fl
         print('Running flux calculations....')

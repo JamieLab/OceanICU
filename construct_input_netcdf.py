@@ -14,8 +14,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import Data_Loading.data_utils as du
 
-def driver(out_file,vars,start_yr=1990,end_yr=2020,resolution=1):
-    lon,lat = du.reg_grid(lat=resolution,lon=resolution)
+def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[]):
+    #lon,lat = du.reg_grid(lat=resolution,lon=resolution)
     direct = {}
     for a in vars:
         timesteps,direct[a[0]+'_'+a[1]],month_track = build_timeseries(a[2],a[1],start_yr,end_yr,lon,lat,a[0])
@@ -24,103 +24,6 @@ def driver(out_file,vars,start_yr=1990,end_yr=2020,resolution=1):
             direct[a[0] + '_' + a[1] + '_anom'] = produce_anomaly(direct[a[0]+'_'+a[1]],month_track)
     save_netcdf(out_file,direct,lon,lat,timesteps)
 
-"""
-Functions for setting up filenames for the different variables, allowing for a scalable
-number of variables to be added to netCDF for neural network training.
-"""
-def sst_cci_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y%m_ESA_CCI_MONTHLY_SST_1_deg.nc'))
-
-def oisst_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y%m_OISSTv2.nc'))
-
-def oc_cci_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('ESACCI-OC-L3S-CHLOR_A-MERGED-1M_MONTHLY_%Y%m-fv6.0_1_deg.nc'))
-
-def noaa_ersl_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y_%m_NOAA_ERSL_xCO2.nc'))
-
-def gebco_filename(load_loc):
-    return load_loc+'/GEBCO_2022_sub_ice_topo_1_deg.nc'
-
-def longhurst_filename(load_loc):
-    return load_loc+'/Longhurst_1_deg.nc'
-
-def era5_ws_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_ERA5_si10_1_deg.nc'))
-
-def era5_mslp_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_ERA5_msl_1_deg.nc'))
-
-def era5_blh_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_ERA5_blh_1_deg.nc'))
-
-def era5_d2m_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_ERA5_d2m_1_deg.nc'))
-
-def era5_t2m_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_ERA5_t2m_1_deg.nc'))
-
-def era5_msdwlwrf_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_ERA5_msdwlwrf_1_deg.nc'))
-
-def era5_msdwswrf_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_ERA5_msdwswrf_1_deg.nc'))
-
-def cmems_sss_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_CMEMS_GLORYSV12_SSS_1_deg.nc'))
-
-def cmems_mld_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_CMEMS_GLORYSV12_MLD_1_deg.nc'))
-
-def taka_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('takahashi_%m_.nc'))
-
-def bicep_pp_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_BICEP_NCEO_PP_ESA-OC-L3S-MERGED-1M_MONTHLY_1_deg.nc'))
-
-def bicep_poc_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_BICEP_NCEO_POC_ESA-OC-L3S-MERGED-1M_MONTHLY_4km_GEO_PML-fv5.0_1_deg.nc'))
-
-def bicep_ep_dun_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_BICEP_NCEO_ExportProduction_ESA-OC-L3S-MERGED-1M_MONTHLY_9km_mapped_fv4.2_1_deg_EP_Dunne.nc'))
-
-def bicep_ep_li_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_BICEP_NCEO_ExportProduction_ESA-OC-L3S-MERGED-1M_MONTHLY_9km_mapped_fv4.2_1_deg_EP_Li.nc'))
-
-def bicep_ep_henson_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_BICEP_NCEO_ExportProduction_ESA-OC-L3S-MERGED-1M_MONTHLY_9km_mapped_fv4.2_1_deg_EP_Henson.nc'))
-
-def watson_som_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y%m_watson_som.nc'))
-
-def ccmp_filename(load_loc,yr,mon):
-    dat = datetime.datetime(yr,mon,1)
-    return os.path.join(load_loc,dat.strftime('%Y'),dat.strftime('%Y_%m_CCMP_Wind_Analysis__V03.0_L4.5_1_deg.nc'))
-
-"""
-End of filename definition functions! -------------------------------------------
-"""
 def build_timeseries(load_loc,variable,start_yr,end_yr,lon,lat,name):
     """
     Function to construct a monthly timeseries between start yr and end yr for the variable.
@@ -140,52 +43,13 @@ def build_timeseries(load_loc,variable,start_yr,end_yr,lon,lat,name):
         Here we set up the different filename structures for the different products.
         For each new variable a new elif needs to be added.
         """
-        if (variable == 'analysed_sst') or (variable == 'sea_ice_fraction'):
-            file = sst_cci_filename(load_loc,yr,mon)
-        elif variable == 'xCO2':
-            file = noaa_ersl_filename(load_loc,yr,mon)
-        elif variable == 'chlor_a':
-            file = oc_cci_filename(load_loc,yr,mon)
-        elif variable == 'elevation':
-            file = gebco_filename(load_loc)
-        elif variable == 'longhurst':
-            file = longhurst_filename(load_loc)
-        elif variable == 'si10':
-            file = era5_ws_filename(load_loc,yr,mon)
-        elif variable == 'msl':
-            file = era5_mslp_filename(load_loc,yr,mon)
-        elif variable == 'so':
-            file = cmems_sss_filename(load_loc,yr,mon)
-        elif variable == 'mlotst':
-            file = cmems_mld_filename(load_loc,yr,mon)
-        elif variable == 'blh':
-            file = era5_blh_filename(load_loc,yr,mon)
-        elif variable == 'd2m':
-            file = era5_d2m_filename(load_loc,yr,mon)
-        elif variable == 't2m':
-            file = era5_t2m_filename(load_loc,yr,mon)
-        elif variable == 'msdwlwrf':
-            file = era5_msdwlwrf_filename(load_loc,yr,mon)
-        elif variable == 'msdwswrf':
-            file = era5_msdwswrf_filename(load_loc,yr,mon)
-        elif variable == 'taka':
-            file = taka_filename(load_loc,yr,mon)
-        elif variable == 'pp':
-            file = bicep_pp_filename(load_loc,yr,mon)
-        elif variable == 'POC':
-            file = bicep_poc_filename(load_loc,yr,mon)
-        elif variable == 'EP_Dunne':
-            file = bicep_ep_dun_filename(load_loc,yr,mon)
-        elif variable == 'EP_Henson':
-            file = bicep_ep_henson_filename(load_loc,yr,mon)
-        elif variable == 'EP_Li':
-            file = bicep_ep_li_filename(load_loc,yr,mon)
-        elif variable == 'biome':
-            file = watson_som_filename(load_loc,yr,mon)
-        elif variable == 'w':
-            file = ccmp_filename(load_loc,yr,mon)
-        elif variable == 'sst':
-            file = oisst_filename(load_loc,yr,mon)
+        dat = datetime.datetime(yr,mon,1)
+        file = load_loc.replace('%Y',dat.strftime('%Y')).replace('%m',dat.strftime('%m'))
+        g = glob.glob(file)
+        if g:
+            file = g[0]
+        print(file)
+
         if not du.checkfileexist(file):
             avai.append(0)
         else:

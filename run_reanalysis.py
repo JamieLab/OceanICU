@@ -20,7 +20,7 @@ statvariables=['fCO2_Tym','pCO2_Tym','fCO2_SST','pCO2_SST']
 
 
 def reanalyse(socat_dir=None,socat_files=None,sst_dir=None,sst_tail=None,out_dir=None,force_reanalyse=False,
-    start_yr = 1990,end_yr = 2020,name = '',outfile = None, var = None):
+    start_yr = 1990,end_yr = 2020,name = '',outfile = None, var = None,prefix = '%Y%m01-OCF-CO2-GLO-1M-100-SOCAT-CONV.nc',flip=True):
     """
     Function to run the fluxengine reanalysis code in custom_reanalysis. DJF to put a pull request into FluxEngine with
     the updates made within the custom code.
@@ -39,7 +39,7 @@ def reanalyse(socat_dir=None,socat_files=None,sst_dir=None,sst_tail=None,out_dir
                           endyr=2023,socatversion=2020,regions=["GL"],customsst=True,
                           customsstvar=var,customsstlat='latitude',customsstlon='longitude'
                           ,output=out_dir)
-    fco2,fco2_std = retrieve_fco2(out_dir,start_yr = start_yr,end_yr=end_yr)
+    fco2,fco2_std = retrieve_fco2(out_dir,start_yr = start_yr,end_yr=end_yr,prefix=prefix)
     append_to_file(outfile,fco2,fco2_std,name,socat_files[0])
 
 def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=''):
@@ -86,7 +86,7 @@ def append_to_file(output_file,fco2,fco2_std,name,socat_files):
     var_o.created_from = socat_files
     c.close()
 
-def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GLO-1M-100-SOCAT-CONV.nc'):
+def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GLO-1M-100-SOCAT-CONV.nc',flip=False):
     """
     Function to iteratively load the fCO2sw from the reanalysis folder (i.e one netcdf per month_year combo)
     """
@@ -104,12 +104,16 @@ def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GL
             #print('True')
             c = Dataset(loc,'r')
             fco2_temp = np.squeeze(c.variables['weighted_fCO2_Tym'])
-            if fco2_temp.shape[0] < fco2_temp.shape[1]:
-                fco2_temp = np.fliplr(np.transpose(fco2_temp))
+            if fco2_temp.shape[0] > fco2_temp.shape[1]:
+                fco2_temp = np.transpose(fco2_temp)
+            if flip:
+                fco2_temp = np.fliplr(fco2_temp)
 
             fco2_std_temp = np.squeeze(c.variables['stdev_fCO2_Tym'])
-            if fco2_std_temp.shape[0] < fco2_std_temp.shape[1]:
-                fco2_std_temp = np.fliplr(np.transpose(fco2_std_temp))
+            if fco2_std_temp.shape[0] > fco2_std_temp.shape[1]:
+                fco2_std_temp = np.transpose(fco2_std_temp)
+            if flip:
+                fco2_std_temp = np.fliplr(fco2_std_temp)
             c.close()
             if inits == 0:
                 fco2 = np.empty((fco2_temp.shape[0],fco2_temp.shape[1],months))

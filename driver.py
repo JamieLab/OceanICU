@@ -56,10 +56,12 @@ if __name__ == '__main__':
     coare_out = 'D:/ESA_CONTRACT/coare'
 
     model_save_loc = 'D:/ESA_CONTRACT/NN/NEW_INPUT'
+    inps = os.path.join(model_save_loc,'inputs')
+    data_file = os.path.join(inps,'neural_network_input.nc')
     start_yr = 1985
     end_yr = 2022
-    #log,lag = du.reg_grid(lat=0.1,lon=0.1,latm=[-55,-30],lonm=[-70,-50])
-    log,lag = du.reg_grid(lat=0.25,lon=0.25,pad=True)
+    log,lag = du.reg_grid(lat=0.1,lon=0.1,latm=[-55,-30],lonm=[-70,-50])
+    #log,lag = du.reg_grid(lat=1,lon=1,pad=False)
     # print(log)
     # print(lag)
     if create_inp:
@@ -67,10 +69,10 @@ if __name__ == '__main__':
         make_save_tree(model_save_loc)
         cur = os.getcwd()
         os.chdir('Data_Loading')
-        inps = os.path.join(model_save_loc,'inputs')
+
         from Data_Loading.cmems_glorysv12_download import cmems_average
 
-        cmems_average('D:/Data/CMEMS/SSS/MONTHLY',os.path.join(inps,'SSS_Test'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag,variable='so')
+        #cmems_average('D:/Data/CMEMS/SSS/MONTHLY',os.path.join(inps,'SSS_Test'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag,variable='so')
         # cmems_average('D:/Data/CMEMS/MLD/MONTHLY',os.path.join(inps,'MLD'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag,variable='mlotst',log_av = True)
         # #
         # from Data_Loading.cci_sstv2 import cci_sst_spatial_average
@@ -90,10 +92,25 @@ if __name__ == '__main__':
         # import Data_Loading.gebco_resample as ge
         # ge.gebco_resample('D:/Data/Bathymetry/GEBCO_2023.nc',log,lag,save_loc = os.path.join(inps,'bath'))
         #
-        # import run_reanalysis as rean
-        # rean.regrid_fco2_data('D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv',latg=lag,long=log,save_loc=inps)
-
-
+        import run_reanalysis as rean
+        socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
+        # rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps)
+        import construct_input_netcdf as cinp
+        vars = [['CCI_SST','analysed_sst',os.path.join(inps,'SST','%Y','%Y%m*.nc'),1]
+        ,['CCI_SST','sea_ice_fraction',os.path.join(inps,'SST','%Y','%Y%m*.nc'),1]
+        ,['NOAA_ERSL','xCO2',os.path.join(inps,'xco2atm','%Y','%Y_%m*.nc'),1]
+        ,['ERA5','blh',os.path.join(inps,'blh','%Y','%Y_%m*.nc'),0]
+        ,['ERA5','d2m',os.path.join(inps,'d2m','%Y','%Y_%m*.nc'),0]
+        ,['ERA5','msdwlwrf',os.path.join(inps,'msdwlwrf','%Y','%Y_%m*.nc'),0]
+        ,['ERA5','msdwswrf',os.path.join(inps,'msdwswrf','%Y','%Y_%m*.nc'),0]
+        ,['ERA5','msl',os.path.join(inps,'msl','%Y','%Y_%m*.nc'),0]
+        ,['ERA5','t2m',os.path.join(inps,'t2m','%Y','%Y_%m*.nc'),0]
+        ,['CMEMS','so',os.path.join(inps,'SAL','%Y','%Y_%m*.nc'),1]
+        ,['CMEMS','mlotst',os.path.join(inps,'MLD','%Y','%Y_%m*.nc'),1]
+        ]
+        #cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr,lon = log,lat = lag)
+        rean.reanalyse(name='CCI-SST',out_dir=os.path.join(inps,'socat'),outfile = data_file,start_yr = start_yr,end_yr = end_yr,prefix = 'GL_from_%Y_to_%Y_%m.nc',socat_files = [socat_file],flip = False)
+        
 
     if run_neural:
         import neural_network_train as nnt

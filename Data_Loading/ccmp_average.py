@@ -25,8 +25,7 @@ def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0
         print(file)
         print(outfile)
         if du.checkfileexist(file) and not du.checkfileexist(outfile):
-            if t == 0:
-                lon,lat = du.load_grid(file)
+            lon,lat = du.load_grid(file)
             c = Dataset(file,'r')
             va_da = np.transpose(np.squeeze(np.array(c.variables['w'][:])))
             va_da[va_da < 0.0] = np.nan

@@ -10,10 +10,10 @@ if __name__ == '__main__':
     import Data_Loading.data_utils as du
     import sys
     sys.path.append(os.path.join(os.getcwd(),'Data_Loading'))
-    create_inp =False
+    create_inp =True
     run_neural =False
     run_flux = False
-    plot_final = True
+    plot_final = False
     coare = False
 
     reanal = [['CCI_SST','D:/Data/SST-CCI/MONTHLY_1DEG', '_ESA_CCI_MONTHLY_SST_1_DEG.nc','D:/ESA_CONTRACT/reanalysis/SST_CCI_S2023'],
@@ -62,6 +62,8 @@ if __name__ == '__main__':
         # import Data_Loading.gebco_resample as ge
         # ge.gebco_resample('D:/Data/Bathymetry/GEBCO_2023.nc',log,lag,save_loc = os.path.join(inps,'bath'))
         #
+        import Data_Loading.ccmp_average as cc
+        cc.ccmp_average('D:/Data/CCMP/v3.0/monthly',outloc=os.path.join(inps,'ccmp'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag)
         import run_reanalysis as rean
         socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
         # rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps)
@@ -78,6 +80,7 @@ if __name__ == '__main__':
         ,['ERA5','t2m',os.path.join(inps,'t2m','%Y','%Y_%m*.nc'),0]
         ,['CMEMS','so',os.path.join(inps,'SSS','%Y','%Y_%m*.nc'),1]
         ,['CMEMS','mlotst',os.path.join(inps,'MLD','%Y','%Y_%m*.nc'),1]
+        ,['CCMP','w',os.path.join(inps,'ccmp','%Y','%Y_%m*.nc'),0]
         ]
         cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr,lon = log,lat = lag)
         rean.reanalyse(name='CCI-SST',out_dir=os.path.join(inps,'socat'),outfile = data_file,start_yr = start_yr,end_yr = end_yr,prefix = 'GL_from_%Y_to_%Y_%m.nc',socat_files = [socat_file],flip = False)
@@ -93,7 +96,7 @@ if __name__ == '__main__':
         print('Running flux calculations....')
         #fl.GCB_remove_prov17(model_save_loc)
         fl.fluxengine_netcdf_create(model_save_loc,input_file = data_file,tsub='CCI_SST_analysed_sst',ws = 'CCMP_w',seaice = 'CCI_SST_sea_ice_fraction',
-             sal='CMEMS_so',msl = 'ERA5_msl',xCO2 = 'NOAA_ERSL_xCO2',start_yr=start_yr,end_yr=end_yr, coare_out = coare_out, tair = 'ERA5_t2m', dewair = 'ERA5_d2m',
+             sal='CMEMS_so',msl = 'ERA5_msl',xCO2 = 'NOAA_ERSL_xCO2',start_yr=start_yr,end_yr=end_yr, coare_out = os.path.join(inps,'coare'), tair = 'ERA5_t2m', dewair = 'ERA5_d2m',
              rs = 'ERA5_msdwswrf', rl = 'ERA5_msdwlwrf', zi = 'ERA5_blh',coolskin = 'COARE3.5')
         # fl.fluxengine_run(model_save_loc,fluxengine_config,start_yr,end_yr)
         #fl.flux_uncertainty_calc(model_save_loc,start_yr = start_yr,end_yr=end_yr)

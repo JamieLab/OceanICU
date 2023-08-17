@@ -11,9 +11,9 @@ if __name__ == '__main__':
     import sys
     sys.path.append(os.path.join(os.getcwd(),'Data_Loading'))
     create_inp =False
-    run_neural = True
+    run_neural =False
     run_flux = False
-    plot_final = False
+    plot_final = True
     coare = False
 
     reanal = [['CCI_SST','D:/Data/SST-CCI/MONTHLY_1DEG', '_ESA_CCI_MONTHLY_SST_1_DEG.nc','D:/ESA_CONTRACT/reanalysis/SST_CCI_S2023'],
@@ -103,8 +103,10 @@ if __name__ == '__main__':
         #bud.run_flux_budgets(indir = os.path.join(model_save_loc,'flux'),outroot=model_save_loc+'/')
 
     if plot_final:
-        import fluxengine_driver as fl
+        #import fluxengine_driver as fl
         #fl.plot_annual_flux('temporal_flux.png',['D:/ESA_CONTRACT/NN/xCO2_SST','D:/ESA_CONTRACT/NN/xCO2_SST_SSS','D:/ESA_CONTRACT/NN/xCO2_SST_SSS_MLD','D:/ESA_CONTRACT/NN/GCB_2023_Watson'],['xCO2_atm+CCI_SST','xCO2_atm+CCI_SST+CMEMS_SSS','xCO2_atm+CCI_SST+CMEMS_SSS+CMEMS_MLD','GCB_Watson_2023'])
         # fl.plot_annual_flux('GCB_submissions.png',['D:/ESA_CONTRACT/NN/GCB_2023_Watson','D:/ESA_CONTRACT/NN/GCB_2023_Watson_Ens5','D:/ESA_CONTRACT/NN/GCB_2023_CCISSTv3','D:/ESA_CONTRACT/NN/GCB_2023_Prelim'],
         #     ['GCB_Watson_2023_CCI_SSTv2','GCB_Watson_2023_OISST','GCB_Watson_2023_CCI_SSTv3','GCB_2023_Prelim (SOCATv2023)'])
         #fl.plot_annual_flux('temporal_flux.png',['D:/ESA_CONTRACT/NN/GCB_2023_Prelim_Ens3','D:/ESA_CONTRACT/NN/NEW_TESTING'],['Watson et al. GCB submission','Ford nerual network version'])
+        import animated_plotting as ap
+        ap.animated_output(model_save_loc,start_yr=start_yr)

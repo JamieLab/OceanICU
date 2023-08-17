@@ -152,6 +152,7 @@ def cmems_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable=''
             c = Dataset(file,'r')
             va_da = np.transpose(np.squeeze(np.array(c.variables[variable][:])))
             va_da[va_da<-100] = np.nan
+            va_da[va_da>5000] = np.nan
             if log_av:
                 va_da = np.log10(va_da)
             # va_da[va_da < 0.0] = np.nan

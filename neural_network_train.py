@@ -54,7 +54,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
 
     for v in var:
         vars.append(v)
-    tabl,output_size,lon,lat = load_data(data_file,vars,model_save_loc)
+    tabl,output_size,lon,lat = load_data(data_file,vars,model_save_loc,outp=True)
     if not sea_ice == None:
         print(f'Setting where sea ice is greater than 95% to nan...')
         tabl[tabl[sea_ice] > 0.95] = np.nan
@@ -186,7 +186,7 @@ Need to work out why reanalysis script currently doesn't work for SOCAT2023...
 #             # print(y_test_preds)
 #             dump([y_test,y_test_preds], open(os.path.join(model_save_loc,'validation',f'prov_{v}_validation_Eflag.pkl'), 'wb'))
 
-def load_data(load_loc,vars,output_loc):
+def load_data(load_loc,vars,output_loc=[],outp=True):
     """
     Function to load the data variables into a pandas dataframe for use in the neural
     network training.
@@ -209,8 +209,8 @@ def load_data(load_loc,vars,output_loc):
         output[:,:,:,t] = data
         ins_save[v] = data
         t += 1
-
-    save_netcdf(os.path.join(output_loc,'input_values.nc'),ins_save,lon,lat,output.shape[2])
+    if outp:
+        save_netcdf(os.path.join(output_loc,'input_values.nc'),ins_save,lon,lat,output.shape[2])
     # Reshape the 3d numpy arrays into a single colum and put into a dataframe.
     for i in range(0,len(vars)):
         if i == 0:

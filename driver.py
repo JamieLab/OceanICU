@@ -10,22 +10,13 @@ if __name__ == '__main__':
     import Data_Loading.data_utils as du
     import sys
     sys.path.append(os.path.join(os.getcwd(),'Data_Loading'))
-    create_inp =True
+    create_inp =False
     run_neural =False
-    run_flux = False
+    run_flux = True
     plot_final = False
     coare = False
 
-    reanal = [['CCI_SST','D:/Data/SST-CCI/MONTHLY_1DEG', '_ESA_CCI_MONTHLY_SST_1_DEG.nc','D:/ESA_CONTRACT/reanalysis/SST_CCI_S2023'],
-        ['OI_SST','D:/Data/OISSTv2_1/monthly', '_OISSTv2.nc','D:/ESA_CONTRACT/reanalysis/OI_SST_S2023'],
-        ['OI_SST_Watson','', '','D:/ESA_CONTRACT/reanalysis/Watson_OISST_v2022'],
-        ['CCI_SSTv3','D:/Data/SST-CCI/v3/MONTHLY_1_DEG', '_ESA_CCI_MONTHLY_SST_1_DEG.nc','D:/ESA_CONTRACT/reanalysis/SST_CCIv3'],]
-    socat = ['D:/Data/_DataSets/SOCAT/v2023','SOCATv2023.tsv']
-    socatflagE = ['D:/Data/_DataSets/SOCAT/v2023','SOCATv2023_FlagE.tsv']
-
-    data_file = 'D:/ESA_CONTRACT/neural_network_input.nc'
     fluxengine_config = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/OceanICU/fluxengine_config/fluxengine_config_night.conf'
-    coare_out = 'D:/ESA_CONTRACT/coare'
 
     model_save_loc = 'D:/ESA_CONTRACT/NN/NEW_INPUT'
     inps = os.path.join(model_save_loc,'inputs')
@@ -59,15 +50,15 @@ if __name__ == '__main__':
         # era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'msdwlwrf'),log=log,lag=lag,var='msdwlwrf',start_yr = start_yr,end_yr =end_yr)
         # era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'msdwswrf'),log=log,lag=lag,var='msdwswrf',start_yr = start_yr,end_yr =end_yr)
         #
-        # import Data_Loading.gebco_resample as ge
-        # ge.gebco_resample('D:/Data/Bathymetry/GEBCO_2023.nc',log,lag,save_loc = os.path.join(inps,'bath'))
+        import Data_Loading.gebco_resample as ge
+        ge.gebco_resample('D:/Data/Bathymetry/GEBCO_2023.nc',log,lag,save_loc = os.path.join(inps,'bath.nc'))
         #
-        import Data_Loading.ccmp_average as cc
-        cc.ccmp_average('D:/Data/CCMP/v3.0/monthly',outloc=os.path.join(inps,'ccmp'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag)
-        import run_reanalysis as rean
-        socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
-        # rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps)
-        import construct_input_netcdf as cinp
+        # import Data_Loading.ccmp_average as cc
+        # cc.ccmp_average('D:/Data/CCMP/v3.0/monthly',outloc=os.path.join(inps,'ccmp'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag)
+        # import run_reanalysis as rean
+        # socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
+        # # rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps)
+        # import construct_input_netcdf as cinp
         #Vars should have each entry as [Extra_Name, netcdf_variable_name,data_location,produce_anomaly]
         vars = [['CCI_SST','analysed_sst',os.path.join(inps,'SST','%Y','%Y%m*.nc'),1]
         ,['CCI_SST','sea_ice_fraction',os.path.join(inps,'SST','%Y','%Y%m*.nc'),1]
@@ -82,9 +73,9 @@ if __name__ == '__main__':
         ,['CMEMS','mlotst',os.path.join(inps,'MLD','%Y','%Y_%m*.nc'),1]
         ,['CCMP','w',os.path.join(inps,'ccmp','%Y','%Y_%m*.nc'),0]
         ]
-        cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr,lon = log,lat = lag)
-        rean.reanalyse(name='CCI-SST',out_dir=os.path.join(inps,'socat'),outfile = data_file,start_yr = start_yr,end_yr = end_yr,prefix = 'GL_from_%Y_to_%Y_%m.nc',socat_files = [socat_file],flip = False)
-        cinp.single_province(data_file,'si_prov',log,lag,start_yr,end_yr)
+        # cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr,lon = log,lat = lag)
+        # rean.reanalyse(name='CCI-SST',out_dir=os.path.join(inps,'socat'),outfile = data_file,start_yr = start_yr,end_yr = end_yr,prefix = 'GL_from_%Y_to_%Y_%m.nc',socat_files = [socat_file],flip = False)
+        # cinp.single_province(data_file,'si_prov',log,lag,start_yr,end_yr)
 
     if run_neural:
         import neural_network_train as nnt
@@ -95,12 +86,12 @@ if __name__ == '__main__':
         import fluxengine_driver as fl
         print('Running flux calculations....')
         #fl.GCB_remove_prov17(model_save_loc)
-        fl.fluxengine_netcdf_create(model_save_loc,input_file = data_file,tsub='CCI_SST_analysed_sst',ws = 'CCMP_w',seaice = 'CCI_SST_sea_ice_fraction',
-             sal='CMEMS_so',msl = 'ERA5_msl',xCO2 = 'NOAA_ERSL_xCO2',start_yr=start_yr,end_yr=end_yr, coare_out = os.path.join(inps,'coare'), tair = 'ERA5_t2m', dewair = 'ERA5_d2m',
-             rs = 'ERA5_msdwswrf', rl = 'ERA5_msdwlwrf', zi = 'ERA5_blh',coolskin = 'COARE3.5')
+        # fl.fluxengine_netcdf_create(model_save_loc,input_file = data_file,tsub='CCI_SST_analysed_sst',ws = 'CCMP_w',seaice = 'CCI_SST_sea_ice_fraction',
+        #      sal='CMEMS_so',msl = 'ERA5_msl',xCO2 = 'NOAA_ERSL_xCO2',start_yr=start_yr,end_yr=end_yr, coare_out = os.path.join(inps,'coare'), tair = 'ERA5_t2m', dewair = 'ERA5_d2m',
+        #      rs = 'ERA5_msdwswrf', rl = 'ERA5_msdwlwrf', zi = 'ERA5_blh',coolskin = 'COARE3.5')
         # fl.fluxengine_run(model_save_loc,fluxengine_config,start_yr,end_yr)
-        #fl.flux_uncertainty_calc(model_save_loc,start_yr = start_yr,end_yr=end_yr)
-        # fl.calc_annual_flux(model_save_loc)
+        # fl.flux_uncertainty_calc(model_save_loc,start_yr = start_yr,end_yr=end_yr)
+        fl.calc_annual_flux(model_save_loc,lon=log,lat=lag)
         # fl.plot_example_flux(model_save_loc)
         #import custom_flux_av.ofluxghg_flux_budgets as bud
         #bud.run_flux_budgets(indir = os.path.join(model_save_loc,'flux'),outroot=model_save_loc+'/')

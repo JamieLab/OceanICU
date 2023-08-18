@@ -212,7 +212,7 @@ def flux_split(flux,flux_unc,f,g):
 
     return np.array(out),np.array(out_unc)
 
-def calc_annual_flux(model_save_loc,land_mask= 'custom_flux_av/data/onedeg_land.nc'):
+def calc_annual_flux(model_save_loc,lon,lat):
     """
     OceanICU version of the fluxengine budgets tool that allows for the uncertainities to be propagated...
     """
@@ -220,12 +220,12 @@ def calc_annual_flux(model_save_loc,land_mask= 'custom_flux_av/data/onedeg_land.
     font = {'weight' : 'normal',
             'size'   : 19}
     matplotlib.rc('font', **font)
+    res = np.abs(lon[0]-lon[1])
+    #lon,lat = du.reg_grid()
+    area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
 
-    lon,lat = du.reg_grid()
-    area = du.area_grid(lat=1,lon=1) * 1e6
-
-    c = Dataset(land_mask,'r')
-    land = np.abs(np.flipud(np.squeeze(np.array(c.variables['land_proportion'])-1)))
+    c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
+    land = np.transpose(np.squeeze(np.array(c.variables['ocean_proportion'])))
     c.close()
 
     c = Dataset(model_save_loc+'/output.nc','r')
@@ -244,49 +244,50 @@ def calc_annual_flux(model_save_loc,land_mask= 'custom_flux_av/data/onedeg_land.
         out.append(np.nansum(flux[:,:,i:i+12]))
         out_unc.append(np.nansum(flux_unc[:,:,i:i+12])/2)
 
-    fig = plt.figure(figsize=(15,15))
-    gs = GridSpec(3,2, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.1,right=0.98)
-    ax = [fig.add_subplot(gs[0,0]),fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,0]),fig.add_subplot(gs[1,1]),fig.add_subplot(gs[2,0]),fig.add_subplot(gs[2,1])]
+    fig = plt.figure(figsize=(10,10))
+    gs = GridSpec(1,1, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.15,right=0.98)
+    ax = [fig.add_subplot(gs[0,0])]#,fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,0]),fig.add_subplot(gs[1,1]),fig.add_subplot(gs[2,0]),fig.add_subplot(gs[2,1])]
 
     ax[0].errorbar(year,out,yerr = out_unc)
-    ax[0].errorbar(year,out,yerr = np.ones((len(out)))*0.6)
+    #ax[0].errorbar(year,out,yerr = np.ones((len(out)))*0.6)
 
-    f = np.squeeze(np.where(lat >= 30)); g = np.arange(0,len(lon));
-    out,out_unc = flux_split(flux,flux_unc,f,g)
-    ax[1].errorbar(year,out,yerr = out_unc)
-    ax[1].plot(year,out_unc*-1)
-
-    f = np.squeeze(np.where(lat <= -30)); g = np.arange(0,len(lon));
-    out,out_unc = flux_split(flux,flux_unc,f,g)
-    ax[2].errorbar(year,out,yerr = out_unc)
-    ax[2].plot(year,out_unc*-1)
-
-    f = np.squeeze(np.where((lat > -30) & (lat < 30))); g = np.arange(0,len(lon));
-    out,out_unc = flux_split(flux,flux_unc,f,g)
-    ax[3].errorbar(year,out,yerr = out_unc)
-    ax[3].plot(year,out_unc*-1)
-
-    f = np.squeeze(np.where((lat > 65))); g = np.arange(0,len(lon));
-    out,out_unc = flux_split(flux,flux_unc,f,g)
-    ax[4].errorbar(year,out,yerr = out_unc)
-    ax[4].plot(year,out_unc*-1)
-
-    f = np.squeeze(np.where((lat > 70) & (lat < 71))); g = np.squeeze(np.where((lon < 27) & (lon>26)));
-    print(f)
-    print(g)
-    print(np.arange(1985,2023,1/12).shape)
-    ax[5].plot(np.arange(1985,2023,1/12),flux[f,g,:])
-    ax[5].plot(np.arange(1985,2023,1/12),flux_unc[f,g,:]*-1)
-
-    ax[0].set_title('Global')
-    ax[1].set_title('30N - 90N')
-    ax[2].set_title('30S - 90S')
-    ax[3].set_title('30N - 30S')
-    ax[4].set_title('65N - 90N')
-    ax[5].set_title('70.5N 26.5E')
-    for i in range(0,6):
+    # f = np.squeeze(np.where(lat >= 30)); g = np.arange(0,len(lon));
+    # out,out_unc = flux_split(flux,flux_unc,f,g)
+    # ax[1].errorbar(year,out,yerr = out_unc)
+    # ax[1].plot(year,out_unc*-1)
+    #
+    # f = np.squeeze(np.where(lat <= -30)); g = np.arange(0,len(lon));
+    # out,out_unc = flux_split(flux,flux_unc,f,g)
+    # ax[2].errorbar(year,out,yerr = out_unc)
+    # ax[2].plot(year,out_unc*-1)
+    #
+    # # f = np.squeeze(np.where((lat > -30) & (lat < 30))); g = np.arange(0,len(lon));
+    # # out,out_unc = flux_split(flux,flux_unc,f,g)
+    # # ax[3].errorbar(year,out,yerr = out_unc)
+    # # ax[3].plot(year,out_unc*-1)
+    #
+    # f = np.squeeze(np.where((lat > 65))); g = np.arange(0,len(lon));
+    # out,out_unc = flux_split(flux,flux_unc,f,g)
+    # ax[4].errorbar(year,out,yerr = out_unc)
+    # ax[4].plot(year,out_unc*-1)
+    #
+    # # f = np.squeeze(np.where((lat > 70) & (lat < 71))); g = np.squeeze(np.where((lon < 27) & (lon>26)));
+    # # print(f)
+    # # print(g)
+    # # print(np.arange(1985,2023,1/12).shape)
+    # # ax[5].plot(np.arange(1985,2023,1/12),flux[f,g,:])
+    # # ax[5].plot(np.arange(1985,2023,1/12),flux_unc[f,g,:]*-1)
+    #
+    # ax[0].set_title('Global')
+    # ax[1].set_title('30N - 90N')
+    # ax[2].set_title('30S - 90S')
+    # ax[3].set_title('30N - 30S')
+    # ax[4].set_title('65N - 90N')
+    # ax[5].set_title('70.5N 26.5E')
+    for i in range(0,1):
         ax[i].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     fig.savefig(os.path.join(model_save_loc,'plots','global_flux_unc.png'))
+    return flux,flux_u
 
 def plot_example_flux(model_save_loc):
     lon,lat = du.reg_grid()

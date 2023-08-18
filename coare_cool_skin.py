@@ -21,8 +21,9 @@ def calc_coare(data_file,out_loc,ws = None,tair = None,dewair = None, sst = None
         c.close()
     else:
         print('Generating COARE3.5 cool skin through time....')
+        du.makefolder(out_loc)
         vars = [ws,tair,sst,dewair,msl,rs,rl,zi]
-        tabl,output_size,lon,lat = load_data(data_file,vars)
+        tabl,output_size,lon,lat = load_data(data_file,vars,outp=False)
         lat_g,lon_g,t = np.meshgrid(lat,lon,range(output_size[2]))
         tabl['lat'] = np.reshape(lat_g,(-1,1))
         tair_c = np.array(tabl[tair]) -273.15

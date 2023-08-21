@@ -37,7 +37,7 @@ matplotlib.rc('font', **font)
 tf.autograph.set_verbosity(0)
 
 def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_save_loc = None,
-    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None):
+    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000):
     """
     This is the driver function to load the data from the input file, trim the data extremes(?) and then call
     the neural network package.
@@ -95,16 +95,16 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     for v in np.unique(tabl[vars[2]]):
         print(str(v) + ' : '+str(np.argwhere(np.array(tabl[vars[2]]) == v).shape))
 
-    #run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc)
+    run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val)
 
     # flag_e_validation(data_file,fco2_sst = fco2_sst, prov = prov, var = var, model_save_loc = model_save_loc,bath = bath,bath_cutoff=bath_cutoff,fco2_cutoff_low=fco2_cutoff_low,
     #     fco2_cutoff_high = fco2_cutoff_high,unc = unc)
 
     # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
     # (propagated input parameter uncertainties)
-    #mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
+    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
     # Then we save the fCO2 data
-    #save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat)
+    save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat)
     # Once saved the validation can be extracted, and used to determine the validation uncertainty for each province,
     # which can then be mapped. This function produces validation statistics for the training/validation, test and all data together
     # using both weighted and unweighted statistics.
@@ -248,7 +248,7 @@ def make_save_tree(model_save_loc):
     if not os.path.isdir(inputs):
         os.mkdir(inputs)
 
-def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10):
+def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10,tot_lut_val=6000):
     """
     Function to run the nerual network training, and saving the best performing model. This function
     produces the model, scaler, uncertainty look up table and validation results for use in producing
@@ -393,11 +393,11 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
             # Calculate the min and maximum of the input dataset values so the range of data can be determined
             minmax = np.squeeze(np.stack((np.amin(X[mask,:],axis=0),np.amax(X[mask,:],axis=0))))
             # Generate the look up table for uncertainty
-            lut = unc_lut_generate(minmax,model,StdScl,unc)
+            lut = unc_lut_generate(minmax,model,StdScl,unc,tot_lut_val=tot_lut_val)
             # and save the look up table.
             dump([lut],open(os.path.join(model_save_loc,'unc_lut',f'prov_{v}_lut.pkl'),'wb'))
 
-def unc_lut_generate(minmax,model,scalar,unc,res = False):
+def unc_lut_generate(minmax,model,scalar,unc,res = False,tot_lut_val=6000):
     """
     This function generates a lookup table to determine the input parameter uncertainity.
     We generate a regular linear grid between the min and max values of all inputs with a set number of steps
@@ -407,9 +407,15 @@ def unc_lut_generate(minmax,model,scalar,unc,res = False):
     if not res:
         # Here we calculate the number of steps in the LUT, so that the full lookup table is ~6000 values.
         # So the more input parameters the less resolved the LUT is.
-        res = int(np.ceil(20 / minmax.shape[1]))
-    print(f'Resolution of LUT = {res}...')
-    rang = (minmax[1,:] - minmax[0,:])/2 # Calculate the range of each value, and divide by two
+        step = 0
+        vals = 0
+        while vals < tot_lut_val:
+            step = step+1
+            vals = step**len(unc)
+        res = step-1
+
+    print(f'Resolution of LUT = {res}... total values = {res**len(unc)}')
+    rang = ((minmax[1,:] - minmax[0,:])*1.3)/2 # Calculate the range of each value, and divide by two
     me = np.mean(minmax,axis=0) # Find the middle value of the the range
     m = [np.linspace(i,j,res) for i,j in zip(me-rang,me+rang)] # For each value we produce a linearly space grid between the min and max values.
     grids = np.meshgrid(*m) # Then mesh these together into one big grid.

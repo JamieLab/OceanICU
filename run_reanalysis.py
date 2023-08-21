@@ -104,14 +104,12 @@ def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GL
             #print('True')
             c = Dataset(loc,'r')
             fco2_temp = np.squeeze(c.variables['weighted_fCO2_Tym'])
-            if fco2_temp.shape[0] > fco2_temp.shape[1]:
-                fco2_temp = np.transpose(fco2_temp)
+            fco2_temp = np.transpose(fco2_temp)
             if flip:
                 fco2_temp = np.fliplr(fco2_temp)
 
             fco2_std_temp = np.squeeze(c.variables['stdev_fCO2_Tym'])
-            if fco2_std_temp.shape[0] > fco2_std_temp.shape[1]:
-                fco2_std_temp = np.transpose(fco2_std_temp)
+            fco2_std_temp = np.transpose(fco2_std_temp)
             if flip:
                 fco2_std_temp = np.fliplr(fco2_std_temp)
             c.close()

@@ -214,3 +214,24 @@ def single_province(save_loc,var,lon,lat,start_yr,end_yr):
     direct = {}
     direct[var] = prov
     append_netcdf(save_loc,direct,lon,lat,timesteps)
+
+def province_shape(save_loc,var,lon,lat,start_yr,end_yr,shp_lon,shp_lat):
+
+    timesteps =((end_yr-start_yr)+1)*12
+
+    long, latg = np.meshgrid(lon,lat)
+    s = long.shape
+    vals = du.inpoly2(np.column_stack((long.ravel(),latg.ravel())),np.column_stack((shp_lon,shp_lat)))[0]
+    vals = np.array(vals).astype('float64')
+    print(vals)
+    vals = np.reshape(vals,(lat.shape[0],lon.shape[0]))
+    vals = np.transpose(vals)
+    vals[vals ==0.0] = np.nan
+
+    prov = np.repeat(vals[:,:,np.newaxis],timesteps,axis=2)
+    direct = {}
+    direct[var] = prov
+    plt.figure()
+    plt.pcolor(direct[var][:,:,0])
+    plt.show()
+    append_netcdf(save_loc,direct,lon,lat,timesteps)

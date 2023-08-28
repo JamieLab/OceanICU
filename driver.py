@@ -12,8 +12,8 @@ if __name__ == '__main__':
     sys.path.append(os.path.join(os.getcwd(),'Data_Loading'))
     create_inp =False
     run_neural =False
-    run_flux = True
-    plot_final = False
+    run_flux = False
+    plot_final = True
     coare = False
 
     fluxengine_config = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/OceanICU/fluxengine_config/fluxengine_config_night.conf'

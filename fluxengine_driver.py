@@ -111,22 +111,22 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020):
 
     #Load the flux
     flux = load_flux_var(fluxloc,'OF',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    flux = np.flip(np.transpose(flux,(1,0,2)),axis=1)
+    flux = np.transpose(flux,(1,0,2))
     #Load the fco2 atm field and convert to percentage unc
     fco2_atm = load_flux_var(fluxloc,'pgas_air',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    fco2_atm = np.flip(np.transpose(fco2_atm,(1,0,2)),axis=1)
+    fco2_atm = np.transpose(fco2_atm,(1,0,2))
     fco2atm_perunc = atm_unc / fco2_atm
     # Load the subskin and skin concentrations
     subskin_conc = load_flux_var(fluxloc,'OSFC',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    subskin_conc = np.flip(np.transpose(subskin_conc,(1,0,2)),axis=1)
+    subskin_conc = np.transpose(subskin_conc,(1,0,2))
     skin_conc = load_flux_var(fluxloc,'OIC1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    skin_conc = np.flip(np.transpose(skin_conc,(1,0,2)),axis=1)
+    skin_conc = np.transpose(skin_conc,(1,0,2))
     # Calculate the concentration uncertainty in units (not percentage)
     skin_conc_unc = skin_conc * fco2atm_perunc
     subskin_conc_unc = subskin_conc * fco2sw_perunc
 
     dconc = load_flux_var(fluxloc,'Dconc',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    dconc = np.flip(np.transpose(dconc,(1,0,2)),axis=1)
+    dconc = np.transpose(dconc,(1,0,2))
     # Add the concentration unc in quadrature and then convert to a percentage.
     conc_unc = np.sqrt(skin_conc_unc**2 + subskin_conc_unc**2) / np.abs(dconc)
     # Flux uncertainity is the percentage unc added and then converted to absolute units (not percentage)
@@ -212,7 +212,7 @@ def flux_split(flux,flux_unc,f,g):
 
     return np.array(out),np.array(out_unc)
 
-def calc_annual_flux(model_save_loc,lon,lat):
+def calc_annual_flux(model_save_loc,lon,lat,bath_cutoff = False):
     """
     OceanICU version of the fluxengine budgets tool that allows for the uncertainities to be propagated...
     """
@@ -226,6 +226,8 @@ def calc_annual_flux(model_save_loc,lon,lat):
 
     c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
     land = np.transpose(np.squeeze(np.array(c.variables['ocean_proportion'])))
+    if bath_cutoff:
+        elev=  np.transpose(np.squeeze(np.array(c.variables['elevation'])))
     c.close()
 
     c = Dataset(model_save_loc+'/output.nc','r')
@@ -236,6 +238,9 @@ def calc_annual_flux(model_save_loc,lon,lat):
     for i in range(0,flux.shape[2]):
         flux[:,:,i] = (flux[:,:,i] * area * land * 30.5) /1e15
         flux_unc[:,:,i] = (flux_unc[:,:,i] * area * land * 30.5) / 1e15
+        if bath_cutoff:
+            flu = flux[:,:,i] ; flu[elev<=bath_cutoff] = np.nan; flux[:,:,i] = flu
+            flu_u = flux_unc[:,:,i]; flu_u[elev<=bath_cutoff] = np.nan; flux_unc[:,:,i] = flu_u
 
     year = list(range(1985,2022+1,1))
     out = []
@@ -287,11 +292,13 @@ def calc_annual_flux(model_save_loc,lon,lat):
     for i in range(0,1):
         ax[i].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     fig.savefig(os.path.join(model_save_loc,'plots','global_flux_unc.png'))
-    return flux,flux_u
+    #return flux,flux_u
 
 def plot_example_flux(model_save_loc):
-    lon,lat = du.reg_grid()
+
     c = Dataset(model_save_loc+'/output.nc','r')
+    lat = np.array(c.variables['latitude'])
+    lon = np.array(c.variables['longitude'])
     flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
     print(flux.shape)
     flux_unc = np.transpose(np.array(c.variables['flux_unc']),(1,0,2))

@@ -190,6 +190,14 @@ def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel):
         #print(g)
         c = Dataset(g[0])
         op = np.squeeze(np.array(c[var]))
+        if t == 0:
+            lat = np.array(c['latitude'])
+            if np.sign(lat[1] - lat[0]) == -1:
+                flip = True
+            else:
+                flip = False
+        if flip:
+            op = np.flipud(op)
         out[:,:,t] = op
         mon = mon+1
         t = t+1
@@ -291,6 +299,8 @@ def calc_annual_flux(model_save_loc,lon,lat,bath_cutoff = False):
     # ax[5].set_title('70.5N 26.5E')
     for i in range(0,1):
         ax[i].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
+    out_f = np.stack((np.array(year),np.array(out),np.array(out_unc)))
+    np.savetxt(os.path.join(model_save_loc,'annual_flux.csv'),out_f,delimiter=',',fmt='%.5f')
     fig.savefig(os.path.join(model_save_loc,'plots','global_flux_unc.png'))
     #return flux,flux_u
 

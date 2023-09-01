@@ -415,7 +415,7 @@ def unc_lut_generate(minmax,model,scalar,unc,res = False,tot_lut_val=6000):
         res = step-1
 
     print(f'Resolution of LUT = {res}... total values = {res**len(unc)}')
-    rang = ((minmax[1,:] - minmax[0,:])*1.3)/2 # Calculate the range of each value, and divide by two
+    rang = ((minmax[1,:] - minmax[0,:])*1.5)/2 # Calculate the range of each value, and divide by two
     me = np.mean(minmax,axis=0) # Find the middle value of the the range
     m = [np.linspace(i,j,res) for i,j in zip(me-rang,me+rang)] # For each value we produce a linearly space grid between the min and max values.
     grids = np.meshgrid(*m) # Then mesh these together into one big grid.

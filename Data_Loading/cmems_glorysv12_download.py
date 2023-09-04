@@ -57,6 +57,21 @@ def motu_option_parser(script_template, usr, pwd, output_filename,output_directo
     dictionary['auth_mode'] = 'cas'
     return dictionary
 
+def script_fore_daily():
+    script_template_fore = 'python -m motuclient \
+    --motu https://my.cmems-du.eu/motu-web/Motu \
+    --service-id GLOBAL_MULTIYEAR_PHY_001_030-TDS \
+    --product-id <PRODUCTID> \
+    --longitude-min -180 --longitude-max 180 \
+    --latitude-min -90 --latitude-max 90 \
+    --date-min <DATEMIN> --date-max <DATEMAX> \
+    --depth-min 0.49402499198913574 --depth-max 0.49402499198913574 \
+    --variable <VAR> \
+    --out-dir <OUTPUT_DIRECTORY> --out-name <OUTPUT_FILENAME> \
+    --user <USERNAME> --pwd <PASSWORD>'
+    product = 'cmems_mod_glo_phy_my_0.083_P1D-m'
+    return script_template_fore, product
+
 def script_fore():
     script_template_fore = 'python -m motuclient \
     --motu https://my.cmems-du.eu/motu-web/Motu \
@@ -72,7 +87,7 @@ def script_fore():
     product = 'cmems_mod_glo_phy_my_0.083_P1M-m'
     return script_template_fore, product
 
-def script_aft(variable):
+def script_aft_daily(variable):
     script_template_nrt = 'python -m motuclient \
     --motu https://nrt.cmems-du.eu/motu-web/Motu \
     --service-id GLOBAL_ANALYSISFORECAST_PHY_001_024-TDS \
@@ -92,6 +107,30 @@ def script_aft(variable):
         product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1M-m'
     elif variable == 'vo':
         product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1M-m'
+    else:
+        product = 'cmems_mod_glo_phy_anfc_0.083deg_P1M-m'
+    return script_template_nrt,product
+
+def script_aft(variable):
+    script_template_nrt = 'python -m motuclient \
+    --motu https://nrt.cmems-du.eu/motu-web/Motu \
+    --service-id GLOBAL_ANALYSISFORECAST_PHY_001_024-TDS \
+    --product-id <PRODUCTID> \
+    --longitude-min -180 --longitude-max 180 \
+    --latitude-min -90 --latitude-max 90 \
+    --date-min <DATEMIN> --date-max <DATEMAX> \
+    --depth-min 0.49402499198913574 --depth-max 0.49402499198913574 \
+    --variable <VAR> \
+    --out-dir <OUTPUT_DIRECTORY> --out-name <OUTPUT_FILENAME> \
+    --user <USERNAME> --pwd <PASSWORD>'
+    if variable == 'thetao':
+        product = 'cmems_mod_glo_phy-thetao_anfc_0.083deg_P1D-m'
+    elif variable == 'so':
+        product = 'cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m'
+    elif variable == 'uo':
+        product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m'
+    elif variable == 'vo':
+        product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m'
     else:
         product = 'cmems_mod_glo_phy_anfc_0.083deg_P1M-m'
     return script_template_nrt,product
@@ -120,9 +159,44 @@ def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
         print(OUTPUT_FILENAME)
         if not du.checkfileexist(os.path.join(OUTPUT_TEMP,OUTPUT_FILENAME)):
             if yr > transition_yr:
-                script_template,product = script_aft(variable)
+                script_template,product = script_aft_daily(variable)
             else:
-                script_template,product = script_fore()
+                script_template,product = script_fore_daily()
+            data_request_options_dict_automated = motu_option_parser(script_template, USERNAME, PASSWORD, OUTPUT_FILENAME,OUTPUT_TEMP,date_min,date_max,variable,product)
+            #print(data_request_options_dict_automated)
+            motuclient.motu_api.execute_request(MotuOptions(data_request_options_dict_automated))
+        mon = mon+1
+        if mon == 13:
+            yr = yr+1
+            mon=1
+
+def load_glorysv12_daily(loc,start_yr = 1993,end_yr = 2020,variable=None):
+    """
+    Reanalysis Dataset DOI: https://doi.org/10.48670/moi-00021
+    Renalaysis/Forecast Dataset DOI: https://doi.org/10.48670/moi-00016
+    """
+    import calendar
+    USERNAME = 'dford1'
+    PASSWORD = 'Jokers!99.88\\'
+    OUTPUT_DIRECTORY = loc
+    # Year reanalysis ends - check https://doi.org/10.48670/moi-00021 for year
+    # After this year we use the forecast dataset from: https://doi.org/10.48670/moi-00016
+    transition_yr = 2020
+    yr = start_yr
+    mon = 1
+    while yr <= end_yr:
+        date_min = datetime.datetime(yr,mon,1,0,0,0);
+        date_max = datetime.datetime(yr,mon,calendar.monthrange(yr,mon)[1],23,59,59); date_max = date_max.strftime('%Y-%m-%d %H:%M:%S')
+        OUTPUT_TEMP = os.path.join(OUTPUT_DIRECTORY,str(yr))
+        du.makefolder(OUTPUT_TEMP)
+        OUTPUT_FILENAME = date_min.strftime(f'%Y_%m_CMEMS_GLORYSV12_{variable}.nc')
+        date_min = date_min.strftime('%Y-%m-%d %H:%M:%S')
+        print(OUTPUT_FILENAME)
+        if not du.checkfileexist(os.path.join(OUTPUT_TEMP,OUTPUT_FILENAME)):
+            if yr > transition_yr:
+                script_template,product = script_aft_daily(variable)
+            else:
+                script_template,product = script_fore_daily()
             data_request_options_dict_automated = motu_option_parser(script_template, USERNAME, PASSWORD, OUTPUT_FILENAME,OUTPUT_TEMP,date_min,date_max,variable,product)
             #print(data_request_options_dict_automated)
             motuclient.motu_api.execute_request(MotuOptions(data_request_options_dict_automated))

@@ -7,7 +7,8 @@ end_yr = 2022
 
 noaa = False
 era5 = False
-cmems = True
+cmems = False
+cmems_daily=True
 bicep = False
 ccmp = False
 oisst = False
@@ -39,6 +40,10 @@ if era5:
     er.era5_average("D:/Data/ERA5/MONTHLY/DATA","D:/Data/ERA5/MONTHLY/1DEG",start_yr=start_yr,end_yr=end_yr,res=1,var='msdwlwrf')
     er.era5_average("D:/Data/ERA5/MONTHLY/DATA","D:/Data/ERA5/MONTHLY/1DEG",start_yr=start_yr,end_yr=end_yr,res=1,var='msdwswrf')
     er.era5_average("D:/Data/ERA5/MONTHLY/DATA","D:/Data/ERA5/MONTHLY/1DEG",start_yr=start_yr,end_yr=end_yr,res=1,var='t2m')
+
+if cmems_daily:
+    import cmems_glorysv12_download as cm
+    cm.load_glorysv12_daily('D:\Data\CMEMS\SSS\DAILY',end_yr = end_yr,variable = 'so')
 
 if cmems:
     import cmems_glorysv12_download as cm

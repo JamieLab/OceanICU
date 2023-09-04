@@ -191,7 +191,6 @@ def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = []):
     result['pCO2_Tym']=data['pCO2_reanalysed [uatm]']
     result['expocode'] = data['Expocode']
 
-    du.makefolder(os.path.join(save_fold,'data'))
     for yrs in set(result['yr']):
         year_data = result[np.where(result['yr'] == yrs)]
         for mon in set(year_data['mon']):

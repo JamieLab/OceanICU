@@ -112,3 +112,35 @@ def sinelat():
     a = np.arange(-1.0,1.00,0.05) # Weird bug in np.range that means final value doesnt = 1 but is ~= 1.
     a = np.append(a,1.0) # So I append 1 as the last value.
     return np.rad2deg(np.arcsin(a))
+
+def append_noaa(socat_file,noaa_file,extrap=True):
+    import pandas as pd
+    print('Generating sine latitudes for NOAA/ERSL...')
+    noaa_grid = sinelat()
+    print('Loading NOAA_file: ' +noaa_file)
+    data = load_noaa_file(noaa_file)
+    noaa_time = np.ascontiguousarray(data[:,0])
+    data = data[:,1:-1:2]
+    if extrap:
+        f = np.where(np.floor(noaa_time[-2]) == np.floor(noaa_time))
+        print(f)
+        noaa_time = np.append(noaa_time,noaa_time[f[0][1]:]+1)
+        print(noaa_time.shape)
+        print(data.shape)
+        print(data[f[0][1]:,:].shape)
+        data = np.append(data,data[f[0][1]:,:]+2.4,axis=0)
+        print(data.shape)
+    #print(noaa_time)
+
+    print('Setting up interpolation variable...')
+    interp = RegularGridInterpolator((noaa_time,noaa_grid),data,bounds_error = False)
+
+    socat = pd.read_table(socat_file,sep='\t')
+    soc_time = []
+    for i in range(0,len(socat)):
+        soc_time.append(toYearFraction(datetime.datetime(socat['yr'][i],socat['mon'][i],socat['day'][i])))
+    atm = interp((np.array(soc_time),np.array(socat['latitude [dec.deg.N]'])))
+    print(atm)
+    socat['noaa_atm [ppm]'] = atm
+    st = socat_file.split('.')
+    socat.to_csv(st[0]+'+noaa.'+st[1],sep='\t')

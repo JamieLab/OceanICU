@@ -192,6 +192,16 @@ def grid_interp(o_lon,o_lat,o_data,n_lon,n_lat):
     out = np.transpose(out.reshape(s))
     return out
 
+def point_interp(o_lon,o_lat,o_data,n_lon,n_lat):
+    # import matplotlib.pyplot as plt
+    o_lon,o_lat = np.meshgrid(o_lon,o_lat)
+    # plt.figure()
+    # plt.pcolor(o_lon,o_lat,o_data)
+    # plt.show()
+    points = np.stack([o_lon.ravel(),o_lat.ravel()],-1)
+    out = interp.griddata(points,o_data.ravel(),(n_lon,n_lat))
+    return out
+
 
 def inpoly2(vert, node, edge=None, ftol=5.0e-14):
     """

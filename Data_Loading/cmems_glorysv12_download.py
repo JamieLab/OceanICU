@@ -100,15 +100,15 @@ def script_aft_daily(variable):
     --out-dir <OUTPUT_DIRECTORY> --out-name <OUTPUT_FILENAME> \
     --user <USERNAME> --pwd <PASSWORD>'
     if variable == 'thetao':
-        product = 'cmems_mod_glo_phy-thetao_anfc_0.083deg_P1M-m'
+        product = 'cmems_mod_glo_phy-thetao_anfc_0.083deg_P1D-m'
     elif variable == 'so':
-        product = 'cmems_mod_glo_phy-so_anfc_0.083deg_P1M-m'
+        product = 'cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m'
     elif variable == 'uo':
-        product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1M-m'
+        product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m'
     elif variable == 'vo':
-        product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1M-m'
+        product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m'
     else:
-        product = 'cmems_mod_glo_phy_anfc_0.083deg_P1M-m'
+        product = 'cmems_mod_glo_phy_anfc_0.083deg_P1D-m'
     return script_template_nrt,product
 
 def script_aft(variable):

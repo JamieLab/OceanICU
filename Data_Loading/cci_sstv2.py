@@ -149,3 +149,44 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
         if mon == 13:
             ye = ye+1
             mon = 1
+
+def cci_socat_append(file,data_loc='D:/Data/SST-CCI'):
+    import pandas as pd
+    import calendar
+    import glob
+    import matplotlib.pyplot as plt
+    data = pd.read_table(file,sep='\t')
+    cci_sst = np.zeros((len(data)))
+    cci_sst[:] = np.nan
+
+    yr = [np.min(data['yr']),np.max(data['yr'])]
+    t = 0
+    for yrs in range(yr[0],yr[1]+1):
+        for mon in range(1,13):
+            days = calendar.monthrange(yrs,mon)[1]
+            for day in range(1,days+1):
+                f = np.where((data['yr'] == yrs) & (data['mon'] == mon) & (data['day'] == day))[0]
+                print(f'Year: {yrs} Month: {mon} Day: {day}')
+                #print(f)
+                if len(f)>0:
+                    sst_file = os.path.join(data_loc,str(yrs),du.numstr(mon),str(yrs)+du.numstr(mon)+du.numstr(day)+'*.nc')
+                    sst_file = glob.glob(sst_file)
+                    if sst_file:
+                        if t == 0:
+                            [lon,lat] = du.load_grid(sst_file[0],latv = 'lat',lonv='lon')
+                            res = np.abs(lon[0] - lon[1]) * 2
+                            t = 1
+                        lat_b = [np.min(data['latitude [dec.deg.N]'][f]),np.max(data['latitude [dec.deg.N]'][f])]
+                        lon_b = [np.min(data['longitude [dec.deg.E]'][f]),np.max(data['longitude [dec.deg.E]'][f])]
+                        lat_b = np.where((lat < lat_b[1]+res) & (lat > lat_b[0]-res))[0]
+                        lon_b = np.where((lon < lon_b[1]+res) & (lon > lon_b[0]-res))[0]
+                        c = Dataset(sst_file[0],'r')
+                        sst_data = np.squeeze(c['analysed_sst'][0,lat_b,lon_b])
+                        sst_data[sst_data<-250] = np.nan
+                        #sst_data = sst_data
+                        c.close()
+
+                        cci_sst[f] = du.point_interp(lon[lon_b],lat[lat_b],sst_data,data['longitude [dec.deg.E]'][f],data['latitude [dec.deg.N]'][f])
+    data['cci_sst [C]'] = cci_sst - 273.15
+    st = file.split('.')
+    data.to_csv(st[0]+'+cci_sst.'+st[1],sep='\t')

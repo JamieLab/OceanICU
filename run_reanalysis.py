@@ -147,7 +147,7 @@ def find_socat(data,lat,lon):
     d = data[(soclat > mlat[0]) & (soclat < mlat[1]) & (soclon > mlon[0]) & (soclon < mlon[1])]
     return d
 
-def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = []):
+def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = [],grid=True):
     import custom_reanalysis.combine_nc_files as combine_nc_files
     import glob
     save_fold = os.path.join(save_loc,'socat')
@@ -159,76 +159,77 @@ def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = []):
         data = find_socat(data,latg,long)
         data.to_csv(os.path.join(save_fold,'socat.tsv'),sep='\t')
     #print(data)
-    print(data.columns)
-    result=np.recarray((np.array(data['yr']).size,),dtype=[('yr',np.int32),
-                                         ('mon',np.int32),
-                                         ('day', np.int32),
-                                         ('hh', np.int32),
-                                         ('mm', np.int32),
-                                         ('ss', np.int32),
-                                         ('lat',np.float64),
-                                         ('lon',np.float64),
-                                         ('SST_C',np.float64),
-                                         ('Tcl_C',np.float64),
-                                         ('fCO2_SST',np.float64),
-                                         ('fCO2_Tym',np.float64),
-                                         ('pCO2_SST',np.float64),
-                                         ('pCO2_Tym',np.float64),
-                                         ('expocode',np.dtype('O'))]);
-    result['yr']=data['yr'];
-    result['mon']=data['mon'];
-    result['day']=data['day'];
-    result['hh']=data['hh'];
-    result['mm']=data['mm'];
-    result['ss']=data['ss'];
-    result['lat']=data['latitude [dec.deg.N]']
-    result['lon']=data['longitude [dec.deg.E]']
-    result['SST_C']=data['SST [deg.C]']
-    result['Tcl_C']=data['T_reynolds [C]']
-    result['fCO2_SST']=data['fCO2rec [uatm]']
-    result['fCO2_Tym']=data['fCO2_reanalysed [uatm]']
-    result['pCO2_SST']=data['pCO2_SST [uatm]']
-    result['pCO2_Tym']=data['pCO2_reanalysed [uatm]']
-    result['expocode'] = data['Expocode']
+    if grid:
+        print(data.columns)
+        result=np.recarray((np.array(data['yr']).size,),dtype=[('yr',np.int32),
+                                             ('mon',np.int32),
+                                             ('day', np.int32),
+                                             ('hh', np.int32),
+                                             ('mm', np.int32),
+                                             ('ss', np.int32),
+                                             ('lat',np.float64),
+                                             ('lon',np.float64),
+                                             ('SST_C',np.float64),
+                                             ('Tcl_C',np.float64),
+                                             ('fCO2_SST',np.float64),
+                                             ('fCO2_Tym',np.float64),
+                                             ('pCO2_SST',np.float64),
+                                             ('pCO2_Tym',np.float64),
+                                             ('expocode',np.dtype('O'))]);
+        result['yr']=data['yr'];
+        result['mon']=data['mon'];
+        result['day']=data['day'];
+        result['hh']=data['hh'];
+        result['mm']=data['mm'];
+        result['ss']=data['ss'];
+        result['lat']=data['latitude [dec.deg.N]']
+        result['lon']=data['longitude [dec.deg.E]']
+        result['SST_C']=data['SST [deg.C]']
+        result['Tcl_C']=data['T_reynolds [C]']
+        result['fCO2_SST']=data['fCO2rec [uatm]']
+        result['fCO2_Tym']=data['fCO2_reanalysed [uatm]']
+        result['pCO2_SST']=data['pCO2_SST [uatm]']
+        result['pCO2_Tym']=data['pCO2_reanalysed [uatm]']
+        result['expocode'] = data['Expocode']
 
-    for yrs in set(result['yr']):
-        year_data = result[np.where(result['yr'] == yrs)]
-        for mon in set(year_data['mon']):
-            print(f'Year: {yrs} - Month: {mon}')
-            month_data = year_data[np.where(year_data['mon'] == mon)]
-            data_loc = os.path.join(save_fold,'reanalysed_global',"%02d"%mon)
+        for yrs in set(result['yr']):
+            year_data = result[np.where(result['yr'] == yrs)]
+            for mon in set(year_data['mon']):
+                print(f'Year: {yrs} - Month: {mon}')
+                month_data = year_data[np.where(year_data['mon'] == mon)]
+                data_loc = os.path.join(save_fold,'reanalysed_global',"%02d"%mon)
 
-            data_loc_per = os.path.join(data_loc,'per_cruise')
-            du.makefolder(data_loc)
-            du.makefolder(data_loc_per)
-            outputfile='GL_from_%s_to_%s_%02d.nc'%(yrs,yrs,mon)
+                data_loc_per = os.path.join(data_loc,'per_cruise')
+                du.makefolder(data_loc)
+                du.makefolder(data_loc_per)
+                outputfile='GL_from_%s_to_%s_%02d.nc'%(yrs,yrs,mon)
 
-            final_output_path = os.path.join(data_loc,outputfile)
-            for expo in set(month_data['expocode']):
-                print(expo)
-                output_cruise_file=os.path.join(data_loc_per,outputfile.replace('.nc','-%s.nc'%expo))
-                expo_indices=np.where(month_data['expocode']==expo)
-                expo_data=month_data[expo_indices]
-                variabledictionary=CreateBinnedData(expo_data,latg,long)
-                #print(variabledictionary)
-                half_days_in_month=15.5
-                datadate=datetime.datetime(yrs,mon,int(half_days_in_month),0,0,0)
-                myprocess=multiprocessing.Process(target=WriteOutToNCAsGrid,args=(variabledictionary,output_cruise_file,None,long,latg,datadate))
-                myprocess.start()
-                myprocess.join()
-            common_prefix=outputfile.replace('.nc','')
-            cruise_files=glob.glob("%s/%s*"%(data_loc_per,common_prefix))
-            if len(cruise_files) !=0:
-               print()
-               print("Combining cruises from region, year and month: ",cruise_files)
-               print()
-               combine_nc_files.FromFilelist(filelist=cruise_files,output=final_output_path,
-                                             weighting="cruise-weighted",outputtime=datadate)
+                final_output_path = os.path.join(data_loc,outputfile)
+                for expo in set(month_data['expocode']):
+                    print(expo)
+                    output_cruise_file=os.path.join(data_loc_per,outputfile.replace('.nc','-%s.nc'%expo))
+                    expo_indices=np.where(month_data['expocode']==expo)
+                    expo_data=month_data[expo_indices]
+                    variabledictionary=CreateBinnedData(expo_data,latg,long)
+                    #print(variabledictionary)
+                    half_days_in_month=15.5
+                    datadate=datetime.datetime(yrs,mon,int(half_days_in_month),0,0,0)
+                    myprocess=multiprocessing.Process(target=WriteOutToNCAsGrid,args=(variabledictionary,output_cruise_file,None,long,latg,datadate))
+                    myprocess.start()
+                    myprocess.join()
+                common_prefix=outputfile.replace('.nc','')
+                cruise_files=glob.glob("%s/%s*"%(data_loc_per,common_prefix))
+                if len(cruise_files) !=0:
+                   print()
+                   print("Combining cruises from region, year and month: ",cruise_files)
+                   print()
+                   combine_nc_files.FromFilelist(filelist=cruise_files,output=final_output_path,
+                                                 weighting="cruise-weighted",outputtime=datadate)
 
-               #get the binned data for the whole month to add to the nc file as other variables
-               allnewvars=CreateBinnedData(month_data,latg,long)
-               newvars={v : allnewvars[v] for v in statvariables+['stds']}
-               combine_nc_files.AddNewVariables(filename=final_output_path,newvars=newvars)
+                   #get the binned data for the whole month to add to the nc file as other variables
+                   allnewvars=CreateBinnedData(month_data,latg,long)
+                   newvars={v : allnewvars[v] for v in statvariables+['stds']}
+                   combine_nc_files.AddNewVariables(filename=final_output_path,newvars=newvars)
 
 def geo_idx(dd, dd_array):
     """

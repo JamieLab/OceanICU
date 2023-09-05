@@ -10,20 +10,20 @@ if __name__ == '__main__':
     import Data_Loading.data_utils as du
     import sys
     sys.path.append(os.path.join(os.getcwd(),'Data_Loading'))
-    create_inp =False
+    create_inp =True
     run_neural =False
     run_flux = False
-    plot_final = True
+    plot_final = False
     coare = False
 
     fluxengine_config = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/OceanICU/fluxengine_config/fluxengine_config_night.conf'
 
-    model_save_loc = 'D:/ESA_CONTRACT/NN/NEW_INPUT'
+    model_save_loc = 'D:/ESA_CONTRACT/NN/testing'
     inps = os.path.join(model_save_loc,'inputs')
     data_file = os.path.join(inps,'neural_network_input.nc')
     start_yr = 1985
     end_yr = 2022
-    log,lag = du.reg_grid(lat=0.1,lon=0.1,latm=[-55,-30],lonm=[-70,-50])
+    log,lag = du.reg_grid(lat=0.1,lon=0.1,latm=[-58,-30],lonm=[-72,-48])
 
     if create_inp:
         from neural_network_train import make_save_tree
@@ -50,14 +50,18 @@ if __name__ == '__main__':
         # era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'msdwlwrf'),log=log,lag=lag,var='msdwlwrf',start_yr = start_yr,end_yr =end_yr)
         # era5_average(loc = "D:/Data/ERA5/MONTHLY/DATA", outloc=os.path.join(inps,'msdwswrf'),log=log,lag=lag,var='msdwswrf',start_yr = start_yr,end_yr =end_yr)
         #
-        import Data_Loading.gebco_resample as ge
-        ge.gebco_resample('D:/Data/Bathymetry/GEBCO_2023.nc',log,lag,save_loc = os.path.join(inps,'bath.nc'))
+        # import Data_Loading.gebco_resample as ge
+        # ge.gebco_resample('D:/Data/Bathymetry/GEBCO_2023.nc',log,lag,save_loc = os.path.join(inps,'bath.nc'))
         #
         # import Data_Loading.ccmp_average as cc
         # cc.ccmp_average('D:/Data/CCMP/v3.0/monthly',outloc=os.path.join(inps,'ccmp'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag)
-        # import run_reanalysis as rean
-        # socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
-        # # rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps)
+        import run_reanalysis as rean
+        socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
+        #rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps,grid=False)
+        # import Data_Loading.cci_sstv2 as cci_sst
+        # cci_sst.cci_socat_append(os.path.join(inps,'socat','socat.tsv'))
+        import Data_Loading.interpolate_noaa_ersl as noaa
+        noaa.append_noaa(os.path.join(inps,'socat','socat+cci_sst.tsv'),'D:/Data/NOAA_ERSL/2023_download.txt')
         # import construct_input_netcdf as cinp
         #Vars should have each entry as [Extra_Name, netcdf_variable_name,data_location,produce_anomaly]
         vars = [['CCI_SST','analysed_sst',os.path.join(inps,'SST','%Y','%Y%m*.nc'),1]

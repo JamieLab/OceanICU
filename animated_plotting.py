@@ -19,7 +19,7 @@ import matplotlib as mpl
 import Data_Loading.data_utils as du
 mpl.rcParams['animation.ffmpeg_path'] = r'C:\\Users\\df391\\OneDrive - University of Exeter\\Python\ffmpeg\\bin\\ffmpeg.exe'
 
-def animated_output(model_save_loc,start_yr,gcb_output = 'D:\\ESA_CONTRACT\\NN\\GCB_2023_Prelim_Ens3\\output.nc'):
+def animated_output(model_save_loc,start_yr,gcb_output = 'C:\\Users\\df391\\OneDrive - University of Exeter\\Post_Doc_ESA_Contract\\Submissions\\GCB2023\\GCB-2023_dataprod_UoEX_WATv2_1985-2022.nc'):
     worldmap = gpd.read_file(gpd.datasets.get_path("ne_50m_land"))
     def animate(i):
         fig.clear()
@@ -35,7 +35,7 @@ def animated_output(model_save_loc,start_yr,gcb_output = 'D:\\ESA_CONTRACT\\NN\\
         ax.set_ylim(ylim)
 
 
-        yr = 1985
+        yr = 2012
         m = 1+i
         g = np.floor(m/12)
         yr = yr+g
@@ -63,7 +63,11 @@ def animated_output(model_save_loc,start_yr,gcb_output = 'D:\\ESA_CONTRACT\\NN\\
     lon = np.array(c.variables['longitude'])
     c.close()
     c = Dataset(gcb_output,'r')
-    fco2_gcb = np.array(c.variables['fco2'])
+    fco2_gcb = np.array(c.variables['sfco2'])
+
+    fco2_gcb = du.lon_switch(fco2_gcb)
+    fco2_gcb = np.transpose(fco2_gcb,[2,1,0])
+    #fco2_gcb = np.fliplr(fco2_gcb)
     lon_gcb,lat_gcb = du.reg_grid()
     c.close()
 
@@ -72,6 +76,9 @@ def animated_output(model_save_loc,start_yr,gcb_output = 'D:\\ESA_CONTRACT\\NN\\
     atm = np.array(c.variables['NOAA_ERSL_xCO2'])
     c.close()
 
+    fco2 = fco2[:,:,-120:]
+    fco2_gcb=fco2_gcb[:,:,-120:]
+    atm = atm[:,:,-120:]
     yr = start_yr
     mon = 1
     i = 0

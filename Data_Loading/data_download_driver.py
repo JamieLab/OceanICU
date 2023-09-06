@@ -44,7 +44,7 @@ if era5:
 if cmems_daily:
     import cmems_glorysv12_download as cm
     cm.load_glorysv12_daily('D:\Data\CMEMS\SSS\DAILY',end_yr = end_yr,variable = 'so')
-    #cm.load_glorysv12_daily('D:\Data\CMEMS\SSS\DAILY',end_yr = end_yr,variable = 'mlotst')
+    cm.load_glorysv12_daily('D:\Data\CMEMS\MLD\DAILY',end_yr = end_yr,variable = 'mlotst')
 
 if cmems:
     import cmems_glorysv12_download as cm

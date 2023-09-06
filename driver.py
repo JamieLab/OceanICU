@@ -57,11 +57,16 @@ if __name__ == '__main__':
         # cc.ccmp_average('D:/Data/CCMP/v3.0/monthly',outloc=os.path.join(inps,'ccmp'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag)
         import run_reanalysis as rean
         socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
-        #rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps,grid=False)
-        # import Data_Loading.cci_sstv2 as cci_sst
-        # cci_sst.cci_socat_append(os.path.join(inps,'socat','socat.tsv'))
+        rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps,grid=False)
+        import Data_Loading.cci_sstv2 as cci_sst
+        cci_sst.cci_socat_append(os.path.join(inps,'socat','socat.tsv'))
         import Data_Loading.interpolate_noaa_ersl as noaa
-        noaa.append_noaa(os.path.join(inps,'socat','socat+cci_sst.tsv'),'D:/Data/NOAA_ERSL/2023_download.txt')
+        noaa.append_noaa(os.path.join(inps,'socat','socat.tsv'),'D:/Data/NOAA_ERSL/2023_download.txt')
+
+        import Data_Loading.cmems_glorysv12_download as cmems
+        cmems.cmems_socat_append(os.path.join(inps,'socat','socat.tsv'),data_loc = 'D:/Data/CMEMS/SSS/DAILY',variable='so')
+        cmems.cmems_socat_append(os.path.join(inps,'socat','socat.tsv'),data_loc = 'D:/Data/CMEMS/MLD/DAILY',variable='mlotst')
+
         # import construct_input_netcdf as cinp
         #Vars should have each entry as [Extra_Name, netcdf_variable_name,data_location,produce_anomaly]
         vars = [['CCI_SST','analysed_sst',os.path.join(inps,'SST','%Y','%Y%m*.nc'),1]

@@ -189,4 +189,4 @@ def cci_socat_append(file,data_loc='D:/Data/SST-CCI'):
                         cci_sst[f] = du.point_interp(lon[lon_b],lat[lat_b],sst_data,data['longitude [dec.deg.E]'][f],data['latitude [dec.deg.N]'][f])
     data['cci_sst [C]'] = cci_sst - 273.15
     st = file.split('.')
-    data.to_csv(st[0]+'+cci_sst.'+st[1],sep='\t')
+    data.to_csv(file,sep='\t',index=False)

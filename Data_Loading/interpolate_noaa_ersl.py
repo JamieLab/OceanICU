@@ -143,4 +143,4 @@ def append_noaa(socat_file,noaa_file,extrap=True):
     print(atm)
     socat['noaa_atm [ppm]'] = atm
     st = socat_file.split('.')
-    socat.to_csv(st[0]+'+noaa.'+st[1],sep='\t')
+    socat.to_csv(socat_file,sep='\t',index=False)

@@ -244,3 +244,53 @@ def cmems_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable=''
         if mon == 13:
             yr = yr+1
             mon=1
+
+def cmems_socat_append(file,data_loc=[],variable = [],plot=False):
+    import pandas as pd
+    import calendar
+    import glob
+    import matplotlib.pyplot as plt
+    data = pd.read_table(file,sep='\t')
+    cmems = np.zeros((len(data)))
+    cmems[:] = np.nan
+
+    yr = [np.min(data['yr']),np.max(data['yr'])]
+    t = 0
+    for yrs in range(yr[0],yr[1]+1):
+        for mon in range(1,13):
+            days = calendar.monthrange(yrs,mon)[1]
+            for day in range(1,days+1):
+                f = np.where((data['yr'] == yrs) & (data['mon'] == mon) & (data['day'] == day))[0]
+                print(f'Year: {yrs} Month: {mon} Day: {day}')
+                #print(f)
+                if len(f)>0:
+                    cmems_file = os.path.join(data_loc,str(yrs),str(yrs)+'_'+du.numstr(mon)+'*.nc')
+                    cmems_file = glob.glob(cmems_file)
+                    if cmems_file:
+                        if t == 0:
+                            [lon,lat] = du.load_grid(cmems_file[0],latv = 'latitude',lonv='longitude')
+                            res = np.abs(lon[0] - lon[1]) * 2
+                            t = 1
+                        lat_b = [np.min(data['latitude [dec.deg.N]'][f]),np.max(data['latitude [dec.deg.N]'][f])]
+                        lon_b = [np.min(data['longitude [dec.deg.E]'][f]),np.max(data['longitude [dec.deg.E]'][f])]
+                        lat_b = np.where((lat < lat_b[1]+res) & (lat > lat_b[0]-res))[0]
+                        lon_b = np.where((lon < lon_b[1]+res) & (lon > lon_b[0]-res))[0]
+                        c = Dataset(cmems_file[0],'r')
+                        if variable == 'mlotst':
+                            sst_data = np.squeeze(c[variable][day-1,lat_b,lon_b])
+                        else:
+                            sst_data = np.squeeze(c[variable][day-1,0,lat_b,lon_b])
+                        sst_data[sst_data<-250] = np.nan
+                        #sst_data = sst_data
+                        c.close()
+
+                        cmems[f] = du.point_interp(lon[lon_b],lat[lat_b],sst_data,data['longitude [dec.deg.E]'][f],data['latitude [dec.deg.N]'][f])
+                        if plot:
+                            plt.figure()
+                            a=plt.pcolor(lon[lon_b],lat[lat_b],sst_data)
+                            plt.colorbar(a)
+                            plt.scatter(data['longitude [dec.deg.E]'][f],data['latitude [dec.deg.N]'][f],c = cmems[f],vmin=np.nanmin(sst_data),vmax=np.nanmax(sst_data),edgecolors='k')
+                            plt.show()
+    data['cmems_'+variable] = cmems
+    st = file.split('.')
+    data.to_csv(file,sep='\t',index = False)

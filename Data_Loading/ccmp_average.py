@@ -11,7 +11,7 @@ import os
 from netCDF4 import Dataset
 import numpy as np
 
-def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0.25):
+def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0.25,var='w'):
     du.makefolder(outloc)
     res = np.round(np.abs(log[0]-log[1]),2)
     yr = start_yr
@@ -21,14 +21,14 @@ def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0
         if mon == 1:
             du.makefolder(os.path.join(outloc,str(yr)))
         file = os.path.join(loc,'y'+str(yr),'m'+du.numstr(mon),'CCMP_Wind_Analysis_'+str(yr) + du.numstr(mon)+'_V03.0_L4.5.nc')
-        outfile = os.path.join(outloc,str(yr),str(yr)+'_'+du.numstr(mon)+'_CCMP_Wind_Analysis__V03.0_L4.5_'+str(res)+'_deg.nc')
+        outfile = os.path.join(outloc,str(yr),str(yr)+'_'+du.numstr(mon)+'_CCMP_Wind_Analysis__V03.0_L4.5_'+str(res)+'_deg_'+var+'.nc')
         print(file)
         print(outfile)
         if du.checkfileexist(file) and not du.checkfileexist(outfile):
             lon,lat = du.load_grid(file)
             c = Dataset(file,'r')
-            va_da = np.transpose(np.squeeze(np.array(c.variables['w'][:])))
-            va_da[va_da < 0.0] = np.nan
+            va_da = np.transpose(np.squeeze(np.array(c.variables[var][:])))
+            va_da[va_da < -100] = np.nan
             lon,va_da = du.grid_switch(lon,va_da)
             c.close()
 
@@ -42,7 +42,7 @@ def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0
             else:
                 va_da_out = du.grid_interp(lon,lat,va_da,log,lag)
                 t=1
-            du.netcdf_create_basic(outfile,va_da_out,'w',lag,log)
+            du.netcdf_create_basic(outfile,va_da_out,var,lag,log)
         mon = mon+1
         if mon == 13:
             yr = yr+1

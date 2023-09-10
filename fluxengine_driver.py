@@ -85,14 +85,14 @@ def fluxengine_run(model_save_loc,config_file = None,start_yr = 1990, end_yr = 2
     returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True)
     os.chdir(return_path)
 
-def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020):
+def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1):
     """
     Function to calculate the time and space varying air-sea CO2 flux uncertainties
     """
     print('Calculating air-sea CO2 flux uncertainty...')
     fluxloc = model_save_loc+'/flux'
-    k_perunc = 0.2 # k percentage uncertainty
-    atm_unc = 1 # Atmospheric fco2 unc (1 uatm)
+    #k_perunc = 0.2 # k percentage uncertainty
+    #atm_unc = 1 # Atmospheric fco2 unc (1 uatm)
 
     # Flux is k([CO2(atm)] - CO2[sw])
     # So we want to know the [CO2] uncertainity. For the moment I assume no uncertainity in the solubility, so the [CO2] uncertainity is the fractional uncertainty of the fCO2 (as we are multipling)
@@ -103,7 +103,12 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020):
     #Start with the fCO2 fields as this will give us the time lengths required for load_flux var.
     c = Dataset(model_save_loc+'/output.nc','r')
     fco2_sw = np.array(c.variables['fco2'])
-    fco2_tot_unc = np.array(c.variables['fco2_tot_unc'])
+    if fco2_tot_unc == -1:
+        fco2_tot_unc = np.array(c.variables['fco2_tot_unc'])
+    else:
+        fco2_tot_unc = np.ones((fco2_sw.shape)) * fco2_tot_unc
+    print(fco2_tot_unc)
+
     c.close()
     # fco2_tot_unc = np.zeros((fco2_sw.shape))
     # fco2_tot_unc[:] = 10
@@ -252,9 +257,17 @@ def calc_annual_flux(model_save_loc,lon,lat,bath_cutoff = False):
 
     year = list(range(1985,2022+1,1))
     out = []
+    up = []
+    down = []
     out_unc = []
     for i in range(0,flux.shape[2],12):
-        out.append(np.nansum(flux[:,:,i:i+12]))
+        flu = flux[:,:,i:i+12]
+        out.append(np.nansum(flu))
+        f = np.where(np.sign(flu) == 1)
+        up.append(np.nansum(flu[f]))
+        f = np.where(np.sign(flu) == -1)
+        down.append(np.nansum(flu[f]))
+
         out_unc.append(np.nansum(flux_unc[:,:,i:i+12])/2)
 
     fig = plt.figure(figsize=(10,10))
@@ -299,7 +312,7 @@ def calc_annual_flux(model_save_loc,lon,lat,bath_cutoff = False):
     # ax[5].set_title('70.5N 26.5E')
     for i in range(0,1):
         ax[i].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
-    out_f = np.stack((np.array(year),np.array(out),np.array(out_unc)))
+    out_f = np.stack((np.array(year),np.array(out),np.array(out_unc),np.array(up),np.array(down)))
     np.savetxt(os.path.join(model_save_loc,'annual_flux.csv'),out_f,delimiter=',',fmt='%.5f')
     fig.savefig(os.path.join(model_save_loc,'plots','global_flux_unc.png'))
     #return flux,flux_u

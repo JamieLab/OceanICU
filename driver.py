@@ -10,8 +10,8 @@ if __name__ == '__main__':
     import Data_Loading.data_utils as du
     import sys
     sys.path.append(os.path.join(os.getcwd(),'Data_Loading'))
-    create_inp =True
-    run_neural =False
+    create_inp =False
+    run_neural =True
     run_flux = False
     plot_final = False
     coare = False
@@ -56,18 +56,18 @@ if __name__ == '__main__':
         # import Data_Loading.ccmp_average as cc
         # cc.ccmp_average('D:/Data/CCMP/v3.0/monthly',outloc=os.path.join(inps,'ccmp'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag)
         import run_reanalysis as rean
-        socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
-        rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps,grid=False)
-        import Data_Loading.cci_sstv2 as cci_sst
-        cci_sst.cci_socat_append(os.path.join(inps,'socat','socat.tsv'))
-        import Data_Loading.interpolate_noaa_ersl as noaa
-        noaa.append_noaa(os.path.join(inps,'socat','socat.tsv'),'D:/Data/NOAA_ERSL/2023_download.txt')
-
+        # socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
+        # rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps,grid=False)
+        # import Data_Loading.cci_sstv2 as cci_sst
+        # cci_sst.cci_socat_append(os.path.join(inps,'socat','socat.tsv'))
+        # import Data_Loading.interpolate_noaa_ersl as noaa
+        # noaa.append_noaa(os.path.join(inps,'socat','socat.tsv'),'D:/Data/NOAA_ERSL/2023_download.txt')
+        #
         import Data_Loading.cmems_glorysv12_download as cmems
-        cmems.cmems_socat_append(os.path.join(inps,'socat','socat.tsv'),data_loc = 'D:/Data/CMEMS/SSS/DAILY',variable='so')
-        cmems.cmems_socat_append(os.path.join(inps,'socat','socat.tsv'),data_loc = 'D:/Data/CMEMS/MLD/DAILY',variable='mlotst')
+        # cmems.cmems_socat_append(os.path.join(inps,'socat','socat.tsv'),data_loc = 'D:/Data/CMEMS/SSS/DAILY',variable='so')
+        cmems.cmems_socat_append(os.path.join(inps,'socat','socat.tsv'),data_loc = 'D:/Data/CMEMS/MLD/DAILY',variable='mlotst',log=True)
 
-        # import construct_input_netcdf as cinp
+        import construct_input_netcdf as cinp
         #Vars should have each entry as [Extra_Name, netcdf_variable_name,data_location,produce_anomaly]
         vars = [['CCI_SST','analysed_sst',os.path.join(inps,'SST','%Y','%Y%m*.nc'),1]
         ,['CCI_SST','sea_ice_fraction',os.path.join(inps,'SST','%Y','%Y%m*.nc'),1]
@@ -82,14 +82,21 @@ if __name__ == '__main__':
         ,['CMEMS','mlotst',os.path.join(inps,'MLD','%Y','%Y_%m*.nc'),1]
         ,['CCMP','w',os.path.join(inps,'ccmp','%Y','%Y_%m*.nc'),0]
         ]
-        # cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr,lon = log,lat = lag)
+        #cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr,lon = log,lat = lag)
         # rean.reanalyse(name='CCI-SST',out_dir=os.path.join(inps,'socat'),outfile = data_file,start_yr = start_yr,end_yr = end_yr,prefix = 'GL_from_%Y_to_%Y_%m.nc',socat_files = [socat_file],flip = False)
-        # cinp.single_province(data_file,'si_prov',log,lag,start_yr,end_yr)
+        import convex as cox
+        sh_file = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_Covex_Seascape/Carbon Budget/data/LMEs/LMEs66.shp'
+        LME,ind = cox.load_LME_file(sh_file)
+        x,y,tit = cox.load_LMEs(LME,ind,14)
+        #cinp.province_shape(data_file,'si_prov',log,lag,start_yr,end_yr,x,y)
+        #cox.socat_append_prov(os.path.join(inps,'socat','socat.tsv'),x,y,1)
+        #rean.correct_fco2_daily(os.path.join(inps,'socat','socat.tsv'),'fCO2_reanalysed [uatm]','T_reynolds [C]','cci_sst [C]')
 
     if run_neural:
         import neural_network_train as nnt
-        nnt.driver(data_file,fco2_sst = 'CCI-SST', prov = 'si_prov',var = ['CCI_SST_analysed_sst','NOAA_ERSL_xCO2','CMEMS_so','CMEMS_mlotst'],
-           model_save_loc = model_save_loc +'/',unc =[0.4,1,0.1,0.05],bath = 'GEBCO_elevation',bath_cutoff = None,fco2_cutoff_low = 50,fco2_cutoff_high = 750,sea_ice = 'CCI_SST_sea_ice_fraction')
+        nnt.daily_socat_neural_driver(os.path.join(inps,'socat','socat.tsv'),fco2_sst = 'cci_sst [C]_fco2', prov = 'prov',var = ['cci_sst [C]','noaa_atm [ppm]','cmems_so','cmems_mlotst'],
+           model_save_loc = model_save_loc +'/',unc =[0.4,1,0.1,0.05],bath = 'GEBCO_elevation',bath_cutoff = None,fco2_cutoff_low = None,fco2_cutoff_high = None,sea_ice = None,
+           mapping_var=['CCI_SST_analysed_sst','NOAA_ERSL_xCO2','CMEMS_so','CMEMS_mlotst'],mapping_prov = 'si_prov',mapping_file = data_file,ktoc='CCI_SST_analysed_sst')
         #nnt.plot_total_validation_unc(fco2_sst = 'CCI_SST',model_save_loc = model_save_loc,ice = 'CCI_SST_sea_ice_fraction')
     if run_flux:
         import fluxengine_driver as fl

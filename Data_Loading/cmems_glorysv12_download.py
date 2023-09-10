@@ -245,7 +245,7 @@ def cmems_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable=''
             yr = yr+1
             mon=1
 
-def cmems_socat_append(file,data_loc=[],variable = [],plot=False):
+def cmems_socat_append(file,data_loc=[],variable = [],plot=False,log=False):
     import pandas as pd
     import calendar
     import glob
@@ -291,6 +291,8 @@ def cmems_socat_append(file,data_loc=[],variable = [],plot=False):
                             plt.colorbar(a)
                             plt.scatter(data['longitude [dec.deg.E]'][f],data['latitude [dec.deg.N]'][f],c = cmems[f],vmin=np.nanmin(sst_data),vmax=np.nanmax(sst_data),edgecolors='k')
                             plt.show()
+    if log:
+        cmems = np.log10(cmems)
     data['cmems_'+variable] = cmems
     st = file.split('.')
     data.to_csv(file,sep='\t',index = False)

@@ -41,3 +41,18 @@ def load_LME_file(sh_file):
         ind.append(int(LME.record(i)[1]))
     ind = np.array(ind)
     return LME,ind
+
+def socat_append_prov(socat_file,shp_lon,shp_lat,prov_no):
+    import pandas as pd
+    data = pd.read_table(socat_file,sep='\t')
+    print()
+    if 'prov' in list(data):
+        prov = data['prov']
+    else:
+        prov = np.zeros((len(data)))
+        prov[:] = np.nan
+
+    vals = inpoly2(np.column_stack((np.array(data['longitude [dec.deg.E]']),np.array(data['latitude [dec.deg.N]']))),np.column_stack((shp_lon,shp_lat)))[0]
+    prov[vals == True] = prov_no
+    data['prov'] = prov
+    data.to_csv(socat_file,sep='\t',index=False)

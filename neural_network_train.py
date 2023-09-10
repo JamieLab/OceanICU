@@ -97,9 +97,6 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
 
     run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val)
 
-    # flag_e_validation(data_file,fco2_sst = fco2_sst, prov = prov, var = var, model_save_loc = model_save_loc,bath = bath,bath_cutoff=bath_cutoff,fco2_cutoff_low=fco2_cutoff_low,
-    #     fco2_cutoff_high = fco2_cutoff_high,unc = unc)
-
     # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
     # (propagated input parameter uncertainties)
     mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
@@ -114,6 +111,36 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     add_total_unc(model_save_loc)
     # Plot the mean of the last year of the timeseries for a sanity check.
     plot_mapped(model_save_loc)
+
+def daily_socat_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_var=[],mapping_prov = [],unc = None, model_save_loc = None,
+    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,mapping_file=[],ktoc = None):
+    vars = [fco2_sst,fco2_sst+'_std']
+    vars.append(prov)
+    if not bath_cutoff == None:
+        vars.append(bath)
+    if not sea_ice == None:
+        vars.append(sea_ice)
+
+    for v in var:
+        vars.append(v)
+    data = pd.read_table(data_file,sep='\t')
+    data[fco2_sst+'_std'] = np.zeros((len(data)))
+    data = data[vars]
+
+    data = data[(np.isnan(data) == 0).all(axis=1)]
+
+    #run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val)
+    print(mapping_var)
+    map_vars = mapping_var.copy()
+    map_vars.append(mapping_prov)
+    tabl,output_size,lon,lat = load_data(mapping_file,map_vars,model_save_loc,outp=False)
+    if ktoc:
+        tabl[ktoc] = tabl[ktoc] - 273.15
+    print(tabl)
+    print(mapping_var)
+    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc)
+
+    save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat)
 
 """
 Flag E valdiation needs updating to the new construct. Treat this as a independent test dataset (29/07/2023).
@@ -844,9 +871,10 @@ def neural_network_map(mapping_data,var=None,model_save_loc=None,prov = None,out
     """
     Function to apply the trained neural network to the full data to produce global maps of fCO2 sw with the network unc and input parameter unc.
     """
+    print(var)
     inp = np.array(mapping_data[var])
     prov = np.array(mapping_data[prov])
-    # print(inp.shape)
+    print(inp.shape)
     # Produce the output arrays
     out = np.empty((inp.shape[0]))
     out[:] = np.nan

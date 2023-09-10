@@ -515,3 +515,10 @@ def WriteOutToNCAsGrid(vardict,outputfile,extrapolatetoyear,long,latg,outputtime
          stdf_data.add_offset = 0.
          stdf_data.standard_name = "stdev_"+var+stats_varext
          stdf_data.long_name = "Standard deviation of "+var+stats_varext+" occupying binned cell"
+
+def correct_fco2_daily(socat_file,month_fco2,month_sst,daily_sst):
+    data = pd.read_table(socat_file,sep='\t')
+    daily_fco2 = daily_sst + '_fco2'
+    # Conversion value from Wanninkhof et al. (2022)
+    data[daily_fco2] = data[month_fco2] * np.exp(0.0413 * (data[daily_sst] - data[month_sst]))
+    data.to_csv(socat_file,sep='\t',index=False)

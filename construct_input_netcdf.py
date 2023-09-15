@@ -14,15 +14,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import Data_Loading.data_utils as du
 
-def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[]):
+def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year = 1970):
     #lon,lat = du.reg_grid(lat=resolution,lon=resolution)
     direct = {}
     for a in vars:
-        timesteps,direct[a[0]+'_'+a[1]],month_track = build_timeseries(a[2],a[1],start_yr,end_yr,lon,lat,a[0])
+        timesteps,direct[a[0]+'_'+a[1]],month_track,time_track_temp = build_timeseries(a[2],a[1],start_yr,end_yr,lon,lat,a[0])
         if a[3] == 1:
             print('Producing anomaly...')
             direct[a[0] + '_' + a[1] + '_anom'] = produce_anomaly(direct[a[0]+'_'+a[1]],month_track)
-    save_netcdf(out_file,direct,lon,lat,timesteps)
+    time_track = []
+    for i in range(len(time_track_temp)):
+        time_track.append((time_track_temp[i] - datetime.datetime(time_ref_year,1,15)).days)
+        #print(time_track)
+    save_netcdf(out_file,direct,lon,lat,timesteps,time_track=time_track,ref_year = time_ref_year)
 
 def build_timeseries(load_loc,variable,start_yr,end_yr,lon,lat,name):
     """
@@ -37,6 +41,7 @@ def build_timeseries(load_loc,variable,start_yr,end_yr,lon,lat,name):
     mon = 1
     avai = []
     month_track = []
+    time_track = []
     t = 0
     while yr <= end_yr:
         """
@@ -57,13 +62,15 @@ def build_timeseries(load_loc,variable,start_yr,end_yr,lon,lat,name):
             out_data[:,:,t] = du.load_netcdf_var(file,variable)
 
         month_track.append(mon)
+        time_track.append(datetime.datetime(yr,mon,15))
+        #print(time_track)
         mon += 1
         t += 1
         if mon==13:
             yr += 1
             mon = 1
     out_data = fill_with_clim(out_data,np.array(avai),np.array(month_track))
-    return timesteps,out_data,np.array(month_track)
+    return timesteps,out_data,np.array(month_track),time_track
 
 def produce_anomaly(data,month_track):
     """
@@ -161,7 +168,7 @@ def construct_climatology(data,month_track):
             clim[:,:,i] = np.squeeze(data[:,:,f])
     return clim
 
-def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False):
+def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,ref_year = 1970):
     """
     Function to save the final netcdf output for use in the neural network training.
     For each variable in the direct dictionary a netcdf variable is generated - this
@@ -196,6 +203,12 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False):
     lon_o.units = 'Degrees'
     lon_o.standard_name = 'Longitude'
     lon_o[:] = lon
+    #print(time_track)
+    if time_track:
+        time_o = c.createVariable('time','f4',('time'))
+        time_o[:] = time_track
+        time_o.units = f'Days since {ref_year}-01-15'
+        time_o.standard_name = 'Time of observations'
     c.close()
 
 def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False):

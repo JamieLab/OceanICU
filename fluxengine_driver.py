@@ -136,8 +136,8 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     conc_unc = np.sqrt(skin_conc_unc**2 + subskin_conc_unc**2) / np.abs(dconc)
     # Flux uncertainity is the percentage unc added and then converted to absolute units (not percentage)
     flux_unc = np.sqrt(conc_unc**2 + k_perunc**2) * np.abs(flux)
-    conc_unc = conc_unc* np.abs(flux)
-    gas_unc = k_perunc* np.abs(flux)
+    conc_unc = conc_unc * np.abs(flux)
+    gas_unc = k_perunc * np.abs(flux)
 
     #Save to the output netcdf
     c = Dataset(model_save_loc+'/output.nc','a')

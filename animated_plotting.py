@@ -72,6 +72,9 @@ def animated_output(model_save_loc,start_yr,gcb_output = 'C:\\Users\\df391\\OneD
     c.close()
 
     file = os.path.join(model_save_loc,'input_values.nc')
+    if not du.checkfileexist(file):
+        file = os.path.join(model_save_loc,'inputs','neural_network_input.nc')
+
     c = Dataset(file,'r')
     atm = np.array(c.variables['NOAA_ERSL_xCO2'])
     c.close()

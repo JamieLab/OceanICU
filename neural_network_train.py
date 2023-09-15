@@ -30,6 +30,7 @@ import glob
 import datetime
 import weight_stats as ws
 import matplotlib.transforms
+import Data_Loading.data_utils as du
 font = {'weight' : 'normal',
         'size'   : 19}
 matplotlib.rc('font', **font)
@@ -113,7 +114,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     plot_mapped(model_save_loc)
 
 def daily_socat_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_var=[],mapping_prov = [],unc = None, model_save_loc = None,
-    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,mapping_file=[],ktoc = None):
+    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,mapping_file=[],ktoc = None,epochs=200,node_in = range(6,31,3)):
     vars = [fco2_sst,fco2_sst+'_std']
     vars.append(prov)
     if not bath_cutoff == None:
@@ -126,21 +127,32 @@ def daily_socat_neural_driver(data_file,fco2_sst = None, prov = None,var = [],ma
     data = pd.read_table(data_file,sep='\t')
     data[fco2_sst+'_std'] = np.zeros((len(data)))
     data = data[vars]
+    if not fco2_cutoff_low == None:
+        print(f'Trimming fCO2(sw) less than {fco2_cutoff_low} uatm...')
+        print(data.shape)
+        data = data[(data[vars[0]] > fco2_cutoff_low)]
+        print(data.shape)
 
+    if not fco2_cutoff_high == None:
+        print(f'Trimming fCO2(sw) greater than {fco2_cutoff_high} uatm...')
+        print(data.shape)
+        data = data[(data[vars[0]] < fco2_cutoff_high)]
+        print(data.shape)
     data = data[(np.isnan(data) == 0).all(axis=1)]
 
-    #run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val)
-    print(mapping_var)
-    map_vars = mapping_var.copy()
-    map_vars.append(mapping_prov)
-    tabl,output_size,lon,lat = load_data(mapping_file,map_vars,model_save_loc,outp=False)
-    if ktoc:
-        tabl[ktoc] = tabl[ktoc] - 273.15
-    print(tabl)
-    print(mapping_var)
-    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc)
-
-    save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat)
+    run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,epochs=epochs,node_in = node_in)
+    plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov,daily=True,var=var)
+    # print(mapping_var)
+    # map_vars = mapping_var.copy()
+    # map_vars.append(mapping_prov)
+    # tabl,output_size,lon,lat = load_data(mapping_file,map_vars,model_save_loc,outp=False)
+    # if ktoc:
+    #     tabl[ktoc] = tabl[ktoc] - 273.15
+    # print(tabl)
+    # print(mapping_var)
+    # mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc)
+    #
+    # save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat)
 
 """
 Flag E valdiation needs updating to the new construct. Treat this as a independent test dataset (29/07/2023).
@@ -275,7 +287,7 @@ def make_save_tree(model_save_loc):
     if not os.path.isdir(inputs):
         os.mkdir(inputs)
 
-def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10,tot_lut_val=6000):
+def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10,tot_lut_val=6000,epochs=200,node_in = range(6,31,3)):
     """
     Function to run the nerual network training, and saving the best performing model. This function
     produces the model, scaler, uncertainty look up table and validation results for use in producing
@@ -284,6 +296,7 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
     """
     Neural Network intilisation settings
     """
+    data.to_csv(os.path.join(model_save_loc,'training.tsv'),sep='\t')
     # Set early stopping condition: 1e-4
     #es = tf.keras.callbacks.EarlyStopping(monitor='val_rmse', mode='min', patience=10, min_delta=1e-4)
     # Here we set a early stop on the loss function (i.e the MSE) so that if it doesn't change by a certain
@@ -303,7 +316,7 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
     #Set the node increments (set initially as 2**i (i.e base 2 values)) - changed 07/2023 to mutliples of 5. and then to multiples of 10 (26/07/2023)
     # Found that using low numbers of neurons were hurting the neural network performance so upped the numbers.
     # A pretraining step is used so the number of neurons actually used is kept to a minimum.
-    node_increments = [i*10 for i in range(6,31,3)] # This ranges neurons from 60 to 300 in 30 increments
+    node_increments = [i*10 for i in node_in] # This ranges neurons from 60 to 300 in 30 increments
     """
     End of intilisation definitions
     """
@@ -362,7 +375,7 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
             model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
             model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
             # Here we train the neural network.
-            history = model.fit(X_train, y_train[:,0], epochs=200, validation_data=[X_val,y_val[:,0]], verbose=0, callbacks=[es],shuffle=False, batch_size=int(len(X_train)/50))
+            history = model.fit(X_train, y_train[:,0], epochs=epochs, validation_data=[X_val,y_val[:,0]], verbose=0, callbacks=[es],shuffle=False, batch_size=int(len(X_train)/50))
 
             # Calculate the independent test dataset loss function
             rms_error = history.history['loss'][-1]
@@ -398,7 +411,7 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
             model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
             model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
             # Here we train the neural network.
-            history = model.fit(X_train, y_train[:,0], epochs=200, validation_data=[X_val,y_val[:,0]], verbose=0, callbacks=[es],shuffle=False, batch_size=int(len(X_train)/50))
+            history = model.fit(X_train, y_train[:,0], epochs=epochs, validation_data=[X_val,y_val[:,0]], verbose=0, callbacks=[es],shuffle=False, batch_size=int(len(X_train)/50))
             loss = history.history['loss'][-1]
             print(f'Ensemble Loss = { loss } ensemble {i}')
             # Save each of the ensemble outputs
@@ -607,57 +620,109 @@ def weighted(x,y,weights,ax,c):
     ax.text(0.02,0.95,f'Weighted Stats\nRMSD = {rmsd} $\mu$atm\nBias = {bias} $\mu$atm\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
     return h1
 
-def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=False,fco2_cutoff_low = 50,fco2_cutoff_high = 750,ice = None,per_prov=True,prov = None):
+def neural_val_run(data,model_save_loc,var,provs,ens=10,unc=True):
+    inp = np.array(data[var])
+    #print(inp.shape)
+    prov = np.array(data[provs])
+
+    out = np.empty((inp.shape[0]))
+    out[:] = np.nan
+    unc_net = np.copy(out)
+    unc_para = np.copy(out)
+    for v in np.unique(prov[~np.isnan(prov)]):
+        scalar = load(open(os.path.join(model_save_loc,'scalars',f'prov_{v}_scalar.pkl'),'rb')) # Load the scalar
+        f = np.squeeze(np.where(prov == v)) # Find the data within the province
+        #print(f)
+        print(f'Number of samples for {v}: {len(f)}')
+        mod_inp = scalar.transform(inp[f,:]) # Transform the data using the scalar
+        #mod_inp = inp[f,:]
+        out_t = np.zeros((len(f),ens))
+        #print(out_t.shape)
+        # For each ensemble run the neural network and get the output
+        for i in range(ens):
+            #print(mod_inp.shape)
+            mod = tf.keras.models.load_model(os.path.join(model_save_loc,'networks',f'prov_{v}_model_ens{i}'),compile=False)
+            out_t[:,i] = np.squeeze(mod.predict(mod_inp))
+        out[f] = np.nanmean(out_t,axis=1) # The output fCO2 is the mean of the ensembles
+        unc_net[f] = np.nanstd(out_t,axis=1)*2 # The output fCO2 network uncertainity
+        if unc:
+            #Load the parameter uncertainty look up table and apply.
+            lut = load(open(os.path.join(model_save_loc,'unc_lut',f'prov_{v}_lut.pkl'),'rb'))
+            lut = lut[0]
+            unc_para[f] = np.squeeze(lut_retr(lut,mod_inp))
+    data['fco2_sw'] = out
+    data['fco2_sw_net_unc'] = unc_net
+    data['fco2_sw_para_unc'] = unc_para
+    data.to_csv(os.path.join(model_save_loc,'training_addedfco2.tsv'),sep='\t')
+    return data
+
+
+def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=False,fco2_cutoff_low = 50,fco2_cutoff_high = 750,ice = None,per_prov=True,prov = None,daily = False,var = []):
     """
     Function to produce validation statistics with respect to the train/validation/test datasets. This step is extremely sensitive to the indexes used, see note below as to
     a change needed in the code to stop issues.
     DJF - need to save all the input parameters used in the neural network within the neural network folder so that issue of mismatched inputs in the construct_input_netcdf netcdf file,
     don't propagate through to the validaiton step.
     """
-    input_file = os.path.join(model_save_loc,'input_values.nc')
-    # Here we create the save file names if they arent defined.
     if not save_file:
         save_file = os.path.join(model_save_loc,'plots','total_validation.png')
         if per_prov:
             save_file_p = os.path.join(model_save_loc,'plots','per_prov_validation.png')
-    print('Plotting validation....')
+    if daily:
+        if du.checkfileexist(os.path.join(model_save_loc,'training_addedfco2.tsv')):
+            data = pd.read_table(os.path.join(model_save_loc,'training_addedfco2.tsv'),sep='\t')
+        else:
+            data = pd.read_table(os.path.join(model_save_loc,'training.tsv'),sep='\t')
+            print(data)
+            data = neural_val_run(data,model_save_loc,var=var,provs=prov)
+        prov = np.array(data[prov])
+        fco2 = np.array(data['fco2_sw'])
+        fco2_unc = np.array(np.sqrt(data['fco2_sw_net_unc']**2 + data['fco2_sw_para_unc']**2))
+        soc = np.array(data[fco2_sst])
+        soc_s = np.array(data[fco2_sst+'_std'])
 
-    # Here we load the output arrays from the neural network
-    c = Dataset(os.path.join(model_save_loc,'output.nc'),'r')
-    fco2 = c.variables['fco2'][:]
-    fco2_unc = np.sqrt(c.variables['fco2_net_unc'][:]**2 + c.variables['fco2_para_unc'][:]**2) # Combining the network unc, and input parameter unc so we have a single uncertainty values
-    # Reshape these into a single column array.
-    fco2 = np.reshape(fco2,(-1,1))
-    fco2_unc = np.reshape(fco2_unc,(-1,1))
-    c.close()
+    else:
+        input_file = os.path.join(model_save_loc,'input_values.nc')
+        # Here we create the save file names if they arent defined.
 
-    # Now we load the SOCAT data, and the datasets needed to trim the data in the same way as was done in the run_neural_network() function. This step must be identical
-    # or the output will be wrong, because the input index wont correspond correctly...
-    c = Dataset(input_file,'r')
-    soc = np.array(c.variables[fco2_sst+'_reanalysed_fCO2_sw'][:])
-    soc_s = np.array(c.variables[fco2_sst+'_reanalysed_fCO2_sw_std'][:])
-    soc_s[np.isnan(soc_s)==True] = 0 # If the std is np.nan but there is an fCO2 value we set std to 0
-    soc_s = np.sqrt(soc_s**2 + 5**2) # Combine in quadrature the std and a measurment unc of 5 (Bakker et al. 2016)
-    # Remove the data where ice is greater than 0.95.
-    if ice:
-        ic = c.variables[ice][:]
-        soc[ic > 0.95] = np.nan
-    soc = np.reshape(soc,(-1,1))
-    soc_s = np.reshape(soc_s,(-1,1))
-    c.close()
-    # Remove the high and low socat values
-    soc[soc < fco2_cutoff_low] = np.nan
-    soc[soc > fco2_cutoff_high] = np.nan
+        print('Plotting validation....')
 
-    # Load the provinces so we can do the per province evaluation for the validation uncertainty.
-    c = Dataset(input_file,'r')
-    prov = c.variables[prov][:]
-    prov = np.reshape(prov,(-1,1))
-    c.close()
+        # Here we load the output arrays from the neural network
+        c = Dataset(os.path.join(model_save_loc,'output.nc'),'r')
+        fco2 = c.variables['fco2'][:]
+        fco2_unc = np.sqrt(c.variables['fco2_net_unc'][:]**2 + c.variables['fco2_para_unc'][:]**2) # Combining the network unc, and input parameter unc so we have a single uncertainty values
+        # Reshape these into a single column array.
+        fco2 = np.reshape(fco2,(-1,1))
+        fco2_unc = np.reshape(fco2_unc,(-1,1))
+        c.close()
 
-    # Find where we have values for the SOCAT data, neural network data, and the province.
-    f = np.where((np.isnan(soc) == False) & (np.isnan(prov) == False) & (np.isnan(fco2) == False))
-    fco2 = fco2[f]; soc = soc[f]; prov=prov[f]; soc_s = soc_s[f]; fco2_unc = fco2_unc[f] # Trim the arrays.
+        # Now we load the SOCAT data, and the datasets needed to trim the data in the same way as was done in the run_neural_network() function. This step must be identical
+        # or the output will be wrong, because the input index wont correspond correctly...
+        c = Dataset(input_file,'r')
+        soc = np.array(c.variables[fco2_sst+'_reanalysed_fCO2_sw'][:])
+        soc_s = np.array(c.variables[fco2_sst+'_reanalysed_fCO2_sw_std'][:])
+        soc_s[np.isnan(soc_s)==True] = 0 # If the std is np.nan but there is an fCO2 value we set std to 0
+        soc_s = np.sqrt(soc_s**2 + 5**2) # Combine in quadrature the std and a measurment unc of 5 (Bakker et al. 2016)
+        # Remove the data where ice is greater than 0.95.
+        if ice:
+            ic = c.variables[ice][:]
+            soc[ic > 0.95] = np.nan
+        soc = np.reshape(soc,(-1,1))
+        soc_s = np.reshape(soc_s,(-1,1))
+        c.close()
+        # Remove the high and low socat values
+        soc[soc < fco2_cutoff_low] = np.nan
+        soc[soc > fco2_cutoff_high] = np.nan
+
+        # Load the provinces so we can do the per province evaluation for the validation uncertainty.
+        c = Dataset(input_file,'r')
+        prov = c.variables[prov][:]
+        prov = np.reshape(prov,(-1,1))
+        c.close()
+
+        # Find where we have values for the SOCAT data, neural network data, and the province.
+        f = np.where((np.isnan(soc) == False) & (np.isnan(prov) == False) & (np.isnan(fco2) == False))
+        fco2 = fco2[f]; soc = soc[f]; prov=prov[f]; soc_s = soc_s[f]; fco2_unc = fco2_unc[f] # Trim the arrays.
 
     """
     Plotting time!

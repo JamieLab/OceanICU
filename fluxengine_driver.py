@@ -15,6 +15,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import cmocean
+import matplotlib.transforms
+font = {'weight' : 'normal',
+        'size'   : 19}
+matplotlib.rc('font', **font)
 
 def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,seaice=None,sal=None,msl=None,xCO2=None,coolskin='Donlon02',start_yr=1990, end_yr = 2020,
     coare_out=None,tair=None,dewair=None,rs=None,rl=None,zi=None):
@@ -85,7 +89,12 @@ def fluxengine_run(model_save_loc,config_file = None,start_yr = 1990, end_yr = 2
     returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True)
     os.chdir(return_path)
 
-def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1):
+def solubility_wannink2014(sst,sal):
+    sol = -58.0931 + ( 90.5069*(100.0 / sst) ) + (22.2940 * (np.log(sst/100.0))) + (sal * (0.027766 + ( (-0.025888)*(sst/100.0)) + (0.0050578*( (sst/100.0)*(sst/100.0) ) ) ) );
+    sol = np.exp(sol)
+    return sol
+
+def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1,sst_unc = 0.27,wind_unc=0.901,sal_unc =0.1):
     """
     Function to calculate the time and space varying air-sea CO2 flux uncertainties
     """
@@ -105,41 +114,152 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     fco2_sw = np.array(c.variables['fco2'])
     if fco2_tot_unc == -1:
         fco2_tot_unc = np.array(c.variables['fco2_tot_unc'])
+        fco2_tot_unc[fco2_tot_unc>1000] = np.nan
+
+
     else:
         fco2_tot_unc = np.ones((fco2_sw.shape)) * fco2_tot_unc
-    print(fco2_tot_unc)
+    #print(fco2_tot_unc)
+    fco2_net_unc = np.array(c.variables['fco2_net_unc'])
+    fco2_net_unc[fco2_net_unc>1000] = np.nan
+    fco2_para_unc = np.array(c.variables['fco2_para_unc'])
+    fco2_para_unc[fco2_para_unc>1000] = np.nan
+    fco2_val_unc = np.array(c.variables['fco2_val_unc'])
+    fco2_val_unc[fco2_val_unc>1000] = np.nan
 
-    c.close()
-    # fco2_tot_unc = np.zeros((fco2_sw.shape))
-    # fco2_tot_unc[:] = 10
     fco2sw_perunc = fco2_tot_unc / fco2_sw
+    fco2sw_val_unc = fco2_val_unc / fco2_sw
+    fco2sw_para_unc = fco2_para_unc / fco2_sw
+    fco2sw_net_unc = fco2_net_unc / fco2_sw
+    c.close()
+    # Here we setup some montecarlo arrays - some equations are more complicated...
+    sal_skin = load_flux_var(fluxloc,'salinity_skin',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    sal_skin = np.transpose(sal_skin,(1,0,2))
+    sal_subskin = load_flux_var(fluxloc,'OKS1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    sal_subskin = np.transpose(sal_subskin,(1,0,2))
+    sst_skin = load_flux_var(fluxloc,'ST1_Kelvin_mean',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    sst_skin = np.transpose(sst_skin,(1,0,2))
+    sst_subskin = load_flux_var(fluxloc,'FT1_Kelvin_mean',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    sst_subskin = np.transpose(sst_subskin,(1,0,2))
 
-    #Load the flux
-    flux = load_flux_var(fluxloc,'OF',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    flux = np.transpose(flux,(1,0,2))
-    #Load the fco2 atm field and convert to percentage unc
-    fco2_atm = load_flux_var(fluxloc,'pgas_air',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    fco2_atm = np.transpose(fco2_atm,(1,0,2))
-    fco2atm_perunc = atm_unc / fco2_atm
-    # Load the subskin and skin concentrations
+    sal_skin_monte = sal_skin[:,:,:,np.newaxis]
+    sal_subskin = sal_subskin[:,:,:,np.newaxis]
+    sst_skin_monte = sst_skin[:,:,:,np.newaxis]
+    sst_subskin = sst_subskin[:,:,:,np.newaxis]
+    norm_sst = np.random.normal(0,sst_unc,20)
+    norm_sst = norm_sst[np.newaxis,np.newaxis,np.newaxis,:]
+    norm_sss = np.random.normal(0,sal_unc,20)
+    norm_sss = norm_sss[np.newaxis,np.newaxis,np.newaxis,:]
+
+    sal_skin_monte = sal_skin_monte + norm_sss
+    sst_skin_monte = sst_skin_monte + norm_sst
+    sst_skin_monte_c = sst_skin_monte - 273.15
+    sst_subskin = sst_subskin+norm_sst
+    sal_subskin = sal_subskin+norm_sss
+
+    # Here we load the concentrations
     subskin_conc = load_flux_var(fluxloc,'OSFC',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
     subskin_conc = np.transpose(subskin_conc,(1,0,2))
     skin_conc = load_flux_var(fluxloc,'OIC1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
     skin_conc = np.transpose(skin_conc,(1,0,2))
-    # Calculate the concentration uncertainty in units (not percentage)
-    skin_conc_unc = skin_conc * fco2atm_perunc
-    subskin_conc_unc = subskin_conc * fco2sw_perunc
-
     dconc = load_flux_var(fluxloc,'Dconc',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
     dconc = np.transpose(dconc,(1,0,2))
-    # Add the concentration unc in quadrature and then convert to a percentage.
-    conc_unc = np.sqrt(skin_conc_unc**2 + subskin_conc_unc**2) / np.abs(dconc)
-    # Flux uncertainity is the percentage unc added and then converted to absolute units (not percentage)
-    flux_unc = np.sqrt(conc_unc**2 + k_perunc**2) * np.abs(flux)
-    conc_unc = conc_unc * np.abs(flux)
-    gas_unc = k_perunc * np.abs(flux)
 
+    #Load the flux
+    flux = load_flux_var(fluxloc,'OF',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    flux = np.transpose(flux,(1,0,2))
+
+    sst_skin_perc = sst_unc / sst_skin
+
+    #Schmidt number - #Here we do a MonteCarlo as the rules are confusing to implement...
+    print('Calculating schmidt uncertainty...')
+    schmidt = load_flux_var(fluxloc,'SC',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    schmidt = np.transpose(schmidt,(1,0,2))
+    schmidt_unc = np.std(2116.8 + (-136.25 * sst_skin_monte_c) + (4.7353 * sst_skin_monte_c**2) + (-0.092307 * sst_skin_monte_c**3) + (0.0007555 * sst_skin_monte_c**4),axis=3)/schmidt
+    #Wanninkhof 2014 suggest a 5% uncertainty on the polynomial fit for the schmidt number.
+    # We then convert from just schmidt number to (Sc/600)^(-0.5) term in air-sea CO2 flux uncertainty
+    schmidt_unc = np.sqrt(schmidt_unc**2 + 0.05**2) / 2
+
+    # Wind_unc
+    print('Calculating wind uncertainty...')
+    w_2 = load_flux_var(fluxloc,'windu10_moment2',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    w_2 = np.transpose(w_2,(1,0,2))
+    w_1 = load_flux_var(fluxloc,'WS1_mean',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    w_1 = np.transpose(w_1,(1,0,2))
+    gas_trans = load_flux_var(fluxloc,'OK3',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    gas_trans= np.transpose(gas_trans,(1,0,2))
+    w_1 = w_1[:,:,:,np.newaxis]
+    w_2 = w_2[:,:,:,np.newaxis]
+    norm_w1 = np.random.normal(0,wind_unc,20)
+    norm_w1 = norm_w1[np.newaxis,np.newaxis,np.newaxis,:]
+    w1 = w_1 + norm_w1
+    w2 = w1**2
+    wind_unc = (0.333 * w1) + (0.222 * w2)
+    for j in range(20):
+        wind_unc[:,:,:,j] = wind_unc[:,:,:,j]*(np.sqrt(600.0/schmidt))
+    wind_unc = np.std(wind_unc ,axis=3)/gas_trans
+
+    #pH20 uncertainty - #Here we do a MonteCarlo as the rules are confusing to implement...
+    print('Calculation pH20 correction uncertainty...')
+    vco2_atm = load_flux_var(fluxloc,'V_gas',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    vco2_atm = np.transpose(vco2_atm,(1,0,2))
+    ph2O_t = load_flux_var(fluxloc,'PH2O',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    ph2O_t = np.transpose(ph2O_t,(1,0,2))
+    pressure = load_flux_var(fluxloc,'air_pressure',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    pressure = np.transpose(pressure,(1,0,2))
+
+    fco2_atm = load_flux_var(fluxloc,'pgas_air',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    fco2_atm = np.transpose(fco2_atm,(1,0,2))
+
+    ph20 = np.zeros((sst_skin_monte.shape))
+    for i in range(20):
+        ph20[:,:,:,i] = vco2_atm[:,:,:] * (pressure[:,:,:] - 1013.25 * np.exp(24.4543 - (67.4509 * (100.0/sst_skin_monte[:,:,:,i])) - (4.8489 * np.log(sst_skin_monte[:,:,:,i]/100.0)) - 0.000544 * sal_skin_monte[:,:,:,i]))/1013.25
+    ph20 = np.nanstd(ph20,axis=3)/fco2_atm
+    #Weiss and Price 1970 uncertainty on pH20 correction is 0.015%
+    ph20 = np.sqrt(ph20**2 + 0.00015**2)
+    ph20 = (ph20 * skin_conc)/np.abs(dconc)
+    #Concentration unc
+    #Load the fco2 atm field and convert to percentage unc
+
+    print('Calculating xCO2atm uncertainty...')
+    vco2_atm_unc = (atm_unc / vco2_atm)*skin_conc/np.abs(dconc)
+
+    #Solubility calculations
+    print('Calculating subskin solubility uncertainty...')
+    subskin_sol = load_flux_var(fluxloc,'fnd_solubility',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    subskin_sol = np.transpose(subskin_sol,(1,0,2))
+    sol_subskin_unc = solubility_wannink2014(sst_subskin,sal_subskin)
+    sol_subskin_unc = np.std(sol_subskin_unc,axis=3)/subskin_sol
+    #Weiss 1974 suggest a 0.2 % uncertainity on the solubility fit
+    sol_subskin_unc = np.sqrt(sol_subskin_unc **2 + 0.002**2)
+    sol_subskin_unc = (sol_subskin_unc*subskin_conc)/np.abs(dconc)
+    print('Calculating skin solubility uncertainty...')
+    skin_sol = load_flux_var(fluxloc,'skin_solubility',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    skin_sol = np.transpose(skin_sol,(1,0,2))
+    sol_skin_unc = solubility_wannink2014(sst_skin_monte,sal_skin_monte)
+    sol_skin_unc = np.std(sol_skin_unc,axis=3) /skin_sol
+    # Weiss 1974 suggest a 0.2 % uncertainity on the solubility fit
+    sol_skin_unc = np.sqrt(sol_skin_unc **2 + 0.002**2)
+    sol_skin_unc = (sol_skin_unc*skin_conc)/np.abs(dconc)
+    # Load the subskin and skin concentrations
+
+
+    # Calculate the concentration uncertainty in units (not percentage)
+    #skin_conc_unc = skin_conc * np.sqrt(fco2atm_perunc ** 2 + sol_skin_unc **2)
+    print('Calculating fCO2(sw) uncertainty...')
+    subskin_conc_unc = (fco2sw_perunc * subskin_conc) / np.abs(dconc)
+    subskin_conc_unc_net = (fco2sw_net_unc * subskin_conc) / np.abs(dconc)
+    subskin_conc_unc_para = (fco2sw_para_unc * subskin_conc) / np.abs(dconc)
+    subskin_conc_unc_val = (fco2sw_val_unc * subskin_conc) / np.abs(dconc)
+    # Add the concentration unc in quadrature and then convert to a percentage.
+    #conc_unc = np.sqrt(skin_conc_unc**2 + subskin_conc_unc**2) / np.abs(dconc)
+    # Flux uncertainity is the percentage unc added and then converted to absolute units (not percentage)
+    #flux_unc = np.sqrt(conc_unc**2 + k_perunc**2) * np.abs(flux)
+    #conc_unc = conc_unc
+    print('Calculating total flux uncertainty...')
+    flux_unc = np.sqrt(k_perunc**2 + wind_unc **2 + schmidt_unc**2 + vco2_atm_unc**2 + ph20**2 + sol_skin_unc**2 + subskin_conc_unc**2 + sol_subskin_unc**2)
     #Save to the output netcdf
+    print('Saving data...')
     c = Dataset(model_save_loc+'/output.nc','a')
     keys = c.variables.keys()
     if 'flux' in keys:
@@ -147,42 +267,90 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     else:
         var_o = c.createVariable('flux','f4',('longitude','latitude','time'))
         var_o[:] = flux
+
+
     if 'flux_unc' in keys:
         c.variables['flux_unc'][:] = flux_unc
     else:
         var_o = c.createVariable('flux_unc','f4',('longitude','latitude','time'))
         var_o[:] = flux_unc
 
-    if 'flux_unc_conc' in keys:
-        c.variables['flux_unc_conc'][:] = conc_unc
+    if 'flux_unc_fco2sw' in keys:
+        c.variables['flux_unc_fco2sw'][:] = subskin_conc_unc
     else:
-        var_o = c.createVariable('flux_unc_conc','f4',('longitude','latitude','time'))
-        var_o[:] = conc_unc
+        var_o = c.createVariable('flux_unc_fco2sw','f4',('longitude','latitude','time'))
+        var_o[:] = subskin_conc_unc
+
+    if 'flux_unc_fco2sw_net' in keys:
+        c.variables['flux_unc_fco2sw_net'][:] = subskin_conc_unc_net
+    else:
+        var_o = c.createVariable('flux_unc_fco2sw_net','f4',('longitude','latitude','time'))
+        var_o[:] = subskin_conc_unc_net
+
+    if 'flux_unc_fco2sw_para' in keys:
+        c.variables['flux_unc_fco2sw_para'][:] = subskin_conc_unc_para
+    else:
+        var_o = c.createVariable('flux_unc_fco2sw_para','f4',('longitude','latitude','time'))
+        var_o[:] = subskin_conc_unc_para
+
+    if 'flux_unc_fco2sw_val' in keys:
+        c.variables['flux_unc_fco2sw_val'][:] = subskin_conc_unc_val
+    else:
+        var_o = c.createVariable('flux_unc_fco2sw_val','f4',('longitude','latitude','time'))
+        var_o[:] = subskin_conc_unc_val
 
     if 'flux_unc_k' in keys:
-        c.variables['flux_unc_k'][:] = gas_unc
+        c.variables['flux_unc_k'][:] = k_perunc
     else:
         var_o = c.createVariable('flux_unc_k','f4',('longitude','latitude','time'))
-        var_o[:] = gas_unc
+        var_o[:] = k_perunc
 
-    if 'fco2_perc_unc' in keys:
-        c.variables['fco2_perc_unc'][:] = fco2sw_perunc
+    if 'flux_unc_wind' in keys:
+        c.variables['flux_unc_wind'][:] = wind_unc
     else:
-        var_o = c.createVariable('fco2_perc_unc','f4',('longitude','latitude','time'))
-        var_o[:] = fco2sw_perunc
+        var_o = c.createVariable('flux_unc_wind','f4',('longitude','latitude','time'))
+        var_o[:] = wind_unc
 
-    if 'fco2atm_perc_unc' in keys:
-        c.variables['fco2atm_perc_unc'][:] = fco2atm_perunc
+    if 'flux_unc_schmidt' in keys:
+        c.variables['flux_unc_schmidt'][:] = schmidt_unc
     else:
-        var_o = c.createVariable('fco2atm_perc_unc','f4',('longitude','latitude','time'))
-        var_o[:] = fco2atm_perunc
+        var_o = c.createVariable('flux_unc_schmidt','f4',('longitude','latitude','time'))
+        var_o[:] = schmidt_unc
+
+    if 'flux_unc_ph2o' in keys:
+        c.variables['flux_unc_ph2o'][:] = ph20
+    else:
+        var_o = c.createVariable('flux_unc_ph2o','f4',('longitude','latitude','time'))
+        var_o[:] = ph20
+
+    if 'flux_unc_xco2atm' in keys:
+        c.variables['flux_unc_xco2atm'][:] = vco2_atm_unc
+    else:
+        var_o = c.createVariable('flux_unc_xco2atm','f4',('longitude','latitude','time'))
+        var_o[:] = vco2_atm_unc
+
+
+    if 'flux_unc_solsubskin_unc' in keys:
+        c.variables['flux_unc_solsubskin_unc'][:] = sol_subskin_unc
+    else:
+        var_o = c.createVariable('flux_unc_solsubskin_unc','f4',('longitude','latitude','time'))
+        var_o[:] = sol_subskin_unc
+
+    if 'flux_unc_solskin_unc' in keys:
+        c.variables['flux_unc_solskin_unc'][:] = sol_skin_unc
+    else:
+        var_o = c.createVariable('flux_unc_solskin_unc','f4',('longitude','latitude','time'))
+        var_o[:] = sol_skin_unc
+
     c.close()
+    print('Done uncertainty calculations!')
 
 def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel):
     """
     Load variables out of the fluxengine monthly output files into a single variable.
     """
     import glob
+    print('Loading fluxengine variable: ' + var + '...')
     out = np.zeros((latl,lonl,timel))
     out[:] = np.nan
     yr = start_yr
@@ -229,6 +397,7 @@ def calc_annual_flux(model_save_loc,lon,lat,bath_cutoff = False):
     """
     OceanICU version of the fluxengine budgets tool that allows for the uncertainities to be propagated...
     """
+    flux_unc_components = ['fco2sw','k','wind','schmidt','ph2o','xco2atm','solsubskin_unc','solskin_unc','fco2sw_net','fco2sw_para','fco2sw_val']
     import matplotlib.transforms
     font = {'weight' : 'normal',
             'size'   : 19}
@@ -247,10 +416,18 @@ def calc_annual_flux(model_save_loc,lon,lat,bath_cutoff = False):
     flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
     print(flux.shape)
     flux_unc = np.transpose(np.array(c.variables['flux_unc']),(1,0,2))
+    flux_unc[flux_unc > 2000] = np.nan
+    flux_unc = flux_unc * np.abs(flux)
+    flux_components = {}
+    for i in flux_unc_components:
+        flux_components[i] = np.transpose(np.array(c.variables['flux_unc_'+i]),(1,0,2)) * np.abs(flux)
+        flux_components[i][flux_components[i]>2000] = np.nan
     c.close()
     for i in range(0,flux.shape[2]):
         flux[:,:,i] = (flux[:,:,i] * area * land * 30.5) /1e15
         flux_unc[:,:,i] = (flux_unc[:,:,i] * area * land * 30.5) / 1e15
+        for j in flux_unc_components:
+            flux_components[j][:,:,i] = (flux_components[j][:,:,i] * area * land * 30.5) /1e15
         if bath_cutoff:
             flu = flux[:,:,i] ; flu[elev<=bath_cutoff] = np.nan; flux[:,:,i] = flu
             flu_u = flux_unc[:,:,i]; flu_u[elev<=bath_cutoff] = np.nan; flux_unc[:,:,i] = flu_u
@@ -260,6 +437,11 @@ def calc_annual_flux(model_save_loc,lon,lat,bath_cutoff = False):
     up = []
     down = []
     out_unc = []
+    are = []
+    comp = {}
+    for j in flux_unc_components:
+        comp[j] = []
+    area_rep = np.repeat(area[:, :, np.newaxis], 12, axis=2).reshape((-1,1))
     for i in range(0,flux.shape[2],12):
         flu = flux[:,:,i:i+12]
         out.append(np.nansum(flu))
@@ -268,57 +450,41 @@ def calc_annual_flux(model_save_loc,lon,lat,bath_cutoff = False):
         f = np.where(np.sign(flu) == -1)
         down.append(np.nansum(flu[f]))
 
+        flu = flu.reshape((-1,1))
+        f = np.where(np.isnan(flu) == 0)[0]
+        are.append(np.sum(area_rep[f])/12)
+
         out_unc.append(np.nansum(flux_unc[:,:,i:i+12])/2)
+        for j in flux_unc_components:
+            comp[j].append(np.nansum(flux_components[j][:,:,i:i+12])/2)
 
     fig = plt.figure(figsize=(10,10))
     gs = GridSpec(1,1, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.15,right=0.98)
     ax = [fig.add_subplot(gs[0,0])]#,fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,0]),fig.add_subplot(gs[1,1]),fig.add_subplot(gs[2,0]),fig.add_subplot(gs[2,1])]
 
     ax[0].errorbar(year,out,yerr = out_unc)
-    #ax[0].errorbar(year,out,yerr = np.ones((len(out)))*0.6)
 
-    # f = np.squeeze(np.where(lat >= 30)); g = np.arange(0,len(lon));
-    # out,out_unc = flux_split(flux,flux_unc,f,g)
-    # ax[1].errorbar(year,out,yerr = out_unc)
-    # ax[1].plot(year,out_unc*-1)
-    #
-    # f = np.squeeze(np.where(lat <= -30)); g = np.arange(0,len(lon));
-    # out,out_unc = flux_split(flux,flux_unc,f,g)
-    # ax[2].errorbar(year,out,yerr = out_unc)
-    # ax[2].plot(year,out_unc*-1)
-    #
-    # # f = np.squeeze(np.where((lat > -30) & (lat < 30))); g = np.arange(0,len(lon));
-    # # out,out_unc = flux_split(flux,flux_unc,f,g)
-    # # ax[3].errorbar(year,out,yerr = out_unc)
-    # # ax[3].plot(year,out_unc*-1)
-    #
-    # f = np.squeeze(np.where((lat > 65))); g = np.arange(0,len(lon));
-    # out,out_unc = flux_split(flux,flux_unc,f,g)
-    # ax[4].errorbar(year,out,yerr = out_unc)
-    # ax[4].plot(year,out_unc*-1)
-    #
-    # # f = np.squeeze(np.where((lat > 70) & (lat < 71))); g = np.squeeze(np.where((lon < 27) & (lon>26)));
-    # # print(f)
-    # # print(g)
-    # # print(np.arange(1985,2023,1/12).shape)
-    # # ax[5].plot(np.arange(1985,2023,1/12),flux[f,g,:])
-    # # ax[5].plot(np.arange(1985,2023,1/12),flux_unc[f,g,:]*-1)
-    #
-    # ax[0].set_title('Global')
-    # ax[1].set_title('30N - 90N')
-    # ax[2].set_title('30S - 90S')
-    # ax[3].set_title('30N - 30S')
-    # ax[4].set_title('65N - 90N')
-    # ax[5].set_title('70.5N 26.5E')
     for i in range(0,1):
         ax[i].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
-    out_f = np.stack((np.array(year),np.array(out),np.array(out_unc),np.array(up),np.array(down)))
-    np.savetxt(os.path.join(model_save_loc,'annual_flux.csv'),out_f,delimiter=',',fmt='%.5f')
+
+    mol_c = (np.array(out) * 10**15) / np.array(are) / 12
+    head = 'Year, Net air-sea CO2 flux (Pg C yr-1),Net air-sea CO2 flux uncertainty (Pg C yr-1),Upward air-sea CO2 flux (Pg C yr-1),Downward air-sea CO2 flux (Pg C yr-1),Area of net air-sea CO2 flux (m-2),Mean air-sea CO2 flux rate (mol C m-2 yr-1)'
+    out_f = np.transpose(np.stack((np.array(year),np.array(out),np.array(out_unc),np.array(up),np.array(down),np.array(are),np.array(mol_c))))
+    for j in flux_unc_components:
+
+        t2 = np.array(comp[j])
+        t2 = t2[:,np.newaxis]
+        out_f = np.concatenate((out_f,t2),axis=1)
+        print(out_f.shape)
+        print(np.array(comp[j]).shape)
+        head = head+',flux_unc_'+j+' (Pg C yr-1)'
+    np.savetxt(os.path.join(model_save_loc,'annual_flux.csv'),out_f,delimiter=',',fmt='%.5f',header=head)
     fig.savefig(os.path.join(model_save_loc,'plots','global_flux_unc.png'))
     #return flux,flux_u
 
 def plot_example_flux(model_save_loc):
-
+    import geopandas as gpd
+    worldmap = gpd.read_file(gpd.datasets.get_path("ne_50m_land"))
     c = Dataset(model_save_loc+'/output.nc','r')
     lat = np.array(c.variables['latitude'])
     lon = np.array(c.variables['longitude'])
@@ -327,19 +493,25 @@ def plot_example_flux(model_save_loc):
     flux_unc = np.transpose(np.array(c.variables['flux_unc']),(1,0,2))
     c.close()
 
-    fig = plt.figure(figsize=(21,7))
-    gs = GridSpec(1,2, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.05,right=0.95)
+    fig = plt.figure(figsize=(14,14))
+    gs = GridSpec(2,1, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.05,right=0.95)
+
+
     ax1 = fig.add_subplot(gs[0,0]);
-    pc = ax1.pcolor(lon,lat,np.nanmean(flux[:,:,-12:],axis=2),cmap=cmocean.cm.balance)
+    worldmap.plot(color="lightgrey", ax=ax1)
+    ax1.text(0.03,1.07,f'(a)',transform=ax1.transAxes,va='top',fontweight='bold',fontsize = 26)
+    pc = ax1.pcolor(lon,lat,np.nanmean(flux[:,:,:],axis=2),cmap=cmocean.cm.balance)
     cbar = plt.colorbar(pc,ax=ax1)
     cbar.set_label('Air-sea CO$_{2}$ flux (g C m$^{-2}$ d$^{-1}$)');
     pc.set_clim([-0.2,0.2])
 
-    ax2 = fig.add_subplot(gs[0,1]);
-    pc = ax2.pcolor(lon,lat,np.nanmean(flux_unc[:,:,-12:],axis=2),cmap=cmocean.cm.thermal)
+    ax2 = fig.add_subplot(gs[1,0]);
+    worldmap.plot(color="lightgrey", ax=ax2)
+    ax1.text(0.03,1.07,f'(b)',transform=ax2.transAxes,va='top',fontweight='bold',fontsize = 26)
+    pc = ax2.pcolor(lon,lat,np.nanmean(flux_unc[:,:,:]*np.abs(flux),axis=2),cmap='Blues')
     cbar = plt.colorbar(pc,ax=ax2)
     cbar.set_label('Air-sea CO$_{2}$ flux uncertainty (g C m$^{-2}$ d$^{-1}$)');
-    pc.set_clim([0,0.2])
+    pc.set_clim([0,0.1])
     fig.savefig(os.path.join(model_save_loc,'plots','mapped_flux_example.png'),format='png',dpi=300)
 
 def load_annual_flux(model_save_loc):
@@ -410,3 +582,56 @@ def GCB_remove_prov17(model_save_loc):
     c = Dataset(model_out,'a')
     c.variables['fco2'][:] = fco2
     c.close()
+
+def plot_relative_contribution(model_save_loc):
+    label=['fCO$_{2 (sw)}$ Total','Gas Transfer','Wind','Schmidt','pH$_{2}$O','xCO$_{2 (atm)}$','Solubility subskin','Solubility skin']
+    data = np.loadtxt(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',')
+    print(data)
+    totals = []
+    gross = []
+    for i in range(data.shape[0]):
+        totals.append(np.sum(data[i,7:-3]))
+        gross.append(np.sum(np.abs(data[i,3:5])))
+    print(totals)
+    print(gross)
+    data2 = data[:,data.shape[1]-3:]
+    year = data[:,0]
+    data = data[:,7:-3]
+    fig = plt.figure(figsize=(13,15))
+    gs = GridSpec(2,1, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.1,right=0.6)
+    ax = fig.add_subplot(gs[0,0])
+    ax2 = ax.twinx()
+    cols = ['#66c2a5','#fc8d62','#8da0cb','#e78ac3','#a6d854','#91bfdb','#e5c494','#b3b3b3']
+    for i in range(data.shape[0]):
+        bottom = 0
+        for j in range(data.shape[1]):
+            if i == 1:
+                p = ax.bar(year[i],data[i,j]/totals[i],bottom=bottom,color=cols[j],label=label[j])
+            else:
+                p = ax.bar(year[i],data[i,j]/totals[i],bottom=bottom,color=cols[j])
+            bottom = bottom + (data[i,j]/totals[i])
+    ax2.plot(year,gross,'k-')
+    ax.legend(bbox_to_anchor=(1.14, 0.8))
+    ax.set_ylabel('Relative contribution to uncertainty')
+    ax.set_xlabel('Year')
+    ax.set_ylim([0,1])
+    ax2.set_ylabel('Gross air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
+
+    ax = fig.add_subplot(gs[1,0])
+    label = ['fCO$_{2 (sw)}$ Network','fCO$_{2 (sw)}$ Parameter','fCO$_{2 (sw)}$ Validation']
+    totals = []
+    for i in range(data2.shape[0]):
+        totals.append(np.sum(data2[i,:]))
+    for i in range(data2.shape[0]):
+        bottom = 0
+        for j in range(data2.shape[1]):
+            if i == 1:
+                p = ax.bar(year[i],data2[i,j]/totals[i],bottom=bottom,color=cols[j],label=label[j])
+            else:
+                p = ax.bar(year[i],data2[i,j]/totals[i],bottom=bottom,color=cols[j])
+            bottom = bottom + (data2[i,j]/totals[i])
+    ax.legend(bbox_to_anchor=(1.14, 0.8))
+    ax.set_ylabel('Relative contribution to uncertainty')
+    ax.set_xlabel('Year')
+    ax.set_ylim([0,1])
+    fig.savefig(os.path.join(model_save_loc,'plots','relative_uncertainty_contribution.png'),format='png',dpi=300)

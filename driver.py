@@ -10,20 +10,20 @@ if __name__ == '__main__':
     import Data_Loading.data_utils as du
     import sys
     sys.path.append(os.path.join(os.getcwd(),'Data_Loading'))
-    create_inp =False
+    create_inp =True
     run_neural =False
     run_flux = False
-    plot_final = True
+    plot_final = False
     coare = False
 
     fluxengine_config = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/OceanICU/fluxengine_config/fluxengine_config_night.conf'
 
-    model_save_loc = 'D:/ESA_CONTRACT/NN/testing'
+    model_save_loc = 'D:/ESA_CONTRACT/NN/cci_sst_daily_match'
     inps = os.path.join(model_save_loc,'inputs')
     data_file = os.path.join(inps,'neural_network_input.nc')
     start_yr = 1985
     end_yr = 2022
-    log,lag = du.reg_grid(lat=0.1,lon=0.1,latm=[-58,-30],lonm=[-72,-48])
+    log,lag = du.reg_grid(lat=0.1,lon=0.1)
 
     if create_inp:
         from neural_network_train import make_save_tree
@@ -31,7 +31,7 @@ if __name__ == '__main__':
         cur = os.getcwd()
         os.chdir('Data_Loading')
 
-        from Data_Loading.cmems_glorysv12_download import cmems_average
+        #from Data_Loading.cmems_glorysv12_download import cmems_average
 
         #cmems_average('D:/Data/CMEMS/SSS/MONTHLY',os.path.join(inps,'SSS_Test'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag,variable='so')
         # cmems_average('D:/Data/CMEMS/MLD/MONTHLY',os.path.join(inps,'MLD'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag,variable='mlotst',log_av = True)
@@ -56,16 +56,18 @@ if __name__ == '__main__':
         # import Data_Loading.ccmp_average as cc
         # cc.ccmp_average('D:/Data/CCMP/v3.0/monthly',outloc=os.path.join(inps,'ccmp'),start_yr=start_yr,end_yr=end_yr,log=log,lag=lag)
         import run_reanalysis as rean
-        # socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
-        # rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps,grid=False)
-        # import Data_Loading.cci_sstv2 as cci_sst
-        # cci_sst.cci_socat_append(os.path.join(inps,'socat','socat.tsv'))
+        socat_file = 'D:/Data/_DataSets/SOCAT/v2023/SOCATv2023_reanalysed/SOCATv2023with_header_ESACCI.tsv'
+        #rean.regrid_fco2_data(socat_file,latg=lag,long=log,save_loc=inps,grid=False)
+        import Data_Loading.cci_sstv2 as cci_sst
+        #cci_sst.cci_socat_append(os.path.join(inps,'socat','socat.tsv'))
+        import Data_Loading.OISST_data_download as oisst
+        oisst.oisst_socat_append(os.path.join(inps,'socat','socat.tsv'))
         # import Data_Loading.interpolate_noaa_ersl as noaa
         # noaa.append_noaa(os.path.join(inps,'socat','socat.tsv'),'D:/Data/NOAA_ERSL/2023_download.txt')
         #
         import Data_Loading.cmems_glorysv12_download as cmems
         # cmems.cmems_socat_append(os.path.join(inps,'socat','socat.tsv'),data_loc = 'D:/Data/CMEMS/SSS/DAILY',variable='so')
-        cmems.cmems_socat_append(os.path.join(inps,'socat','socat.tsv'),data_loc = 'D:/Data/CMEMS/MLD/DAILY',variable='mlotst',log=True)
+        #cmems.cmems_socat_append(os.path.join(inps,'socat','socat.tsv'),data_loc = 'D:/Data/CMEMS/MLD/DAILY',variable='mlotst',log=True)
 
         import construct_input_netcdf as cinp
         #Vars should have each entry as [Extra_Name, netcdf_variable_name,data_location,produce_anomaly]
@@ -84,10 +86,10 @@ if __name__ == '__main__':
         ]
         #cinp.driver(data_file,vars,start_yr = start_yr,end_yr = end_yr,lon = log,lat = lag)
         # rean.reanalyse(name='CCI-SST',out_dir=os.path.join(inps,'socat'),outfile = data_file,start_yr = start_yr,end_yr = end_yr,prefix = 'GL_from_%Y_to_%Y_%m.nc',socat_files = [socat_file],flip = False)
-        import convex as cox
-        sh_file = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_Covex_Seascape/Carbon Budget/data/LMEs/LMEs66.shp'
-        LME,ind = cox.load_LME_file(sh_file)
-        x,y,tit = cox.load_LMEs(LME,ind,14)
+        # import convex as cox
+        # sh_file = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_Covex_Seascape/Carbon Budget/data/LMEs/LMEs66.shp'
+        # LME,ind = cox.load_LME_file(sh_file)
+        # x,y,tit = cox.load_LMEs(LME,ind,14)
         #cinp.province_shape(data_file,'si_prov',log,lag,start_yr,end_yr,x,y)
         #cox.socat_append_prov(os.path.join(inps,'socat','socat.tsv'),x,y,1)
         #rean.correct_fco2_daily(os.path.join(inps,'socat','socat.tsv'),'fCO2_reanalysed [uatm]','T_reynolds [C]','cci_sst [C]')

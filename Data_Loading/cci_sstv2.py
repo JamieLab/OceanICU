@@ -150,19 +150,35 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
             ye = ye+1
             mon = 1
 
-def cci_socat_append(file,data_loc='D:/Data/SST-CCI'):
+def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1981):
     import pandas as pd
     import calendar
     import glob
     import matplotlib.pyplot as plt
+    import pickle
     data = pd.read_table(file,sep='\t')
     cci_sst = np.zeros((len(data)))
     cci_sst[:] = np.nan
-
+    cci_sst_unc = np.copy(cci_sst)
+    s = file.split('.')
     yr = [np.min(data['yr']),np.max(data['yr'])]
     t = 0
-    for yrs in range(yr[0],yr[1]+1):
+    if du.checkfileexist(s[0]+'.pkl'):
+        print('Loading pickle file....')
+        dbfile = open(s[0]+'.pkl', 'rb')
+        temp = pickle.load(dbfile)
+        dbfile.close()
+        start_yr = temp[0]
+        cci_sst = temp[1]
+        cci_sst_unc = temp[2]
+        print(start_yr)
+
+    for yrs in range(start_yr,yr[1]+1):
+        dbfile = open(s[0]+'.pkl', 'wb')
+        pickle.dump([yrs,cci_sst,cci_sst_unc],dbfile)
+        dbfile.close()
         for mon in range(1,13):
+
             days = calendar.monthrange(yrs,mon)[1]
             for day in range(1,days+1):
                 f = np.where((data['yr'] == yrs) & (data['mon'] == mon) & (data['day'] == day))[0]
@@ -176,17 +192,32 @@ def cci_socat_append(file,data_loc='D:/Data/SST-CCI'):
                             [lon,lat] = du.load_grid(sst_file[0],latv = 'lat',lonv='lon')
                             res = np.abs(lon[0] - lon[1]) * 2
                             t = 1
-                        lat_b = [np.min(data['latitude [dec.deg.N]'][f]),np.max(data['latitude [dec.deg.N]'][f])]
-                        lon_b = [np.min(data['longitude [dec.deg.E]'][f]),np.max(data['longitude [dec.deg.E]'][f])]
-                        lat_b = np.where((lat < lat_b[1]+res) & (lat > lat_b[0]-res))[0]
-                        lon_b = np.where((lon < lon_b[1]+res) & (lon > lon_b[0]-res))[0]
-                        c = Dataset(sst_file[0],'r')
-                        sst_data = np.squeeze(c['analysed_sst'][0,lat_b,lon_b])
-                        sst_data[sst_data<-250] = np.nan
-                        #sst_data = sst_data
-                        c.close()
+                        for expo in set(data['Expocode'][f]):
+                            print(expo)
+                            g = np.where(data['Expocode'][f] == expo)[0]
+                            #print(g)
+                            lat_b = [np.min(data['latitude [dec.deg.N]'][f[g]]),np.max(data['latitude [dec.deg.N]'][f[g]])]
+                            lon_b = [np.min(data['longitude [dec.deg.E]'][f[g]]),np.max(data['longitude [dec.deg.E]'][f[g]])]
+                            #print(lat_b)
+                            #print(lon_b)
+                            lat_b = np.where((lat < lat_b[1]+res) & (lat > lat_b[0]-res))[0]
+                            lon_b = np.where((lon < lon_b[1]+res) & (lon > lon_b[0]-res))[0]
+                            c = Dataset(sst_file[0],'r')
+                            sst_data = np.squeeze(c['analysed_sst'][0,lat_b,lon_b])
+                            sst_unc = np.squeeze(c['analysed_sst_uncertainty'][0,lat_b,lon_b])
+                            sst_data[sst_data<-250] = np.nan
+                            sst_unc[sst_unc<-250] = np.nan
+                            #sst_data = sst_data
+                            c.close()
+                            #print(data['longitude [dec.deg.E]'][f[g]])
+                            #print(data['latitude [dec.deg.N]'][f[g]])
+                            a = du.point_interp(lon[lon_b],lat[lat_b],sst_data,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=False)
+                            #print(a)
+                            cci_sst[f[g]] = a
+                            a = du.point_interp(lon[lon_b],lat[lat_b],sst_unc,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=False)
+                            cci_sst_unc[f[g]] = a
 
-                        cci_sst[f] = du.point_interp(lon[lon_b],lat[lat_b],sst_data,data['longitude [dec.deg.E]'][f],data['latitude [dec.deg.N]'][f])
     data['cci_sst [C]'] = cci_sst - 273.15
+    data['cci_sst_unc [C]'] = cci_sst_unc
     st = file.split('.')
     data.to_csv(file,sep='\t',index=False)

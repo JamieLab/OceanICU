@@ -280,7 +280,8 @@ def cmems_socat_append(file,data_loc=[],variable = [],plot=False,log=False):
                             sst_data = np.squeeze(c[variable][day-1,lat_b,lon_b])
                         else:
                             sst_data = np.squeeze(c[variable][day-1,0,lat_b,lon_b])
-                        sst_data[sst_data<-250] = np.nan
+                        sst_data[sst_data<-100] = np.nan
+                        sst_data[sst_data>3000] = np.nan
                         #sst_data = sst_data
                         c.close()
 

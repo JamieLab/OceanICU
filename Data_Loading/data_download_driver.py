@@ -2,16 +2,16 @@
 """
 """
 import data_utils as du
-start_yr = 1985
-end_yr = 2022
+start_yr = 1981
+end_yr = 2023
 
 noaa = False
 era5 = False
 cmems = False
-cmems_daily=True
+cmems_daily=False
 bicep = False
 ccmp = False
-oisst = False
+oisst = True
 cci = False
 gebco = False
 
@@ -72,8 +72,8 @@ if ccmp:
 
 if oisst:
     import OISST_data_download as OI
-    #OI.download_oisst_v21_daily('D:/Data/OISSTv2_1',start_yr=start_yr,end_yr=end_yr)
-    OI.OISST_monthly_split('sst.mon.mean.nc','D:/Data/OISSTv2_1/monthly')
+    OI.download_oisst_v21_daily('D:/Data/OISSTv2_1',start_yr=start_yr,end_yr=end_yr)
+    #OI.OISST_monthly_split('sst.mon.mean.nc','D:/Data/OISSTv2_1/monthly')
 
 if cci:
     import cci_sst_retrieve_v2 as cc

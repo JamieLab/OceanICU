@@ -55,7 +55,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
 
     for v in var:
         vars.append(v)
-    tabl,output_size,lon,lat = load_data(data_file,vars,model_save_loc,outp=True)
+    tabl,output_size,lon,lat,time = load_data(data_file,vars,model_save_loc,outp=True)
     if not sea_ice == None:
         print(f'Setting where sea ice is greater than 95% to nan...')
         tabl[tabl[sea_ice] > 0.95] = np.nan
@@ -102,7 +102,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     # (propagated input parameter uncertainties)
     mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
     # Then we save the fCO2 data
-    save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat)
+    save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,time = time)
     # Once saved the validation can be extracted, and used to determine the validation uncertainty for each province,
     # which can then be mapped. This function produces validation statistics for the training/validation, test and all data together
     # using both weighted and unweighted statistics.
@@ -235,6 +235,7 @@ def load_data(load_loc,vars,output_loc=[],outp=True):
     c = Dataset(load_loc,'r')
     lon = np.array(c.variables['longitude'][:])
     lat = np.array(c.variables['latitude'][:])
+    time = list(c.variables['time'][:])
     t = 0
     # This loop cycles through the netcdf variables and loads the ones defined in vars
     ins_save = {}
@@ -249,7 +250,7 @@ def load_data(load_loc,vars,output_loc=[],outp=True):
         ins_save[v] = data
         t += 1
     if outp:
-        save_netcdf(os.path.join(output_loc,'input_values.nc'),ins_save,lon,lat,output.shape[2])
+        save_netcdf(os.path.join(output_loc,'input_values.nc'),ins_save,lon,lat,output.shape[2],time_track=time)
     # Reshape the 3d numpy arrays into a single colum and put into a dataframe.
     for i in range(0,len(vars)):
         if i == 0:
@@ -260,7 +261,7 @@ def load_data(load_loc,vars,output_loc=[],outp=True):
     c.close()
     #Returns the loaded data, the size of the data in longitude,latitude,time, the longitude array
     #and the latitude array
-    return tabl,d[0:3],lon,lat
+    return tabl,d[0:3],lon,lat,time
 
 def make_save_tree(model_save_loc):
     """
@@ -371,7 +372,8 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
             print(n)
             # Here we setup the Tensor Flow Model (Thanks to Josh Blannin for example code)
             model = tf.keras.models.Sequential(name='PROV_'+str(v)) # Setup the model
-            model.add(tf.keras.layers.Dense(n, input_dim=len(var), activation='sigmoid')) # Add Hidden layer - changed from relu to sigmoid as seems to produce better results.
+            model.add(tf.keras.layers.Dense(n, input_dim=len(var),activation='sigmoid')) # Add Hidden layer - changed from relu to sigmoid as seems to produce better results.
+            #model.add(tf.keras.layers.Dense(n, activation='sigmoid')) # Add Hidden layer - changed from relu to sigmoid as seems to produce better results.
             model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
             model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
             # Here we train the neural network.
@@ -408,6 +410,7 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
             """
             model = tf.keras.models.Sequential(name='PROV_'+str(v)) # Setup the model
             model.add(tf.keras.layers.Dense(min_n, input_dim=len(var), activation='sigmoid')) # Add Hidden layer
+            #model.add(tf.keras.layers.Dense(n, activation='sigmoid'))
             model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
             model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
             # Here we train the neural network.
@@ -596,14 +599,14 @@ def unweight(x,y,ax,c):
     Function to calculate the unweighted statistics and add them to a scatter plot (well any plot really, in the bottom right corner)
     """
     stats_un = ws.unweighted_stats(x,y,'val')
-    h2 = ax.plot(c,c*stats_un['slope']+stats_un['intercept'],'k-.',zorder=5, label = 'Unweighted')
+    #h2 = ax.plot(c,c*stats_un['slope']+stats_un['intercept'],'k-.',zorder=5, label = 'Unweighted')
     rmsd = '%.2f' %np.round(stats_un['rmsd'],2)
     bias = '%.2f' %np.round(stats_un['rel_bias'],2)
     sl = '%.2f' %np.round(stats_un['slope'],2)
     ip = '%.2f' %np.round(stats_un['intercept'],2)
     n = stats_un['n']
     ax.text(0.55,0.3,f'Unweighted Stats\nRMSD = {rmsd} $\mu$atm\nBias = {bias} $\mu$atm\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
-    return h2
+    #return h2
 
 def weighted(x,y,weights,ax,c):
     """
@@ -729,7 +732,7 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     """
     # Setting up the figure for the training/validaiton, test and total validation plots
     fig = plt.figure(figsize=(15,15))
-    gs = GridSpec(2,2, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.1,right=0.98)
+    gs = GridSpec(2,2, figure=fig, wspace=0.25,hspace=0.25,bottom=0.1,top=0.95,left=0.1,right=0.98)
     c = np.array([0,800])
     ax = [fig.add_subplot(gs[0,0]),fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,0]),fig.add_subplot(gs[1,1])]
 
@@ -757,9 +760,11 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     if per_prov:
         col = 6 # 6 columns on the figure
         row = int(np.ceil(len(np.unique(prov))/col)) # Calculate the rows based on number of provinces
-
+        font = {'weight' : 'normal',
+                'size'   : 25}
+        matplotlib.rc('font', **font)
         #Setting up the figure for the per province validation
-        fig2 = plt.figure(figsize=(col*8,row*8))
+        fig2 = plt.figure(figsize=(col*9,row*9))
         gs = GridSpec(row,col, figure=fig2, wspace=0.25,hspace=0.25,bottom=0.05,top=0.98,left=0.05,right=0.98)
         axs = [[fig2.add_subplot(gs[i, j]) for j in range(col)] for i in range(row)]
         flatList = [element for innerList in axs for element in innerList]
@@ -770,13 +775,14 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         w = ws.weighted_stats(soc[ind_test],fco2[ind_test],1/np.sqrt(soc_s[ind_test]**2 + fco2_unc[ind_test]**2),'b') # Weighted stats so we can extract the RMSD for each province and save it.
 
         if per_prov: # Plot the scatter plot for each province with the in plot statistics
+
             axs[tp].scatter(soc[ind_test],fco2[ind_test])
             unweight(soc[ind_test],fco2[ind_test],axs[tp],c)
             weighted(soc[ind_test],fco2[ind_test],1/np.sqrt(soc_s[ind_test]**2 + fco2_unc[ind_test]**2),axs[tp],c)
             axs[tp].set_title(f'Province {v}')
             axs[tp].set_xlim(c); axs[tp].set_ylim(c); axs[tp].plot(c,c,'k-');
-            axs[tp].set_xlabel('in situ fCO$_{2 (sw,subskin)}$ ($\mu$atm)')
-            axs[tp].set_ylabel('Predicted fCO$_{2 (sw,subskin)}$ ($\mu$atm)')
+            axs[tp].set_xlabel('in situ SOCAT fCO$_{2 (sw)}$ ($\mu$atm)')
+            axs[tp].set_ylabel('Neural Network fCO$_{2 (sw)}$ ($\mu$atm)')
             tp = tp+1
         if t == 0: # Start the combination array
             tot_ts = np.stack((soc[ind_test],soc_s[ind_test]),axis=1)
@@ -789,6 +795,9 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
             tot_tn = np.concatenate((tot_tn,np.stack((fco2[ind_test],fco2_unc[ind_test]),axis=1)))
             rmsd = np.vstack((rmsd,np.array([v,w['rmsd']]))) # Append further rmsd values with its province number
             #print(rmsd)
+    font = {'weight' : 'normal',
+            'size'   : 19}
+    matplotlib.rc('font', **font)
     print(rmsd)
     np.savetxt(os.path.join(model_save_loc,'validation','independent_test_rmsd.csv'), rmsd, delimiter=",") # Save this rmsd data to a csv file to load later...
     # Produce the scatter plot for the test dataset
@@ -808,14 +817,16 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     ax[3].errorbar(ts[:,0],tn[:,0],xerr=ts[:,1],yerr=tn[:,1],linestyle='none')
 
     # Plot tidying up and adding axis labels and plot titles
+    let = ['a','b','c','d','e','f','g','h']
     for i in [0,1,2,3]:
         ax[i].set_xlim(c); ax[i].set_ylim(c); ax[i].plot(c,c,'k-');
-        ax[i].set_xlabel('in situ fCO$_{2 (sw,subskin)}$ ($\mu$atm)')
-        ax[i].set_ylabel('Predicted fCO$_{2 (sw,subskin)}$ ($\mu$atm)')
+        ax[i].set_xlabel('in situ SOCAT fCO$_{2 (sw)}$ ($\mu$atm)')
+        ax[i].set_ylabel('Neural Network fCO$_{2 (sw)}$ ($\mu$atm)')
+        ax[i].text(0.03,1.07,f'({let[i]})',transform=ax[i].transAxes,va='top',fontweight='bold',fontsize = 26)
     ax[0].set_title('Training and Validation')
     ax[1].set_title('Independent Test')
-    ax[2].set_title('Train, Val and Test')
-    ax[3].set_title('Train, Val and Test with errorbars')
+    ax[2].set_title('All datasets')
+    ax[3].set_title('All datasets with errorbars')
 
     # Save the figures.
     fig.savefig(save_file,format='png',dpi=300)
@@ -970,36 +981,46 @@ def neural_network_map(mapping_data,var=None,model_save_loc=None,prov = None,out
     unc_para = np.reshape(unc_para,(output_size))
     return out,unc_net,unc_para
 
-def save_mapped_fco2(data,net_unc,para_unc,data_shape = None, model_save_loc = None, lon = None,lat = None):
+def save_mapped_fco2(data,net_unc,para_unc,data_shape = None, model_save_loc = None, lon = None,lat = None,time = None):
     """
     Function to save the mapped fco2 data produced by nerual_network_map.
     """
-    c = Dataset(os.path.join(model_save_loc,'output.nc'),'w',format='NETCDF4_CLASSIC')
-    c.code_used = 'neural_network_train.py'
-    c.date_created = datetime.datetime.now().strftime(('%d/%m/%Y'))
-    c.created_by = 'Daniel J. Ford (d.ford@exeter.ac.uk)'
+    from construct_input_netcdf import save_netcdf
+    direct = {}
+    direct['fco2'] = data
+    direct['fco2_net_unc'] = net_unc
+    direct['fco2_para_unc'] = para_unc
 
-    c.createDimension('longitude',data_shape[0])
-    c.createDimension('latitude',data_shape[1])
-    c.createDimension('time',data_shape[2])
-    var_o = c.createVariable('fco2','f4',('longitude','latitude','time'))
-    var_o[:] = data
-    data_smooth = spatial_smooth(data)
-    var_o = c.createVariable('fco2_smoothed','f4',('longitude','latitude','time'))
-    var_o[:] = data_smooth
-    var_o = c.createVariable('fco2_net_unc','f4',('longitude','latitude','time'))
-    var_o[:] = net_unc
-    var_o = c.createVariable('fco2_para_unc','f4',('longitude','latitude','time'))
-    var_o[:] = para_unc
-    lat_o = c.createVariable('latitude','f4',('latitude'))
-    lat_o[:] = lat
-    lat_o.units = 'Degrees'
-    lat_o.standard_name = 'Latitude'
-    lon_o = c.createVariable('longitude','f4',('longitude'))
-    lon_o.units = 'Degrees'
-    lon_o.standard_name = 'Longitude'
-    lon_o[:] = lon
-    c.close()
+    save_netcdf(os.path.join(model_save_loc,'output.nc'),direct,lon,lat,data.shape[2],time_track=time)
+
+    # c = Dataset(,'w',format='NETCDF4_CLASSIC')
+    # c.code_used = 'neural_network_train.py'
+    # c.date_created = datetime.datetime.now().strftime(('%d/%m/%Y'))
+    # c.created_by = 'Daniel J. Ford (d.ford@exeter.ac.uk)'
+    #
+    # c.createDimension('longitude',data_shape[0])
+    # c.createDimension('latitude',data_shape[1])
+    # c.createDimension('time',data_shape[2])
+    # var_o = c.createVariable('fco2','f4',('longitude','latitude','time'))
+    # var_o[:] = data
+    # data_smooth = spatial_smooth(data)
+    # var_o = c.createVariable('fco2_net_unc','f4',('longitude','latitude','time'))
+    # var_o[:] = net_unc
+    # var_o = c.createVariable('fco2_para_unc','f4',('longitude','latitude','time'))
+    # var_o[:] = para_unc
+    # lat_o = c.createVariable('latitude','f4',('latitude'))
+    # lat_o[:] = lat
+    # lat_o.units = 'Degrees'
+    # lat_o.standard_name = 'Latitude'
+    # lon_o = c.createVariable('longitude','f4',('longitude'))
+    # lon_o.units = 'Degrees'
+    # lon_o.standard_name = 'Longitude'
+    # lon_o[:] = lon
+    # time_o = c.createVariable('time','f4',('time'))
+    # time_o[:] = time_track
+    # time_o.units = f'Days since {ref_year}-01-15'
+    # time_o.standard_name = 'Time of observations'
+    # c.close()
 
 def spatial_smooth(data):
     import scipy.signal as sg

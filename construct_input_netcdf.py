@@ -168,7 +168,7 @@ def construct_climatology(data,month_track):
             clim[:,:,i] = np.squeeze(data[:,:,f])
     return clim
 
-def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,ref_year = 1970):
+def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,ref_year = 1970,units=False):
     """
     Function to save the final netcdf output for use in the neural network training.
     For each variable in the direct dictionary a netcdf variable is generated - this
@@ -192,6 +192,8 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,re
         else:
             var_o = c.createVariable(var,'f4',('longitude','latitude','time'))#,**copts)
             var_o[:] = direct[var]
+        if units:
+            var_o.units = units[var]
         #print(direct[var].shape)
 
 
@@ -203,7 +205,7 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,re
     lon_o.units = 'Degrees'
     lon_o.standard_name = 'Longitude'
     lon_o[:] = lon
-    #print(time_track)
+    print(time_track)
     if time_track:
         time_o = c.createVariable('time','f4',('time'))
         time_o[:] = time_track
@@ -211,7 +213,7 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,re
         time_o.standard_name = 'Time of observations'
     c.close()
 
-def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False):
+def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False):
     c = Dataset(save_loc,'a',format='NETCDF4_CLASSIC')
     for var in list(direct.keys()):
         if flip:
@@ -220,6 +222,8 @@ def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False):
         else:
             var_o = c.createVariable(var,'f4',('longitude','latitude','time'))#,**copts)
             var_o[:] = direct[var]
+        if units:
+            var_o.units = units[var]
 
 def single_province(save_loc,var,lon,lat,start_yr,end_yr):
     timesteps =((end_yr-start_yr)+1)*12

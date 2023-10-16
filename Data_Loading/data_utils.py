@@ -52,6 +52,7 @@ def reg_grid(lat=1,lon=1,latm = [-90,90],lonm = [-180,180],pad = False):
     return lon_g,lat_g
 
 def area_grid(lon,lat,res):
+    print(res)
     #lon,lat = reg_grid(lon=lon,lat=lat)
     area = np.zeros((len(lat),1))
     for i in range(len(lat)):
@@ -143,6 +144,14 @@ def numstr(num):
     else:
         return str(num)
 
+def numstr3(num):
+    if num < 10:
+        return '00'+str(num)
+    if num < 100:
+        return '0'+str(num)
+    else:
+        return str(num)
+
 def netcdf_create_basic(file,var,var_name,lat,lon):
     #copts={"zlib":True,"complevel":5} # Compression variables to save space :-)
     outp = Dataset(file,'w',format='NETCDF4_CLASSIC')
@@ -192,12 +201,14 @@ def grid_interp(o_lon,o_lat,o_data,n_lon,n_lat):
     out = np.transpose(out.reshape(s))
     return out
 
-def point_interp(o_lon,o_lat,o_data,n_lon,n_lat):
-    # import matplotlib.pyplot as plt
+def point_interp(o_lon,o_lat,o_data,n_lon,n_lat,plot=False):
+    import matplotlib.pyplot as plt
     o_lon,o_lat = np.meshgrid(o_lon,o_lat)
-    # plt.figure()
-    # plt.pcolor(o_lon,o_lat,o_data)
-    # plt.show()
+    if plot:
+        plt.figure()
+        plt.pcolor(o_lon,o_lat,o_data)
+        plt.scatter(n_lon,n_lat)
+        plt.show()
     points = np.stack([o_lon.ravel(),o_lat.ravel()],-1)
     out = interp.griddata(points,o_data.ravel(),(n_lon,n_lat))
     return out

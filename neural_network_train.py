@@ -883,7 +883,7 @@ def plot_mapped(model_save_loc):
     Function to plot a mapped example of the fCO2 and the uncertainty components for the final year of the array.
     More a sanity check that things have worked correctly.
     """
-
+    dat =300
     #Load all the variables needed for plotting
     c = Dataset(model_save_loc+'/output.nc')
     lat = np.squeeze(c.variables['latitude'][:])
@@ -896,11 +896,11 @@ def plot_mapped(model_save_loc):
     c.close()
 
     #Take the mean of the final year for each variable
-    fco2_plot = np.transpose(np.nanmean(fco2[:,:,-11:],axis=2))
-    fco2_u_plot = np.transpose(np.nanmean(fco2_net_unc[:,:,-11:],axis=2))
-    fco2_up_plot = np.transpose(np.nanmean(fco2_para_unc[:,:,-11:],axis=2))
-    fco2_val_plot = np.transpose(np.nanmean(fco2_val_unc[:,:,-11:],axis=2))
-    fco2_tot_plot = np.transpose(np.nanmean(fco2_tot_unc[:,:,-11:],axis=2))
+    fco2_plot = np.transpose(fco2[:,:,dat])
+    fco2_u_plot = np.transpose(fco2_net_unc[:,:,dat])
+    fco2_up_plot = np.transpose(fco2_para_unc[:,:,dat])
+    fco2_val_plot = np.transpose(fco2_val_unc[:,:,dat])
+    fco2_tot_plot = np.transpose(fco2_tot_unc[:,:,dat])
 
     # And plot these... (Maybe a more line efficient way to do this...)
     fig = plt.figure(figsize=(21,21))

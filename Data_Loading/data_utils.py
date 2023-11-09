@@ -159,7 +159,7 @@ def netcdf_create_basic(file,var,var_name,lat,lon):
     outp.created_by = 'Daniel J. Ford (d.ford@exeter.ac.uk)'
     outp.createDimension('lon',lon.shape[0])
     outp.createDimension('lat',lat.shape[0])
-    sst_o = outp.createVariable(var_name,'f4',('lon','lat'))
+    sst_o = outp.createVariable(var_name,'f4',('lon','lat'),zlib=True)
     sst_o[:] = var
 
     lat_o = outp.createVariable('latitude','f4',('lat'))
@@ -174,7 +174,7 @@ def netcdf_create_basic(file,var,var_name,lat,lon):
 
 def netcdf_append_basic(file,var,var_name):
     outp = Dataset(file,'a',format='NETCDF4_CLASSIC')
-    sst_o = outp.createVariable(var_name,'f4',('lon','lat'))
+    sst_o = outp.createVariable(var_name,'f4',('lon','lat'),zlib=True)
     sst_o[:] = var
     outp.close()
 

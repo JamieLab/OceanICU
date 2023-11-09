@@ -57,9 +57,9 @@ def cci_retrieve(loc="D:/Data/SST-CCI/",start_yr = 1981,end_yr = 2023):
                 zip_ref.extractall(p)
         d = d+datetime.timedelta(days=1)
 
-def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023):
+def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023,time_cor = 5):
     du.makefolder(os.path.join(inp,'monthly'))
-    if start_yr < 1981:
+    if start_yr <= 1981:
         ye = 1981
         mon = 9
     else:
@@ -78,32 +78,40 @@ def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023):
             #print(files)
             # Load the lat and lon grid for the first time (set i to 1 as we only want to do this once)
             if i == 0:
-                lon,lat = lat_lon(os.path.join(fold,files[0]))
+                lon,lat = du.load_grid(os.path.join(fold,files[0]),latv='lat',lonv='lon')
                 i = 1
             #
             sst = np.empty((lon.shape[0],lat.shape[0],len(files)))
             sst[:] = np.nan
             ice = np.empty((lon.shape[0],lat.shape[0],len(files)))
             ice[:] = np.nan
+            unc = np.empty((lon.shape[0],lat.shape[0],len(files)))
+            unc[:] = np.nan
             for j in range(len(files)):
                 print(files[j])
                 c = Dataset(os.path.join(fold,files[j]),'r')
                 sst_t = np.array(c.variables['analysed_sst'][:]); sst_t[sst_t < 0 ] = np.nan
-                sst_t = np.transpose(sst[0,:,:])
+                #print(np.transpose(sst[0,:,:]).shape)
+                sst_t = np.transpose(sst_t[0,:,:])
 
-                ice_t = np.array(c.variables['sea_ice_fraction'][:]); ice[ice < 0] = np.nan
-                ice_t = np.transpose(ice[0,:,:])
+                ice_t = np.array(c.variables['sea_ice_fraction'][:]); ice_t[ice_t < 0] = np.nan
+                ice_t = np.transpose(ice_t[0,:,:])
 
+                unc_t = np.array(c.variables['analysed_sst_uncertainty'][:]); unc_t[unc_t < 0] = np.nan
+                unc_t = np.transpose(unc_t[0,:,:])
                 c.close()
 
                 sst[:,:,j] = sst_t
                 ice[:,:,j] = ice_t
+                unc[:,:,j] = unc_t
             sst_o = np.nanmean(sst,axis=2)
             ice_o = np.nanmean(ice,axis=2)
+            unc_o = np.nanmean(unc,axis=2)/np.sqrt(len(files)/time_cor)
             if mon == 1:
                 du.makefolder(os.path.join(inp,'monthly',str(ye)))
-            du.netcdf_create(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+numstr(mon)+'.nc'),sst_o,'analysed_sst',lat,lon)
-            du.netcdf_append(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+numstr(mon)+'.nc'),ice_o,'sea_ice_fraction')
+            du.netcdf_create_basic(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc'),sst_o,'analysed_sst',lat,lon)
+            du.netcdf_append_basic(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc'),ice_o,'sea_ice_fraction')
+            du.netcdf_append_basic(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc'),unc_o,'analysed_sst_uncertainty')
         mon = mon+1
         if mon == 13:
             mon = 1
@@ -138,12 +146,15 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
             c = Dataset(file,'r')
             sst = np.array(c.variables['analysed_sst'][:]); sst[sst<0] = np.nan
             ice = np.array(c.variables['sea_ice_fraction'][:])
+            unc = np.array(c.variables['analysed_sst_uncertainty'][:])
             c.close()
             #print(sst.shape)
             sst_o = du.grid_average(sst,lo_grid,la_grid)
             ice_o = du.grid_average(ice,lo_grid,la_grid)
+            unc_o = du.grid_average(unc,lo_grid,la_grid)
             du.netcdf_create_basic(file_o,sst_o,'analysed_sst',lag,log)
             du.netcdf_append_basic(file_o,ice_o,'sea_ice_fraction')
+            du.netcdf_append_basic(file_o,unc_o,'analysed_sst_uncertainty')
 
         mon = mon+1
         if mon == 13:

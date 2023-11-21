@@ -47,11 +47,12 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,se
         dt_coare = ccs.calc_coare(input_file,coare_out,ws = ws,tair = tair, dewair = dewair, sst = tsub, msl = msl,
             rs = rs, rl = rl, zi = zi,start_yr=start_yr,end_yr=end_yr)
         direct['t_skin'] = direct['t_subskin'] - dt_coare
+        direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
 
-    append_netcdf(os.path.join(model_save_loc,'input_values.nc'),direct,lon,lat,timesteps)
+    append_netcdf(input_file,direct,lon,lat,timesteps)
     direct['wind_speed_2'] = direct['wind_speed'] ** 2
     direct['wind_speed_3'] = direct['wind_speed'] ** 3
-
+    direct['sea_ice_fraction'] = direct['sea_ice_fraction']# * 100
     direct['fco2sw'] = du.load_netcdf_var(os.path.join(model_save_loc,'output.nc'),'fco2')
     #save_netcdf(os.path.join(model_save_loc,'fluxengine.nc'),direct,lon,lat,timesteps)
     fluxengine_individual_netcdf(model_save_loc,direct,lon,lat,start_yr,end_yr)
@@ -154,10 +155,15 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     skin_conc = np.transpose(skin_conc,(1,0,2))
     dconc = load_flux_var(fluxloc,'Dconc',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
     dconc = np.transpose(dconc,(1,0,2))
-
+    # Load the ice data
+    ice = load_flux_var(fluxloc,'P1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    ice = np.transpose(ice,(1,0,2))
     #Load the flux
     flux = load_flux_var(fluxloc,'OF',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    flux = np.transpose(flux,(1,0,2))
+    """
+    Here we correct the flux for the ice coverage...
+    """
+    flux = np.transpose(flux,(1,0,2)) * (1-ice)
 
     #sst_skin_perc = sst_unc / sst_skin
 
@@ -196,6 +202,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
         tem_u[:] = np.nan
         for i in range(ens):
             w1 = w_1[:,:,j] + norm_wind[i]
+            w1[w1 < 0] = 0.0
             w2 = w1**2
             tem_u[:,:,i] = ((0.333 * w1) + (0.222 * w2))*(np.sqrt(600.0/schmidt[:,:,j]))
         wind_unc[:,:,j] = np.std(tem_u,axis=2)/gas_trans[:,:,j]
@@ -285,7 +292,8 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     #flux_unc = np.sqrt(conc_unc**2 + k_perunc**2) * np.abs(flux)
     #conc_unc = conc_unc
     print('Calculating total flux uncertainty...')
-    flux_unc = np.sqrt(k_perunc**2 + wind_unc **2 + schmidt_unc**2 + vco2_atm_unc**2 + ph20**2 + sol_skin_unc**2 + subskin_conc_unc**2 + sol_subskin_unc**2)
+    flux_unc = np.sqrt(k_perunc**2 + wind_unc **2 + schmidt_unc**2 + vco2_atm_unc**2 + ph20**2 + sol_skin_unc**2 + subskin_conc_unc**2 + sol_subskin_unc**2
+        + schmidt_fixed**2 + ph20_fixed**2 + sol_skin_fixed**2 + sol_subskin_fixed**2)
     #Save to the output netcdf
     print('Saving data...')
     c = Dataset(model_save_loc+'/output.nc','a')
@@ -418,7 +426,14 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     else:
         var_o = c.createVariable('flux_unc_fco2atm','f4',('longitude','latitude','time'))
         var_o[:] = np.sqrt(ph20**2 + vco2_atm_unc**2)
-
+    """
+    Adding ice to output flux file...
+    """
+    if 'ice' in keys:
+        c.variables['ice'][:] = ice
+    else:
+        var_o = c.createVariable('ice','f4',('longitude','latitude','time'))
+        var_o[:] = ice
     c.close()
     print('Done uncertainty calculations!')
 
@@ -492,32 +507,32 @@ def calc_annual_flux(model_save_loc,lon,lat,bath_cutoff = False):
     c = Dataset(model_save_loc+'/output.nc','r')
     flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
     print(flux.shape)
-    flux_unc = np.transpose(np.array(c.variables['flux_unc']),(1,0,2))
-    flux_unc[flux_unc > 2000] = np.nan
-    flux_unc = flux_unc * np.abs(flux)
-    flux_components = {}
-    for i in flux_unc_components:
-        flux_components[i] = np.transpose(np.array(c.variables['flux_unc_'+i]),(1,0,2)) * np.abs(flux)
-        flux_components[i][flux_components[i]>2000] = np.nan
+    # flux_unc = np.transpose(np.array(c.variables['flux_unc']),(1,0,2))
+    # flux_unc[flux_unc > 2000] = np.nan
+    # flux_unc = flux_unc * np.abs(flux)
+    # flux_components = {}
+    # for i in flux_unc_components:
+    #     flux_components[i] = np.transpose(np.array(c.variables['flux_unc_'+i]),(1,0,2)) * np.abs(flux)
+    #     flux_components[i][flux_components[i]>2000] = np.nan
     c.close()
     for i in range(0,flux.shape[2]):
         flux[:,:,i] = (flux[:,:,i] * area * land * 30.5) /1e15
-        flux_unc[:,:,i] = (flux_unc[:,:,i] * area * land * 30.5) / 1e15
-        for j in flux_unc_components:
-            flux_components[j][:,:,i] = (flux_components[j][:,:,i] * area * land * 30.5) /1e15
+        # flux_unc[:,:,i] = (flux_unc[:,:,i] * area * land * 30.5) / 1e15
+        # for j in flux_unc_components:
+        #     flux_components[j][:,:,i] = (flux_components[j][:,:,i] * area * land * 30.5) /1e15
         if bath_cutoff:
             flu = flux[:,:,i] ; flu[elev<=bath_cutoff] = np.nan; flux[:,:,i] = flu
-            flu_u = flux_unc[:,:,i]; flu_u[elev<=bath_cutoff] = np.nan; flux_unc[:,:,i] = flu_u
+            # flu_u = flux_unc[:,:,i]; flu_u[elev<=bath_cutoff] = np.nan; flux_unc[:,:,i] = flu_u
 
     year = list(range(1985,2022+1,1))
     out = []
     up = []
     down = []
-    out_unc = []
+    # out_unc = []
     are = []
     comp = {}
-    for j in flux_unc_components:
-        comp[j] = []
+    # for j in flux_unc_components:
+    #     comp[j] = []
     area_rep = np.repeat(area[:, :, np.newaxis], 12, axis=2).reshape((-1,1))
     for i in range(0,flux.shape[2],12):
         flu = flux[:,:,i:i+12]
@@ -531,35 +546,58 @@ def calc_annual_flux(model_save_loc,lon,lat,bath_cutoff = False):
         f = np.where(np.isnan(flu) == 0)[0]
         are.append(np.sum(area_rep[f])/12)
 
-        out_unc.append(np.nansum(flux_unc[:,:,i:i+12])/2)
-        for j in flux_unc_components:
-            comp[j].append(np.nansum(flux_components[j][:,:,i:i+12])/2)
+        # out_unc.append(np.nansum(flux_unc[:,:,i:i+12])/2)
+        # for j in flux_unc_components:
+        #     comp[j].append(np.nansum(flux_components[j][:,:,i:i+12])/2)
 
-    fig = plt.figure(figsize=(10,10))
-    gs = GridSpec(1,1, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.15,right=0.98)
-    ax = [fig.add_subplot(gs[0,0])]#,fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,0]),fig.add_subplot(gs[1,1]),fig.add_subplot(gs[2,0]),fig.add_subplot(gs[2,1])]
-    ax[0].plot(year,out,'k-',linewidth=2)
-    ax[0].fill_between(year,np.array(out)-np.array(out_unc),np.array(out)+ np.array(out_unc),alpha=0.4,label='Total uncertainty')
-    ax[0].fill_between(year,np.array(out)-np.array(comp['k']),np.array(out)+ np.array(comp['k']),alpha=0.4,label='Gas Transfer')
-    ax[0].legend()
+    # fig = plt.figure(figsize=(10,10))
+    # gs = GridSpec(1,1, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.15,right=0.98)
+    # ax = [fig.add_subplot(gs[0,0])]#,fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,0]),fig.add_subplot(gs[1,1]),fig.add_subplot(gs[2,0]),fig.add_subplot(gs[2,1])]
+    # ax[0].plot(year,out,'k-',linewidth=2)
+    # ax[0].fill_between(year,np.array(out)-np.array(out_unc),np.array(out)+ np.array(out_unc),alpha=0.4,label='Total uncertainty')
+    # ax[0].fill_between(year,np.array(out)-np.array(comp['k']),np.array(out)+ np.array(comp['k']),alpha=0.4,label='Gas Transfer')
+    # ax[0].legend()
 
-    for i in range(0,1):
-        ax[i].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
+    # for i in range(0,1):
+    #     ax[i].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
 
     mol_c = (np.array(out) * 10**15) / np.array(are) / 12
-    head = 'Year, Net air-sea CO2 flux (Pg C yr-1),Net air-sea CO2 flux uncertainty (Pg C yr-1),Upward air-sea CO2 flux (Pg C yr-1),Downward air-sea CO2 flux (Pg C yr-1),Area of net air-sea CO2 flux (m-2),Mean air-sea CO2 flux rate (mol C m-2 yr-1)'
-    out_f = np.transpose(np.stack((np.array(year),np.array(out),np.array(out_unc),np.array(up),np.array(down),np.array(are),np.array(mol_c))))
-    for j in flux_unc_components:
-
-        t2 = np.array(comp[j])
-        t2 = t2[:,np.newaxis]
-        out_f = np.concatenate((out_f,t2),axis=1)
-        print(out_f.shape)
-        print(np.array(comp[j]).shape)
-        head = head+',flux_unc_'+j+' (Pg C yr-1)'
+    head = 'Year, Net air-sea CO2 flux (Pg C yr-1),Upward air-sea CO2 flux (Pg C yr-1),Downward air-sea CO2 flux (Pg C yr-1),Area of net air-sea CO2 flux (m-2),Mean air-sea CO2 flux rate (mol C m-2 yr-1)'
+    out_f = np.transpose(np.stack((np.array(year),np.array(out),np.array(up),np.array(down),np.array(are),np.array(mol_c))))
     np.savetxt(os.path.join(model_save_loc,'annual_flux.csv'),out_f,delimiter=',',fmt='%.5f',header=head)
-    fig.savefig(os.path.join(model_save_loc,'plots','global_flux_unc.png'))
+    # fig.savefig(os.path.join(model_save_loc,'plots','global_flux_unc.png'))
     #return flux,flux_u
+
+def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False):
+    fix = ['k','ph2o_fixed','schmidt_fixed','solskin_unc_fixed','solsubskin_unc_fixed']
+    res = np.abs(lon[0]-lon[1])
+    area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
+    c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
+    land = np.transpose(np.squeeze(np.array(c.variables['ocean_proportion'])))
+    if bath_cutoff:
+        elev=  np.transpose(np.squeeze(np.array(c.variables['elevation'])))
+    c.close()
+
+    c = Dataset(model_save_loc+'/output.nc','r')
+    flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
+    print(flux.shape)
+    flux_components = {}
+    for i in fix:
+        flux_components[i] = np.transpose(np.array(c.variables['flux_unc_'+i]),(1,0,2)) * np.abs(flux)
+        flux_components[i][flux_components[i]>2000] = np.nan
+    for i in range(0,flux.shape[2]):
+        for j in fix:
+            flux_components[j][:,:,i] = (flux_components[j][:,:,i] * area * land * 30.5) /1e15
+    comp = {}
+    for j in fix:
+        comp[j] = []
+    for i in range(0,flux.shape[2],12):
+        for j in fix:
+            comp[j].append(np.nansum(flux_components[j][:,:,i:i+12])/2)
+    data = pd.read_table(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',')
+    for j in fix:
+        data['flux_unc_'+j+' (Pg C yr-1)'] = comp[j]
+    data.to_csv(os.path.join(model_save_loc,'annual_flux.csv'),index=False)
 
 def plot_example_flux(model_save_loc):
     import geopandas as gpd
@@ -583,6 +621,7 @@ def plot_example_flux(model_save_loc):
     cbar = plt.colorbar(pc,ax=ax1)
     cbar.set_label('Air-sea CO$_{2}$ flux (g C m$^{-2}$ d$^{-1}$)');
     pc.set_clim([-0.2,0.2])
+    ax1.set_facecolor('gray')
 
     ax2 = fig.add_subplot(gs[1,0]);
     #worldmap.plot(color="lightgrey", ax=ax2)
@@ -591,6 +630,7 @@ def plot_example_flux(model_save_loc):
     cbar = plt.colorbar(pc,ax=ax2)
     cbar.set_label('Air-sea CO$_{2}$ flux uncertainty (g C m$^{-2}$ d$^{-1}$)');
     pc.set_clim([0,0.1])
+    ax2.set_facecolor('gray')
     fig.savefig(os.path.join(model_save_loc,'plots','mapped_flux_example.png'),format='png',dpi=300)
 
 
@@ -612,91 +652,97 @@ def plot_example_flux(model_save_loc):
         cbar = plt.colorbar(pc,ax=axs[i])
         cbar.set_label('Air-sea CO$_{2}$ flux uncertainty (g C m$^{-2}$ d$^{-1}$)');
         axs[i].set_title(label[i])
+        axs[i].set_facecolor('gray')
     fig.savefig(os.path.join(model_save_loc,'plots','mapped_flux_components_example.png'),format='png',dpi=300)
 
 
-def GCB_remove_prov17(model_save_loc):
-    bio_file = os.path.join(model_save_loc,'networks','biomes.nc')
-    model_out = os.path.join(model_save_loc,'output.nc')
-    c = Dataset(bio_file,'r')
-    prov = np.array(c.variables['prov'])
-    print(prov.shape)
-    c.close()
-
-    c = Dataset(model_out,'r')
-    fco2 = np.array(c.variables['fco2'])
-    print(fco2.shape)
-    c.close()
-
-    fco2[prov == 17.0] = np.nan
-    c = Dataset(model_out,'a')
-    c.variables['fco2'][:] = fco2
-    c.close()
-
 def plot_relative_contribution(model_save_loc):
-    label=['fCO$_{2 (sw)}$ Total','Gas Transfer','Wind','Schmidt','Solubility subskin','Solubility skin','fCO$_{2 (atm)}$']
+    ye = '# Year'
+    gro = ['Upward air-sea CO2 flux (Pg C yr-1)','Downward air-sea CO2 flux (Pg C yr-1)']
+    uncs = ['k','wind','xco2atm','seaice','fco2sw']
+    uncs_comp= ['ph2o','schmidt','solskin_unc','solsubskin_unc']
+    label=['Gas Transfer','Wind','Sea Ice','fCO$_{2 (sw)}$ Total','Schmidt','Solubility skin','Solubility subskin','fCO$_{2 (atm)}$']
     label2 = ['pH$_{2}$O','xCO$_{2 (atm)}$']
-    data = np.loadtxt(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',')
-    print(data)
+    data = pd.read_table(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',')
+
+    """
+    Start by getting all the data out of the annual_flux.csv file. These could be run in any order so we put into a consitent format
+    We then combine the fixed and non-fixed components of uncs_comp to produce a single estimate.
+    """
+    combined = np.zeros((len(data[ye]),len(uncs_comp)+len(uncs)))
+    for i in range(len(uncs)):
+        combined[:,i] = data['flux_unc_'+uncs[i]+' (Pg C yr-1)']
+    for i in range(len(uncs_comp)):
+        combined[:,i+len(uncs)] = np.sqrt(data['flux_unc_'+uncs_comp[i]+' (Pg C yr-1)']**2 + data['flux_unc_'+uncs_comp[i]+'_fixed (Pg C yr-1)']**2)
+    combine_head = uncs+uncs_comp
+    #print(combined)
+    #print(combine_head)
     totals = []
     gross = []
-    for i in range(data.shape[0]):
-        totals.append(np.sum(data[i,[7,8,9,10,13,14,15]]))
-        gross.append(data[i,3:5])
+    for i in range(len(data[ye])):
+        totals.append(np.sum(combined[i,:]))
     print(totals)
-    gross = np.array(gross)
-    print(gross)
-    data2 = data[:,data.shape[1]-3:]
-    year = data[:,0]
-    #data = data[:,7:-3]
-    data_atm = data[:,[11,12]]
-    data = data[:,[7,8,9,10,13,14,15]]
-
-    print(data.shape)
-    fig = plt.figure(figsize=(26,15))
-    gs = GridSpec(2,2, figure=fig, wspace=0.9,hspace=0.2,bottom=0.07,top=0.95,left=0.075,right=0.9)
+    gross = np.array(data[gro])
+    year = data[ye]
+    # #data = data[:,7:-3]
+    data_atm = combined[:,[2,5]]
+    combined = combined[:,[0,1,3,4,6,7,8]]
+    print(combined.shape)
+    atm = np.sqrt(np.sum(data_atm**2,axis=1))
+    atm = atm[:,np.newaxis]
+    print(atm.shape)
+    combined = np.append(combined,atm,axis=1)
+    print(combined.shape)
+    #label = np.array(combine_head)[[0,1,3,4,6,7,8]]; label = np.append(label,'fCO2_atm')#
+    #print(label)
+    # data = data[:,[7,8,9,10,13,14,15]]
+    #
+    # print(data.shape)
+    fig = plt.figure(figsize=(26,10))
+    gs = GridSpec(1,2, figure=fig, wspace=0.9,hspace=0.2,bottom=0.07,top=0.95,left=0.075,right=0.9)
     ax = fig.add_subplot(gs[0,0])
     ax2 = ax.twinx()
-    cols = ['#66c2a5','#fc8d62','#8da0cb','#e78ac3','#a6d854','#91bfdb','#e5c494','#b3b3b3']
-    for i in range(data.shape[0]):
+    cols = ['#6929c4','#1192e8','#005d5d','#e78ac3','#fa4d56','#570408','#e5c494','#198038','#002d9c']
+    cols = ["#fd7f6f", "#7eb0d5", "#b2e061", "#bd7ebe", "#ffb55a", "#ffee65", "#beb9db", "#fdcce5", "#8bd3c7"]
+    for i in range(combined.shape[0]):
         bottom = 0
-        for j in range(data.shape[1]):
+        for j in range(combined.shape[1]):
             if i == 1:
-                p = ax.bar(year[i],data[i,j]/totals[i],bottom=bottom,color=cols[j],label=label[j])
+                p = ax.bar(year[i],combined[i,j]/totals[i],bottom=bottom,color=cols[j],label=label[j])
             else:
-                p = ax.bar(year[i],data[i,j]/totals[i],bottom=bottom,color=cols[j])
-            bottom = bottom + (data[i,j]/totals[i])
-    ax2.plot(year,-np.sum(np.abs(gross),axis=1),'k-',label = 'Gross Flux')
-    ax2.plot(year,np.sum(gross,axis=1),'k--', label = 'Net Flux')
+                p = ax.bar(year[i],combined[i,j]/totals[i],bottom=bottom,color=cols[j])
+            bottom = bottom + (combined[i,j]/totals[i])
+    ax2.plot(year,-np.sum(np.abs(gross),axis=1),'k-',label = 'Gross Flux',linewidth=3)
+    ax2.plot(year,np.sum(gross,axis=1),'k--', label = 'Net Flux',linewidth=3)
     ax2.legend(bbox_to_anchor=(1.6, 0.9))
-
+    #
     ax.legend(bbox_to_anchor=(1.17, 0.73))
     ax.set_ylabel('Relative contribution to uncertainty')
     ax.set_xlabel('Year')
     ax.set_ylim([0,1])
     ax2.set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
-
-    ax = fig.add_subplot(gs[1,0])
-    label = ['fCO$_{2 (sw)}$ Network','fCO$_{2 (sw)}$ Parameter','fCO$_{2 (sw)}$ Evaluation']
-    totals = []
-    for i in range(data2.shape[0]):
-        totals.append(np.sum(data2[i,:]))
-    for i in range(data2.shape[0]):
-        bottom = 0
-        for j in range(data2.shape[1]):
-            if i == 1:
-                p = ax.bar(year[i],data2[i,j]/totals[i],bottom=bottom,color=cols[j],label=label[j])
-            else:
-                p = ax.bar(year[i],data2[i,j]/totals[i],bottom=bottom,color=cols[j])
-            bottom = bottom + (data2[i,j]/totals[i])
-    ax.legend(bbox_to_anchor=(1.14, 0.8))
-    ax.set_ylabel('Relative contribution to uncertainty')
-    ax.set_xlabel('Year')
-    ax.set_ylim([0,1])
-    ax.set_title('fCO$_{2 (sw)}$ total uncertainty contributions')
-
+    #
+    # ax = fig.add_subplot(gs[1,0])
+    # label = ['fCO$_{2 (sw)}$ Network','fCO$_{2 (sw)}$ Parameter','fCO$_{2 (sw)}$ Evaluation']
+    # totals = []
+    # for i in range(data2.shape[0]):
+    #     totals.append(np.sum(data2[i,:]))
+    # for i in range(data2.shape[0]):
+    #     bottom = 0
+    #     for j in range(data2.shape[1]):
+    #         if i == 1:
+    #             p = ax.bar(year[i],data2[i,j]/totals[i],bottom=bottom,color=cols[j],label=label[j])
+    #         else:
+    #             p = ax.bar(year[i],data2[i,j]/totals[i],bottom=bottom,color=cols[j])
+    #         bottom = bottom + (data2[i,j]/totals[i])
+    # ax.legend(bbox_to_anchor=(1.14, 0.8))
+    # ax.set_ylabel('Relative contribution to uncertainty')
+    # ax.set_xlabel('Year')
+    # ax.set_ylim([0,1])
+    # ax.set_title('fCO$_{2 (sw)}$ total uncertainty contributions')
+    #
     ax = fig.add_subplot(gs[0,1])
-    label = ['pH$_{2}$O','xCO$_{2 (atm)}$']
+    label = ['xCO$_{2 (atm)}$','pH$_{2}$O']
     totals = []
     for i in range(data_atm.shape[0]):
         totals.append(np.sum(data_atm[i,:]))
@@ -713,47 +759,57 @@ def plot_relative_contribution(model_save_loc):
     ax.set_xlabel('Year')
     ax.set_ylim([0,1])
     ax.set_title('fCO$_{2 (atm)}$ uncertainty contributions')
-
+    #
     fig.savefig(os.path.join(model_save_loc,'plots','relative_uncertainty_contribution.png'),format='png',dpi=300)
 
-def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022):
+    # fig = plt.figure(figsize=(10,10))
+    # gs = GridSpec(1,2, figure=fig, wspace=0.9,hspace=0.2,bottom=0.07,top=0.95,left=0.075,right=0.9)
+    # ax = fig.add_subplot(gs[0,0])
+    # ax2.plot(year,np.sum(gross,axis=1),'k-',linewidth=3)
+
+def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[2000,200],flux_var = '',seaice = False,seaice_var=''):
+    """
+    Code to evaluate the effect of uncertainties that decorrelate over a specified length scale.
+    The pre-calculated flux uncertainties are loaded from the framework output, and then a random grid
+    of random numbers is constructed over the region defined within the decorrelation length (i.e random
+    tie points spread ~evenly over the globe so that each point is 2xdecorrelation length apart). This
+    tie point grid is then interpolated over the domain, so that a systematic regional random number is
+    assign. Flux uncertainites are multiplied by the random number, and added to the orginial flux. Globally
+    intergrated values are then calculated annually for an ensemble of this approach (200 ensembles). The
+    standard deviation is extract for the annual CO2 flux timeseries from the 200 ensembles giving the
+    integrated flux uncertainty whilst accounting for decorrelation lengths.
+
+    For sea ice, we treat the approach differently. The uncertainties for most sea ice cases are asymmetric
+    and cannot be pre-computed. Therefore we take the flux output, and orginial sea ice concentration
+    for the flux calculation, and calcualte the flux without sea ice. Then the flux is recomputed based on the sea
+    ice concentration from the uncertainty montecarlo. Slightly different approach.
+    """
     import scipy.interpolate as interp
-    #fluxloc = model_save_loc+'/flux'
+    import random
+    fluxloc = model_save_loc+'/flux'
     c = Dataset(model_save_loc+'/output.nc','r')
-    c_flux = np.array(c.variables['flux'])
-    c_flux_unc = np.array(c.variables['flux_unc_solskin_unc']) * np.abs(c_flux)
-    #fco2_tot_unc[:] = 12
+    if not seaice:
+        c_flux = np.array(c.variables['flux'])
+        c_flux_unc = np.array(c.variables['flux_unc_'+flux_var]) * np.abs(c_flux)
     lon = np.array(c.variables['longitude'])
     lat = np.array(c.variables['latitude'])
     time = np.array(c.variables['time'])
-    # fco2_tot_unc[fco2_tot_unc>1000] = np.nan
     c.close()
-    # Calculating avaiable in situ data to constrain neural network.
-    # c = Dataset(model_save_loc+'/input_values.nc','r')
-    # fco2_insitu = np.array(c.variables['CCI_SST_reanalysed_fCO2_sw'])
-    #
-    # c.close()
+
     time_2 = np.zeros((len(time)))
     for i in range(0,len(time)):
         time_2[i] = ((datetime.datetime(1970,1,15)+datetime.timedelta(days=int(time[i]))).year)
 
-
-
-    # subskin_sol = load_flux_var(fluxloc,'fnd_solubility',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    # subskin_sol = np.transpose(subskin_sol,(1,0,2))
-    # subskin_sol = subskin_sol * 12.0108/1000
-    # skin_conc = load_flux_var(fluxloc,'OIC1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    # skin_conc = np.transpose(skin_conc,(1,0,2))
-    # skin_conc = skin_conc
-    # gas_trans = load_flux_var(fluxloc,'OK3',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    # gas_trans= np.transpose(gas_trans,(1,0,2))
-    # gas_trans = gas_trans * 24.0 / 100.0
-    # schmidt = load_flux_var(fluxloc,'SC',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
-    # schmidt = np.transpose(schmidt,(1,0,2))
-    # schmidt = np.sqrt(schmidt/600)
+    if seaice:
+        c_flux = load_flux_var(fluxloc,'OF',start_yr,end_yr,len(lon),len(lat),len(time))
+        c_flux = np.transpose(c_flux,(1,0,2))
+        ice = load_flux_var(fluxloc,'P1',start_yr,end_yr,len(lon),len(lat),len(time))
+        ice = np.transpose(ice,(1,0,2))
+        c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'r')
+        ice_unc = np.array(c.variables[seaice_var][:])
+        c.close()
 
     res = np.abs(lon[0]-lon[1])
-    #lon,lat = du.reg_grid()
     area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
     print(area.shape)
     area = np.transpose(area)
@@ -775,12 +831,21 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022):
     # data_totals = np.abs(data_totals - np.max(data_totals))
     # data_totals = (range_decorr[1] - range_decorr[0]) * ((data_totals - 0) / (np.max(data_totals) - 0)) + range_decorr[0]
     # print(data_totals)
-    # decors = np.loadtxt(os.path.join(model_save_loc,'decorrelation.csv'),delimiter=',')
+
     # data_totals = decors[:,1]
     decors = np.zeros((len(a),2))
-    decors[:,0] = decors[:,0] + 400
-    decors[:,1] = decors[:,0] * 0.59
-    ens = 200
+    if isinstance(decor, str):
+        print('Loading Decorrelation')
+        decor_loaded = np.loadtxt(os.path.join(model_save_loc,'decorrelation.csv'),delimiter=',')
+        decors[:,0] = decor_loaded[:,1]
+
+        decors[:,1] = decor_loaded[:,2]
+        print(decors)
+    else:
+        decors[:,0] = decors[:,0] + decor[0]
+        decors[:,1] = decor[1]
+        print(decors)
+    ens = 100
     out = np.zeros((len(a),ens))
     #pad = 40 # 8 = 400km, 13 = 650km, 14 = 700 km, 28 = 1400km, 40 = 2000km
     print(f'Lat 1: {lat[0]} Lat2: {lat[-1]}')
@@ -796,19 +861,36 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022):
             if t_c ==1:
                 pad = -1
                 while (pad < 1) | (pad>70):
-                    pad = ((decors[t,0] + (decors[t,1]*np.random.normal(0,0.33,1))) / 110)*2
-                    print(pad)
-                lon_s = np.linspace(lon[0],lon[-1],int((lon[-1] - lon[0])/pad))
+                    ran = np.random.normal(0,0.33,1)
+                    de_len = (decors[t,0] + (decors[t,1]*ran))
+                    pad = (de_len / 110.574)*2
                 lat_s = np.linspace(lat[0],lat[-1],int((lat[-1]-lat[0])/pad))
-                lon_ss,lat_ss = np.meshgrid(lon_s,lat_s)
-            unc_o = np.random.normal(0,1,(len(lon_s),len(lat_s)))
+                lat_ss = []
+                lon_ss = []
+                for l in range(len(lat_s)):
+                    lat_km = 111.320*np.cos(np.deg2rad(lat_s[l]))
+                    padl = (de_len/lat_km)*2
 
-            points = np.stack([lon_ss.ravel(),lat_ss.ravel()],-1)
-            u = unc_o[:,:].ravel()
+                    in_padl = int((lon[-1] - lon[0])/padl)
+                    #print(in_padl)
+                    if in_padl == 0:
+                        lon_s = [0]
+                    else:
+                        lon_s = np.linspace(lon[0],lon[-1],in_padl)
+                    for p in range(len(lon_s)):
+                        lat_ss.append(lat_s[l])
+                        lon_ss.append(lon_s[p])
+                lat_ss.append(lat[0]); lat_ss.append(lat[0]);lat_ss.append(lat[-1]);lat_ss.append(lat[-1]);
+                lon_ss.append(lon[0]); lon_ss.append(lon[-1]); lon_ss.append(lon[0]); lon_ss.append(lon[-1]);
+
+            unc_o = np.random.normal(0,1,(len(lon_ss)))
+            v = np.random.normal(0,1)
+            unc_o[-3:] = v
+
+            points = np.stack([np.array(lon_ss).ravel(),np.array(lat_ss).ravel()],-1)
+            u = unc_o.ravel()
             un_int = interp.griddata(points,u,(np.stack([lon_ns.ravel(),lat_ns.ravel()],-1)),method = 'cubic')
             un_int = np.transpose(un_int.reshape((len(lat),len(lon))))
-            #un_int = un_int[:,:,np.newaxis]
-            #print(un_int.shape)
             unc[:,:,i] = un_int
             t_c = t_c + 1
             if t_c == 13:
@@ -816,19 +898,18 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022):
                 t_c = 1
             if (j ==0) & (i == 0):
                 fig = plt.figure()
-                plt.pcolor(lon,lat,np.transpose(np.squeeze(unc[:,:,i])))
+                plt.pcolor(lon,lat,np.transpose(np.squeeze(unc[:,:,i])),vmin=-1,vmax=1)
                 plt.colorbar()
                 fig.savefig(os.path.join(model_save_loc,'plots','example_pco2_perturbation.png'),format='png',dpi=300)
-                plt.show()
-
-
-        #print(unc)
-        #unc = np.random.normal(0,2,[fco2_tot_unc.shape[0],fco2_tot_unc.shape[1],fco2_tot_unc.shape[2],1])
-        # fco2_unc = (unc*fco2_tot_unc) + fco2_sw
-        e_flux = c_flux + (unc*c_flux_unc)
+                #plt.show()
+        if seaice:
+            ice_t = ice+(ice_unc*unc)
+            ice_t[ice_t > 100] = 100; ice_t[ice_t <0] = 0
+            e_flux = c_flux * (1-ice_t)
+        else:
+            e_flux = c_flux + (unc*c_flux_unc)
         flux = np.zeros((c_flux.shape))
         for i in range(0,flux.shape[2]):
-            #flux[:,:,i] =
             flux[:,:,i] = (e_flux[:,:,i] * area * land * 30.5) /1e15
 
         t = 0
@@ -840,10 +921,7 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022):
     fig = plt.figure(figsize=(14,7))
     gs = GridSpec(1,2, figure=fig, wspace=0.5,hspace=0.2,bottom=0.1,top=0.95,left=0.10,right=0.98)
     ax = fig.add_subplot(gs[0,0])
-    # ax.bar(a,data_plotting)
     ax.set_xlabel('Year')
-    # ax.set_ylabel('Frequency of 1 deg observations in SOCAT')
-    # ax2 = ax.twinx()
     ax.plot(a,decors[:,0],'k-')
     ax.fill_between(a,decors[:,0] - (decors[:,1]/2), decors[:,0]+ (decors[:,1]/2),alpha=0.4,color='k')
     ax.set_ylabel('Decorrelation length (km)')
@@ -858,7 +936,13 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022):
     ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     print(st)
     fig.savefig(os.path.join(model_save_loc,'plots','pco2_uncertainty_contribution_revised.png'),format='png',dpi=300)
-    np.savetxt(os.path.join(model_save_loc,'unc_monte_revised.csv'),np.stack((np.array(a),st)),delimiter=',',fmt='%.5f')
+    data = pd.read_table(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',')
+    if seaice:
+        data['flux_unc_seaice (Pg C yr-1)'] = st
+    else:
+        data['flux_unc_'+flux_var+' (Pg C yr-1)'] = st
+    data.to_csv(os.path.join(model_save_loc,'annual_flux.csv'),index=False)
+    #np.savetxt(os.path.join(model_save_loc,'unc_monte_revised.csv'),np.stack((np.array(a),st)),delimiter=',',fmt='%.5f')
     #plt.show()
 
 def plot_net_flux_unc(model_save_loc):
@@ -867,9 +951,9 @@ def plot_net_flux_unc(model_save_loc):
     ax = fig.add_subplot(gs[0,0])
 
     ann = np.loadtxt(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',',skiprows=1)
-    sta = np.loadtxt(os.path.join(model_save_loc,'unc_monte.csv'),delimiter=',')
-    st = sta[1,:]
-    a = sta[0,:]
+    #sta = np.loadtxt(os.path.join(model_save_loc,'unc_monte.csv'),delimiter=',')
+    st = np.sqrt(np.sum(ann[:,6:]**2,axis=1))
+    a = ann[:,0]
     ax.plot(a,ann[:,1],'k-',linewidth=3,zorder=6)
 
     #ax.plot(a,out,zorder=2)
@@ -879,27 +963,35 @@ def plot_net_flux_unc(model_save_loc):
     ax.set_xlabel('Year')
     fig.savefig(os.path.join(model_save_loc,'plots','pco2_uncertainty_contribution_single.png'),format='png',dpi=300)
 
-def variogram_evaluation(model_save_loc):
+def variogram_evaluation(model_save_loc,output_file = 'decorrelation.csv',input_array = False):
     import skgstat as skg
     import random
     import scipy
-    fluxloc = model_save_loc+'/flux'
-    c = Dataset(model_save_loc+'/output.nc','r')
-    fco2_sw = np.array(c.variables['fco2'])
-    #fco2_tot_unc[:] = 12
-    lon = np.array(c.variables['longitude'])
-    lat = np.array(c.variables['latitude'])
-    #fco2_tot_unc[fco2_tot_unc>1000] = np.nan
-    c.close()
-    # Calculating avaiable in situ data to constrain neural network.
-    c = Dataset(model_save_loc+'/input_values.nc','r')
-    fco2_insitu = np.array(c.variables['CCI_SST_reanalysed_fCO2_sw'])
-    time = np.array(c.variables['time'])
-    c.close()
+    if not input_array:
+        c = Dataset(model_save_loc+'/output.nc','r')
+        fco2_sw = np.array(c.variables['fco2'])
+        #fco2_tot_unc[:] = 12
+        lon = np.array(c.variables['longitude'])
+        lat = np.array(c.variables['latitude'])
+        #fco2_tot_unc[fco2_tot_unc>1000] = np.nan
+        c.close()
+        # Calculating avaiable in situ data to constrain neural network.
+        c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'r')
+        fco2_insitu = np.array(c.variables['CCI_SST_reanalysed_fCO2_sw'])
+        time = np.array(c.variables['time'])
+        c.close()
+
+    else:
+        c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'r')
+        data = np.array(c.variables[input_array][:])
+        data[data<=0.0] = np.nan
+        time = np.array(c.variables['time'])
+        lon = np.array(c.variables['longitude'])
+        lat = np.array(c.variables['latitude'])
+        c.close()
     time_2 = np.zeros((len(time)))
     for i in range(0,len(time)):
         time_2[i] = ((datetime.datetime(1970,1,15)+datetime.timedelta(days=int(time[i]))).year)
-
     # coordinates, values = skg.data.pancake(N=300).get('sample')
     # print(coordinates)
     # V = skg.Variogram(coordinates=coordinates, values=values)
@@ -916,39 +1008,44 @@ def variogram_evaluation(model_save_loc):
     gs = GridSpec(hei,5, figure=fig, wspace=0.5,hspace=0.2,bottom=0.1,top=0.95,left=0.10,right=0.98)
     axs = np.array([[fig.add_subplot(gs[i, j]) for j in range(5)] for i in range(hei)]).ravel()
     print(axs)
-    for i in range(fco2_sw.shape[2]):
+    for i in range(len(time)):
         if yr != time_2[i]:
             out[t,0] = yr
             axs[t].hist(a,50)
-            axs[t].set_title(out[t,0]); axs[t].set_xlabel('Decorrelation (km)'); axs[t].set_ylabel('Frequecy')
+            axs[t].set_title(out[t,0]); axs[t].set_xlabel('Decorrelation (km)'); axs[t].set_ylabel('Frequency')
             yr = time_2[i]
             out[t,1] = np.median(a); out[t,2] = scipy.stats.iqr(a); out[t,3] = np.mean(a); out[t,4] = np.std(a)
 
             a = []
             t = t+1
-        f = np.argwhere(((np.isnan(fco2_insitu[:,:,i].ravel()) == 0) & (np.isnan(fco2_sw[:,:,i].ravel()) == 0)))
-        coords = np.transpose(np.squeeze(np.stack((lon_g.ravel()[f],lat_g.ravel()[f]))))
-        #print(coords)
-        #print(coords.shape)
-        values = fco2_insitu[:,:,i].ravel() - fco2_sw[:,:,i].ravel()
+        if not input_array:
+            f = np.argwhere(((np.isnan(fco2_insitu[:,:,i].ravel()) == 0) & (np.isnan(fco2_sw[:,:,i].ravel()) == 0)))
 
+            #print(coords)
+            #print(coords.shape)
+            values = fco2_insitu[:,:,i].ravel() - fco2_sw[:,:,i].ravel()
+        else:
+            f = np.argwhere((np.isnan(data[:,:,i].ravel()) == 0))
+            values = data[:,:,i].ravel()
+        coords = np.transpose(np.squeeze(np.stack((lon_g.ravel()[f],lat_g.ravel()[f]))))
         values = np.squeeze(values[f])
         print(values.shape)
         #print(values)
 
 
-        for j in range(200):
+        for j in range(10):
             if len(values) < 50:
                 ran = random.sample(range(len(values)), int(len(values)/2))
             elif len(values) < 300:
                 ran = random.sample(range(len(values)), int(len(values)/5))
             else:
-                ran = random.sample(range(len(values)), int(len(values)/10))
+                ran = random.sample(range(len(values)), int(len(values)/1000))
             try:
-                V = skg.Variogram(coordinates=coords[ran], values=values[ran],dist_func=getDistanceByHaversine,maxlag=4000,fit_method='lm',estimator='dowd')
+                V = skg.Variogram(coordinates=coords[ran], values=values[ran],dist_func=getDistanceByHaversine,maxlag=4000,fit_method='lm')#,estimator='dowd')
                 V.n_lags = 40
                 des = V.describe()
-                #print(des['effective_range'])
+                #
+                print(des['effective_range'])
                 if (des['effective_range'] > 100) & (des['effective_range'] < 5000):
                     a.append(des['effective_range'])
             except:
@@ -963,7 +1060,7 @@ def variogram_evaluation(model_save_loc):
     vals = scipy.stats.iqr(a)
     print(f'Median: {np.median(a)}')
     print(f'IQR: {vals}')
-    np.savetxt(os.path.join(model_save_loc,'decorrelation.csv'),out,delimiter=',',fmt='%.5f')
+    np.savetxt(os.path.join(model_save_loc,'decorrelation',output_file),out,delimiter=',',fmt='%.5f')
     # plt.plot(out[:,0],out[:,1],'k-',linewidth=3)
     # iq = out[:,2]/2
     # plt.fill_between(out[:,0],out[:,1]-iq,out[:,1]+iq)

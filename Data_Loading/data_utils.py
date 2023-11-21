@@ -59,6 +59,7 @@ def area_grid(lon,lat,res):
         area[i] = oneDegreeArea(lat[i],res)
     area = np.tile(area,(1,len(lon)))
     return area
+
 def determine_grid_average(hlon,hlat,llon,llat):
     res = abs(llon[0] - llon[1])/2
     print(res)
@@ -73,6 +74,27 @@ def determine_grid_average(hlon,hlat,llon,llat):
         la_grid.append(np.where(np.logical_and(hlat < llat[i]+res,hlat >= llat[i]-res)))
         # grid[i,j] =
     return lo_grid,la_grid
+
+def determine_grid_average_nonreg(hlon,hlat,llon,llat):
+    res = abs(llon[0] - llon[1])/2
+    print(res)
+    llon,llat = np.meshgrid(llon,llat)
+    llon = llon.ravel()
+    llat = llat.ravel()
+    out = []
+    for i in range(len(llon)):
+        out.append(np.where((hlon < llon[i]+res) & (hlon >= llon[i]-res) & (hlat < llat[i]+res) & (hlat >= llat[i]-res))[0])
+    #print(out)
+    return out
+
+def grid_average_nonreg(var,in_grid):
+    var_o = np.empty((len(in_grid)))
+    var_o[:] = np.nan
+    for i in range(len(in_grid)):
+        #print(in_grid[i])
+        if in_grid[i].size > 0:
+            var_o[i] = np.nanmean(var[in_grid[i]])
+    return var_o
 
 def grid_average(var,lo_grid,la_grid):
     print(var.shape)

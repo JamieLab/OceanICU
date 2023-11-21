@@ -11,9 +11,10 @@ cmems = False
 cmems_daily=False
 bicep = False
 ccmp = False
-oisst = True
+oisst = False
 cci = False
 gebco = False
+osisaf = True
 
 if gebco:
     import gebco_resample as ge
@@ -78,3 +79,7 @@ if oisst:
 if cci:
     import cci_sst_retrieve_v2 as cc
     cc.cci_sst_v3_trailblaze('D:/Data/SST-CCI/v3',start_yr=start_yr,end_yr=end_yr)
+
+if osisaf:
+    import OSISAF_download as OSI
+    OSI.load_OSI_SAF_daily('D:/Data/OSISAF',start_yr=start_yr,end_yr=end_yr)

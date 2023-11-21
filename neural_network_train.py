@@ -56,9 +56,9 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     for v in var:
         vars.append(v)
     tabl,output_size,lon,lat,time = load_data(data_file,vars,model_save_loc,outp=True)
-    if not sea_ice == None:
-        print(f'Setting where sea ice is greater than 95% to nan...')
-        tabl[tabl[sea_ice] > 0.95] = np.nan
+    # if not sea_ice == None:
+    #     print(f'Setting where sea ice is greater than 95% to nan...')
+    #     tabl[tabl[sea_ice] > 0.95] = np.nan
 
     mapping_data = tabl
     print(mapping_data)
@@ -96,13 +96,13 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     for v in np.unique(tabl[vars[2]]):
         print(str(v) + ' : '+str(np.argwhere(np.array(tabl[vars[2]]) == v).shape))
 
-    run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val)
+    #run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val)
 
     # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
     # (propagated input parameter uncertainties)
-    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
+    #mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
     # Then we save the fCO2 data
-    save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,time = time)
+    #save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,time = time)
     # Once saved the validation can be extracted, and used to determine the validation uncertainty for each province,
     # which can then be mapped. This function produces validation statistics for the training/validation, test and all data together
     # using both weighted and unweighted statistics.
@@ -250,7 +250,7 @@ def load_data(load_loc,vars,output_loc=[],outp=True):
         ins_save[v] = data
         t += 1
     if outp:
-        save_netcdf(os.path.join(output_loc,'input_values.nc'),ins_save,lon,lat,output.shape[2],time_track=time)
+        save_netcdf(os.path.join(output_loc,'inputs','neural_network_train_input_values.nc'),ins_save,lon,lat,output.shape[2],time_track=time)
     # Reshape the 3d numpy arrays into a single colum and put into a dataframe.
     for i in range(0,len(vars)):
         if i == 0:
@@ -685,7 +685,7 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         soc_s = np.array(data[fco2_sst+'_std'])
 
     else:
-        input_file = os.path.join(model_save_loc,'input_values.nc')
+        input_file = os.path.join(model_save_loc,'inputs','neural_network_train_input_values.nc')
         # Here we create the save file names if they arent defined.
 
         print('Plotting validation....')
@@ -707,9 +707,9 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         soc_s[np.isnan(soc_s)==True] = 0 # If the std is np.nan but there is an fCO2 value we set std to 0
         soc_s = np.sqrt(soc_s**2 + 5**2) # Combine in quadrature the std and a measurment unc of 5 (Bakker et al. 2016)
         # Remove the data where ice is greater than 0.95.
-        if ice:
-            ic = c.variables[ice][:]
-            soc[ic > 0.95] = np.nan
+        # if ice:
+        #     ic = c.variables[ice][:]
+        #     soc[ic > 0.95] = np.nan
         soc = np.reshape(soc,(-1,1))
         soc_s = np.reshape(soc_s,(-1,1))
         c.close()
@@ -839,7 +839,7 @@ def add_validation_unc(model_save_loc,prov):
     with the validation uncertainity for each province mapped
     """
     # Load the province data
-    c = Dataset(os.path.join(model_save_loc,'input_values.nc'))
+    c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_train_input_values.nc'))
     prov = c.variables[prov][:]
     s = prov.shape
     prov = np.reshape(prov,(-1,1))
@@ -858,8 +858,16 @@ def add_validation_unc(model_save_loc,prov):
 
     # Need to add a check if the fCO2_val_unc variable has been created already - if it has we just overwrite with the new data...
     c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
-    var_o = c.createVariable('fco2_val_unc','f4',('longitude','latitude','time'))
-    var_o[:] = val_unc
+    keys = c.variables.keys()
+    if 'fco2_val_unc' in keys:
+        c.variables['fco2_val_unc'][:] = val_unc
+        c.variables['fco2_val_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    else:
+
+        var_o = c.createVariable('fco2_val_unc','f4',('longitude','latitude','time'))
+        var_o[:] = val_unc
+        var_o.long_name = 'Fugacity of CO2 in seawater evaluation uncertainty'
+        var_o.date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
     c.close()
 
 def add_total_unc(model_save_loc):
@@ -868,22 +876,31 @@ def add_total_unc(model_save_loc):
     """
     # Load the uncertainity components
     c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
+    keys = c.variables.keys()
     ne = c.variables['fco2_net_unc'][:]
     pa = c.variables['fco2_para_unc'][:]
     va = c.variables['fco2_val_unc'][:]
 
     tot = np.sqrt(ne**2 + pa**2 + va**2) # Combine these in quadrature
     # Need to add a check if the fCO2_tot_unc variable has been created already - if it has we just overwrite with the new data...
-    var_o = c.createVariable('fco2_tot_unc','f4',('longitude','latitude','time'))
-    var_o[:] = tot
+    if 'fco2_tot_unc' in keys:
+        c.variables['fco2_tot_unc'][:] = tot
+        c.variables['fco2_tot_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    else:
+        var_o = c.createVariable('fco2_tot_unc','f4',('longitude','latitude','time'))
+        var_o[:] = tot
+        var_o.long_name = 'Fugacity of CO2 in seawater total uncertainty'
+        var_o.date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+        var_o.comment = 'Combination of fco2_val_unc, fco2_net_unc and fco2_para_unc in quadrature'
+        var_o.units = 'uatm'
     c.close()
 
-def plot_mapped(model_save_loc):
+def plot_mapped(model_save_loc,dat=300):
     """
     Function to plot a mapped example of the fCO2 and the uncertainty components for the final year of the array.
     More a sanity check that things have worked correctly.
     """
-    dat =300
+    #dat =300
     #Load all the variables needed for plotting
     c = Dataset(model_save_loc+'/output.nc')
     lat = np.squeeze(c.variables['latitude'][:])
@@ -903,13 +920,14 @@ def plot_mapped(model_save_loc):
     fco2_tot_plot = np.transpose(fco2_tot_unc[:,:,dat])
 
     # And plot these... (Maybe a more line efficient way to do this...)
-    fig = plt.figure(figsize=(21,21))
-    gs = GridSpec(3,2, figure=fig, wspace=0.1,hspace=0.10,bottom=0.05,top=0.95,left=0.05,right=1.00)
+    fig = plt.figure(figsize=(28,28))
+    gs = GridSpec(3,2, figure=fig, wspace=0.18,hspace=0.18,bottom=0.05,top=0.95,left=0.05,right=1.00)
     ax1 = fig.add_subplot(gs[0,0]);
     pc = ax1.pcolor(lon,lat,fco2_plot)
     cbar = plt.colorbar(pc,ax=ax1)
     cbar.set_label('Predicted fCO$_{2 (sw,subskin)}$ ($\mu$atm)');
     pc.set_clim([300,500])
+    ax1.set_facecolor('gray')
     s = model_save_loc.split('/')
     ax1.set_title(s[-1])
 
@@ -918,24 +936,28 @@ def plot_mapped(model_save_loc):
     cbar = plt.colorbar(pc,ax=ax2)
     cbar.set_label('fCO$_{2 (sw,subskin)}$ network uncertainty ($\mu$atm)');
     pc.set_clim([0,50])
+    ax2.set_facecolor('gray')
 
     ax3 = fig.add_subplot(gs[1,0]);
     pc = ax3.pcolor(lon,lat,fco2_up_plot)
     cbar = plt.colorbar(pc,ax=ax3)
     cbar.set_label('fCO$_{2 (sw,subskin)}$ input parameter uncertainty ($\mu$atm)');
     pc.set_clim([0,50])
+    ax3.set_facecolor('gray')
 
     ax4 = fig.add_subplot(gs[1,1]);
     pc = ax4.pcolor(lon,lat,fco2_val_plot)
     cbar = plt.colorbar(pc,ax=ax4)
-    cbar.set_label('fCO$_{2 (sw,subskin)}$ validation uncertainty ($\mu$atm)');
+    cbar.set_label('fCO$_{2 (sw,subskin)}$ evaluation uncertainty ($\mu$atm)');
     pc.set_clim([0,50])
+    ax4.set_facecolor('gray')
 
     ax5 = fig.add_subplot(gs[2,0]);
     pc = ax5.pcolor(lon,lat,fco2_tot_plot)
     cbar = plt.colorbar(pc,ax=ax5)
     cbar.set_label('fCO$_{2 (sw,subskin)}$ total uncertainty ($\mu$atm)');
     pc.set_clim([0,50])
+    ax5.set_facecolor('gray')
 
     # put the model folder name as the title, so we know what this was generated for.
     s = model_save_loc.split('/')
@@ -986,41 +1008,15 @@ def save_mapped_fco2(data,net_unc,para_unc,data_shape = None, model_save_loc = N
     Function to save the mapped fco2 data produced by nerual_network_map.
     """
     from construct_input_netcdf import save_netcdf
-    direct = {}
-    direct['fco2'] = data
-    direct['fco2_net_unc'] = net_unc
-    direct['fco2_para_unc'] = para_unc
+    direct = {}; direct['fco2'] = data; direct['fco2_net_unc'] = net_unc; direct['fco2_para_unc'] = para_unc
+    units = {}; units['fco2'] = 'uatm'; units['fco2_net_unc'] = 'uatm'; units['fco2_para_unc'] = 'uatm'
+    long_name={};
+    long_name['fco2'] = 'Fugacity of CO2 in seawater'
+    long_name['fco2_net_unc'] = 'Fugacity of CO2 in seawater network uncertainty'
+    long_name['fco2_para_unc'] = 'Fugacity of CO2 in seawater parameter uncertainty'
 
-    save_netcdf(os.path.join(model_save_loc,'output.nc'),direct,lon,lat,data.shape[2],time_track=time)
+    save_netcdf(os.path.join(model_save_loc,'output.nc'),direct,lon,lat,data.shape[2],time_track=time,units = units,long_name=long_name)
 
-    # c = Dataset(,'w',format='NETCDF4_CLASSIC')
-    # c.code_used = 'neural_network_train.py'
-    # c.date_created = datetime.datetime.now().strftime(('%d/%m/%Y'))
-    # c.created_by = 'Daniel J. Ford (d.ford@exeter.ac.uk)'
-    #
-    # c.createDimension('longitude',data_shape[0])
-    # c.createDimension('latitude',data_shape[1])
-    # c.createDimension('time',data_shape[2])
-    # var_o = c.createVariable('fco2','f4',('longitude','latitude','time'))
-    # var_o[:] = data
-    # data_smooth = spatial_smooth(data)
-    # var_o = c.createVariable('fco2_net_unc','f4',('longitude','latitude','time'))
-    # var_o[:] = net_unc
-    # var_o = c.createVariable('fco2_para_unc','f4',('longitude','latitude','time'))
-    # var_o[:] = para_unc
-    # lat_o = c.createVariable('latitude','f4',('latitude'))
-    # lat_o[:] = lat
-    # lat_o.units = 'Degrees'
-    # lat_o.standard_name = 'Latitude'
-    # lon_o = c.createVariable('longitude','f4',('longitude'))
-    # lon_o.units = 'Degrees'
-    # lon_o.standard_name = 'Longitude'
-    # lon_o[:] = lon
-    # time_o = c.createVariable('time','f4',('time'))
-    # time_o[:] = time_track
-    # time_o.units = f'Days since {ref_year}-01-15'
-    # time_o.standard_name = 'Time of observations'
-    # c.close()
 
 def spatial_smooth(data):
     import scipy.signal as sg

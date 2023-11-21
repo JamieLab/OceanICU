@@ -168,7 +168,7 @@ def construct_climatology(data,month_track):
             clim[:,:,i] = np.squeeze(data[:,:,f])
     return clim
 
-def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,ref_year = 1970,units=False):
+def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,ref_year = 1970,units=False,long_name=False):
     """
     Function to save the final netcdf output for use in the neural network training.
     For each variable in the direct dictionary a netcdf variable is generated - this
@@ -178,8 +178,9 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,re
     #copts={"zlib":True,"complevel":5}
     c = Dataset(save_loc,'w',format='NETCDF4_CLASSIC')
     #c.code_used = 'construct_input_netcdf.py'
-    c.date_created = datetime.datetime.now().strftime(('%d/%m/%Y'))
+    c.date_file_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
     c.code_by = 'Daniel J. Ford (d.ford@exeter.ac.uk)'
+    c.code_location = 'https://github.com/JamieLab/OceanICU'
 
     c.createDimension('longitude',lon.shape[0])
     c.createDimension('latitude',lat.shape[0])
@@ -194,8 +195,9 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,re
             var_o[:] = direct[var]
         if units:
             var_o.units = units[var]
-        #print(direct[var].shape)
-
+        if long_name:
+            var_o.long_name = long_name[var]
+        var_o.date_variable = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
 
     lat_o = c.createVariable('latitude','f4',('latitude'))
     lat_o[:] = lat
@@ -215,15 +217,25 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,re
 
 def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False):
     c = Dataset(save_loc,'a',format='NETCDF4_CLASSIC')
+    v = c.variables.keys()
     for var in list(direct.keys()):
         if flip:
-            var_o = c.createVariable(var,'f4',('latitude','longitude','time'))#,**copts)
-            var_o[:] = direct[var].transpose(1,0,2)
+            if var in v:
+                c.variables[var][:] = direct[var]
+            else:
+                var_o = c.createVariable(var,'f4',('latitude','longitude','time'))#,**copts)
+                var_o[:] = direct[var].transpose(1,0,2)
         else:
-            var_o = c.createVariable(var,'f4',('longitude','latitude','time'))#,**copts)
-            var_o[:] = direct[var]
+            if var in v:
+                c.variables[var][:] = direct[var]
+            else:
+                var_o = c.createVariable(var,'f4',('longitude','latitude','time'))#,**copts)
+                var_o[:] = direct[var]
+        var_o = c.variables[var]
         if units:
             var_o.units = units[var]
+        var_o.date_variable = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.close()
 
 def single_province(save_loc,var,lon,lat,start_yr,end_yr):
     timesteps =((end_yr-start_yr)+1)*12
@@ -263,3 +275,50 @@ def append_variable(file,o_file,var,new_var=None):
     c.close()
 
     append_netcdf(o_file,direct,1,1,1,flip=False)
+
+def append_longhurst_prov(model_save_loc,longhurstfile,long_prov,prov_val):
+    c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'a')
+    prov = np.array(c.variables['prov'][:])
+
+    d = Dataset(longhurstfile,'r')
+    long = np.array(d.variables['longhurst'])
+    d.close()
+
+    d = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
+    bath = np.array(d.variables['ocean_proportion'][:])
+    d.close()
+    for i in range(len(long_prov)):
+        f = np.where(long == long_prov[i])
+        print(f[0].shape)
+        print(np.nanmax(prov))
+        prov[f[0],f[1],:] = prov_val
+    f = np.where(bath == 0)
+    prov[f[0],f[1],:] = np.nan
+    c.variables['prov'][:] = prov
+    c.close()
+
+def manual_prov(model_save_loc,lat_g,lon_g,fill=np.nan):
+    c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'a')
+    prov = np.array(c.variables['prov'][:])
+    lat = np.array(c.variables['latitude'][:])
+    lon = np.array(c.variables['longitude'][:])
+
+    f = np.where((lat>lat_g[0]) & (lat <lat_g[1]) )[0]
+    g = np.where((lon>lon_g[0]) & (lon <lon_g[1]) )[0]
+    [g,f] = np.meshgrid(g,f)
+    for i in range(prov.shape[2]):
+        prov[g,f,i] = fill
+    c.variables['prov'][:] = prov
+    c.close()
+
+def fill_with_var(model_save_loc,var_o,var_f):
+    c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'a')
+    var_o_d = np.array(c.variables[var_o][:])
+    var_f_d = np.array(c.variables[var_f][:])
+
+    for i in range(var_o_d.shape[2]):
+        f = np.where(np.isnan(var_o_d[:,:,i]) == 1)
+        var_o_d[f[0],f[1],i] = var_f_d[f[0],f[1],i]
+    c.variables[var_o][:] = var_o_d
+    c.variables[var_o].comment = 'Missing data filled with: '+var_f
+    c.close()

@@ -95,7 +95,7 @@ def solubility_wannink2014(sst,sal):
     sol = np.exp(sol)
     return sol
 
-def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1,sst_unc = 0.27,wind_unc=0.901,sal_unc =0.1,ens=100):
+def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1,sst_unc = 0.27,wind_unc=0.901,sal_unc =0.1,ens=100,unc_input_file=None):
     """
     Function to calculate the time and space varying air-sea CO2 flux uncertainties
     """
@@ -116,8 +116,6 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     if fco2_tot_unc == -1:
         fco2_tot_unc = np.array(c.variables['fco2_tot_unc'])
         fco2_tot_unc[fco2_tot_unc>1000] = np.nan
-
-
     else:
         fco2_tot_unc = np.ones((fco2_sw.shape)) * fco2_tot_unc
     #print(fco2_tot_unc)
@@ -142,8 +140,14 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     sst_skin = np.transpose(sst_skin,(1,0,2))
     sst_subskin = load_flux_var(fluxloc,'FT1_Kelvin_mean',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
     sst_subskin = np.transpose(sst_subskin,(1,0,2))
-
-    norm_sst = np.random.normal(0,sst_unc,ens)
+    if type(sst_unc) == str:
+        c = Dataset(unc_input_file,'r')
+        sst_unc_d = np.array(c.variables[sst_unc])
+        norm_sst = np.random.normal(0,1,ens)
+        c.close()
+    else:
+        #Assume it's a number!
+        norm_sst = np.random.normal(0,sst_unc,ens)
     norm_sss = np.random.normal(0,sal_unc,ens)
     norm_wind = np.random.normal(0,wind_unc,ens)
 
@@ -177,12 +181,16 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
         tem_u = np.zeros((fco2_sw.shape[0],fco2_sw.shape[1],ens))
         tem_u[:] = np.nan
         for i in range(ens):
-            sst_t = sst_skin[:,:,j] + norm_sst[i] - 273.15
+            if type(sst_unc) == str:
+                sst_t = sst_skin[:,:,j] + (norm_sst[i] * sst_unc_d[:,:,j]) - 273.15
+            else:
+                sst_t = sst_skin[:,:,j] + norm_sst[i] - 273.15
             tem_u[:,:,i] = 2116.8 + (-136.25 * sst_t) + (4.7353 * sst_t**2) + (-0.092307 * sst_t**3) + (0.0007555 * sst_t**4)
         schmidt_unc[:,:,j] = np.nanstd(tem_u,axis=2) / schmidt[:,:,j]
 
     #Wanninkhof 2014 suggest a 5% uncertainty on the polynomial fit for the schmidt number.
     # We then convert from just schmidt number to (Sc/600)^(-0.5) term in air-sea CO2 flux uncertainty
+    # Dividing by two as the schmidt number is square rooted in the calculation.
     schmidt_unc = np.sqrt(schmidt_unc**2) / 2
     schmidt_fixed = 0.05 / 2
     # Wind_unc
@@ -224,7 +232,10 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
         tem_u = np.zeros((fco2_sw.shape[0],fco2_sw.shape[1],ens))
         tem_u[:] = np.nan
         for i in range(ens):
-            sst_t = sst_skin[:,:,j] + norm_sst[i]
+            if type(sst_unc) == str:
+                sst_t = sst_skin[:,:,j] + (norm_sst[i] * sst_unc_d[:,:,j])
+            else:
+                sst_t = sst_skin[:,:,j] + norm_sst[i]
             sal_t = sal_skin[:,:,j] + norm_sss[i]
             tem_u[:,:,i] = vco2_atm[:,:,j] * (pressure[:,:,j] - 1013.25 * np.exp(24.4543 - (67.4509 * (100.0/sst_t)) - (4.8489 * np.log(sst_t/100.0)) - 0.000544 * sal_t))/1013.25
         ph20[:,:,j] = np.nanstd(tem_u,axis=2) / fco2_atm[:,:,j]
@@ -248,7 +259,10 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
         tem_u = np.zeros((fco2_sw.shape[0],fco2_sw.shape[1],ens))
         tem_u[:] = np.nan
         for i in range(ens):
-            sst_t = sst_subskin[:,:,j] + norm_sst[i]
+            if type(sst_unc) == str:
+                sst_t = sst_subskin[:,:,j] + (norm_sst[i] * sst_unc_d[:,:,j])
+            else:
+                sst_t = sst_subskin[:,:,j] + norm_sst[i]
             sal_t = sal_subskin[:,:,j] + norm_sss[i]
             tem_u[:,:,i] = solubility_wannink2014(sst_t,sal_t)
         sol_subskin_unc[:,:,j] = np.std(tem_u,axis=2)/subskin_sol[:,:,j]
@@ -267,7 +281,10 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
         tem_u = np.zeros((fco2_sw.shape[0],fco2_sw.shape[1],ens))
         tem_u[:] = np.nan
         for i in range(ens):
-            sst_t = sst_skin[:,:,j] + norm_sst[i]
+            if type(sst_unc) == str:
+                sst_t = sst_skin[:,:,j] + (norm_sst[i] * sst_unc_d[:,:,j])
+            else:
+                sst_t = sst_skin[:,:,j] + norm_sst[i]
             sal_t = sal_skin[:,:,j] + norm_sss[i]
             tem_u[:,:,i] = solubility_wannink2014(sst_t,sal_t)
         sol_skin_unc[:,:,j] = np.std(tem_u,axis=2)/skin_sol[:,:,j]
@@ -836,10 +853,10 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
     decors = np.zeros((len(a),2))
     if isinstance(decor, str):
         print('Loading Decorrelation')
-        decor_loaded = np.loadtxt(os.path.join(model_save_loc,'decorrelation.csv'),delimiter=',')
+        decor_loaded = np.loadtxt(os.path.join(model_save_loc,'decorrelation',decor),delimiter=',')
         decors[:,0] = decor_loaded[:,1]
 
-        decors[:,1] = decor_loaded[:,2]
+        decors[:,1] = decor_loaded[:,2]/2 # IQR needs to be divided by two to get a +- range
         print(decors)
     else:
         decors[:,0] = decors[:,0] + decor[0]
@@ -961,9 +978,32 @@ def plot_net_flux_unc(model_save_loc):
     ax.fill_between(a,ann[:,1] - (2*st),ann[:,1] + (2*st),alpha=0.4,color='k',zorder=4)
     ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     ax.set_xlabel('Year')
-    fig.savefig(os.path.join(model_save_loc,'plots','pco2_uncertainty_contribution_single.png'),format='png',dpi=300)
+    fig.savefig(os.path.join(model_save_loc,'plots','net_flux_uncertainty.png'),format='png',dpi=300)
 
-def variogram_evaluation(model_save_loc,output_file = 'decorrelation.csv',input_array = False):
+def variogram_evaluation(model_save_loc,output_file = 'decorrelation.csv',input_array = False,input_datafile = False,ens=100,hemisphere=False):
+    def variogram_run(a,values,coords,ens):
+        for j in range(ens):
+            if len(values) < 50:
+                ran = random.sample(range(len(values)), int(len(values)/2))
+            elif len(values) < 300:
+                ran = random.sample(range(len(values)), int(len(values)/5))
+            else:
+                ran = random.sample(range(len(values)), 200)
+            try:
+                V = skg.Variogram(coordinates=coords[ran], values=values[ran],dist_func=getDistanceByHaversine,maxlag='median',fit_method='lm',estimator='dowd')
+                #V.n_lags = 80
+                V.bin_func = 'scott'
+                des = V.describe()
+                # V.plot(show=True)
+                # wait = input("Press Enter to continue.")
+                #print(des['effective_range'])
+                if (des['effective_range'] > 0) & (des['effective_range'] < 8000):
+                    a.append(des['effective_range'])
+            except:
+                print('Exception')
+
+        return a
+
     import skgstat as skg
     import random
     import scipy
@@ -982,7 +1022,7 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation.csv',input_
         c.close()
 
     else:
-        c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'r')
+        c = Dataset(input_datafile,'r')
         data = np.array(c.variables[input_array][:])
         data[data<=0.0] = np.nan
         time = np.array(c.variables['time'])
@@ -1009,10 +1049,12 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation.csv',input_
     axs = np.array([[fig.add_subplot(gs[i, j]) for j in range(5)] for i in range(hei)]).ravel()
     print(axs)
     for i in range(len(time)):
+        print(f'Current step = {i} out of {len(time)}')
         if yr != time_2[i]:
             out[t,0] = yr
             axs[t].hist(a,50)
             axs[t].set_title(out[t,0]); axs[t].set_xlabel('Decorrelation (km)'); axs[t].set_ylabel('Frequency')
+            axs[t].set_xlim([0,8000])
             yr = time_2[i]
             out[t,1] = np.median(a); out[t,2] = scipy.stats.iqr(a); out[t,3] = np.mean(a); out[t,4] = np.std(a)
 
@@ -1031,36 +1073,33 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation.csv',input_
         values = np.squeeze(values[f])
         print(values.shape)
         #print(values)
+        if hemisphere:
+            #print(coords)
+            f = np.where(coords[:,1] <= 0)[0]
+            coords2 = coords[f,:]
+            #print(coords2)
+            values2 = values[f]
+            a = variogram_run(a,values2,coords2,int(ens/2))
+
+            f = np.where(coords[:,1] > 0)[0]
+            coords2 = coords[f,:]
+            values2 = values[f]
+            a = variogram_run(a,values2,coords2,int(ens/2))
+        else:
+            a = variogram_run(a,values,coords,ens)
 
 
-        for j in range(10):
-            if len(values) < 50:
-                ran = random.sample(range(len(values)), int(len(values)/2))
-            elif len(values) < 300:
-                ran = random.sample(range(len(values)), int(len(values)/5))
-            else:
-                ran = random.sample(range(len(values)), int(len(values)/1000))
-            try:
-                V = skg.Variogram(coordinates=coords[ran], values=values[ran],dist_func=getDistanceByHaversine,maxlag=4000,fit_method='lm')#,estimator='dowd')
-                V.n_lags = 40
-                des = V.describe()
-                #
-                print(des['effective_range'])
-                if (des['effective_range'] > 100) & (des['effective_range'] < 5000):
-                    a.append(des['effective_range'])
-            except:
-                print('Exception')
     out[t,0] = yr
     axs[t].hist(a,50)
-    axs[t].set_title(out[t,0]); axs[t].set_xlabel('Decorrelation (km)'); axs[t].set_ylabel('Frequecy')
+    axs[t].set_title(out[t,0]); axs[t].set_xlabel('Decorrelation (km)'); axs[t].set_ylabel('Frequency')
     yr = time_2[i]
     out[t,1] = np.median(a); out[t,2] = scipy.stats.iqr(a); out[t,3] = np.mean(a); out[t,4] = np.std(a)
 
-    fig.savefig(os.path.join(model_save_loc,'plots','yearly_decorrelation.png'),format='png',dpi=300)
+    fig.savefig(os.path.join(model_save_loc,'plots',output_file+'.png'),format='png',dpi=300)
     vals = scipy.stats.iqr(a)
     print(f'Median: {np.median(a)}')
     print(f'IQR: {vals}')
-    np.savetxt(os.path.join(model_save_loc,'decorrelation',output_file),out,delimiter=',',fmt='%.5f')
+    np.savetxt(os.path.join(model_save_loc,'decorrelation',output_file+'.csv'),out,delimiter=',',fmt='%.5f')
     # plt.plot(out[:,0],out[:,1],'k-',linewidth=3)
     # iq = out[:,2]/2
     # plt.fill_between(out[:,0],out[:,1]-iq,out[:,1]+iq)

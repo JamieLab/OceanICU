@@ -3,7 +3,7 @@ from netCDF4 import Dataset
 import numpy as np
 import data_utils as du
 
-def gebco_resample(file,log,lag,save_loc = False):
+def gebco_resample(file,log,lag,save_loc = False,save_loc_fluxengine=False):
     res = np.round(np.abs(log[0]-log[1]),2)
     if not save_loc:
         file_p = file.split('.')
@@ -25,6 +25,18 @@ def gebco_resample(file,log,lag,save_loc = False):
         du.netcdf_create_basic(file_o,elev_o,'elevation',lag,log)
         land = land_proportion_calc(elev,lo_grid,la_grid)
         du.netcdf_append_basic(file_o,land,'ocean_proportion')
+        land = np.abs(land-1)
+        du.netcdf_append_basic(file_o,land,'land_proportion')
+        land = np.flipud(np.transpose(land))
+
+        outp = Dataset(save_loc_fluxengine,'w',format='NETCDF4_CLASSIC')
+        outp.createDimension('lon',lag.shape[0])
+        outp.createDimension('lat',log.shape[0])
+        outp.createDimension('time',1)
+        sst_o = outp.createVariable('land_proportion','f4',('time','lon','lat'),zlib=True)
+        sst_o[:] = land[np.newaxis,:,:]
+        outp.close()
+        #du.netcdf_create_basic(save_loc_fluxengine,land,'land_proportion',log,lag)
 
 def land_proportion_calc(var,lo_grid,la_grid):
     out = np.empty((len(lo_grid),len(la_grid)))

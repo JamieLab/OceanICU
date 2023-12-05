@@ -23,8 +23,8 @@ from numpy import zeros
 from math import sqrt, cos, sin, radians
 from scipy.integrate import quad
 
-def run_flux_budgets(indir = None,outroot = None,maskfile = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/Python/custom_flux_av/data/World_Seas-final-complete.nc',
-    landfile = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/Python/custom_flux_av/data/onedeg_land.nc',maskdatasets = []):
+def run_flux_budgets(indir = None,outroot = None,maskfile = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/OceanICU/custom_flux_av/data/World_Seas-final-complete.nc',landdataset='land_proportion',
+    landfile = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/OceanICU/custom_flux_av/data/onedeg_land.nc',maskdatasets = []):
     fluxdataset = 'OF'
     kwdataset = 'OK3'
     cidataset = 'OIC1'
@@ -32,7 +32,7 @@ def run_flux_budgets(indir = None,outroot = None,maskfile = 'C:/Users/df391/OneD
     icedataset = 'P1'
     #maskdatasets = []
     regions = []
-    landdataset = 'land_proportion'
+    #landdataset = 'land_proportion'
     LooseIce = False
     icePercent = False
     places = 10

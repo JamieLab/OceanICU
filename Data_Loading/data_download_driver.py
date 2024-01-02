@@ -10,11 +10,11 @@ era5 = False
 cmems = False
 cmems_daily=False
 bicep = False
-ccmp = False
+ccmp = True
 oisst = False
 cci = False
 gebco = False
-osisaf = True
+osisaf = False
 
 if gebco:
     import gebco_resample as ge
@@ -69,7 +69,8 @@ if bicep:
 
 if ccmp:
     import ccmp_average as ccmp
-    ccmp.ccmp_average('D:/Data/CCMP/v3.0/monthly','D:/Data/CCMP/v3.0/monthly/1DEG',start_yr=start_yr,end_yr=end_yr,res=1)
+    ccmp.ccmp_temporal_average('D:/Data/CCMP/v3.1',v=3.1,var='ws')
+    #ccmp.ccmp_average('D:/Data/CCMP/v3.0/monthly','D:/Data/CCMP/v3.0/monthly/1DEG',start_yr=start_yr,end_yr=end_yr,res=1)
 
 if oisst:
     import OISST_data_download as OI

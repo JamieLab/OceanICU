@@ -28,14 +28,14 @@ def gebco_resample(file,log,lag,save_loc = False,save_loc_fluxengine=False):
         land = np.abs(land-1)
         du.netcdf_append_basic(file_o,land,'land_proportion')
         land = np.flipud(np.transpose(land))
-
-        outp = Dataset(save_loc_fluxengine,'w',format='NETCDF4_CLASSIC')
-        outp.createDimension('lon',lag.shape[0])
-        outp.createDimension('lat',log.shape[0])
-        outp.createDimension('time',1)
-        sst_o = outp.createVariable('land_proportion','f4',('time','lon','lat'),zlib=True)
-        sst_o[:] = land[np.newaxis,:,:]
-        outp.close()
+        if save_loc_fluxengine:
+            outp = Dataset(save_loc_fluxengine,'w',format='NETCDF4_CLASSIC')
+            outp.createDimension('lon',lag.shape[0])
+            outp.createDimension('lat',log.shape[0])
+            outp.createDimension('time',1)
+            sst_o = outp.createVariable('land_proportion','f4',('time','lon','lat'),zlib=True)
+            sst_o[:] = land[np.newaxis,:,:]
+            outp.close()
         #du.netcdf_create_basic(save_loc_fluxengine,land,'land_proportion',log,lag)
 
 def land_proportion_calc(var,lo_grid,la_grid):

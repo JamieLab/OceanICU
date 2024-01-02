@@ -311,14 +311,87 @@ def manual_prov(model_save_loc,lat_g,lon_g,fill=np.nan):
     c.variables['prov'][:] = prov
     c.close()
 
-def fill_with_var(model_save_loc,var_o,var_f):
+def fill_with_var(model_save_loc,var_o,var_f,log,lag,mod = None):
     c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'a')
     var_o_d = np.array(c.variables[var_o][:])
     var_f_d = np.array(c.variables[var_f][:])
+    if mod == 'power2':
+        var_f_d = var_f_d **2
 
     for i in range(var_o_d.shape[2]):
         f = np.where(np.isnan(var_o_d[:,:,i]) == 1)
         var_o_d[f[0],f[1],i] = var_f_d[f[0],f[1],i]
-    c.variables[var_o][:] = var_o_d
-    c.variables[var_o].comment = 'Missing data filled with: '+var_f
+    var = var_o + '_' + var_f
+    v = c.variables.keys()
+    if var in v:
+        c.variables[var][:] = var_o_d
+    else:
+        var_o = c.createVariable(var,'f4',('longitude','latitude','time'))#,**copts)
+        var_o[:] = var_o_d
+    c.variables[var].comment = 'Missing data filled with: '+var_f
     c.close()
+
+def land_clear(model_save_loc):
+    c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
+    ocean = c.variables['ocean_proportion'][:]
+    #ocean = ocean[:,:,np.newaxis]
+    c.close()
+
+    c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'a')
+    time = c.variables['time'][:]
+    ocean = np.repeat(ocean[:, :, np.newaxis], len(time), axis=2)
+    v = list(c.variables.keys())
+    v.remove('time')
+    v.remove('latitude')
+    v.remove('longitude')
+
+    for var in v:
+        print(var)
+        data = c.variables[var][:]
+        data[ocean == 0.0] = np.nan
+        c.variables[var][:] = data
+    c.close()
+
+def replace_socat_with_model(input_data_file,start_yr,end_yr,socat_var = False,gcb_model=None,mod_ref_year = 1959,plot=False,mod_variable='model_fco2'):
+    c = Dataset(gcb_model,'r')
+    time = c.variables['time'][:]
+    mod_fco2 = c.variables['sfco2'][0,:,:,:]
+    mod_lon = c.variables['lon'][:]
+    c.close()
+    ref_time = datetime.datetime(mod_ref_year,1,1)
+    time2 = []
+    for i in range(len(time)):
+        time2.append((ref_time + datetime.timedelta(days = int(time[i]))).year)
+    time2 = np.array(time2)
+    #print(time2)
+    f = np.where((time2 >= start_yr) & (time2 <= end_yr))[0]
+    #print(f)
+    mod_fco2 = mod_fco2[f,:,:]
+
+    c = Dataset(input_data_file,'a')
+    inp_fco2 = c.variables[socat_var][:]
+    lon = c.variables['longitude'][:]
+    lat = c.variables['latitude'][:]
+
+    mod_fco2 = du.lon_switch(mod_fco2)
+    mod_fco2 = mod_fco2.transpose((2,1,0))
+
+    if plot:
+        plt.figure()
+        plt.pcolor(lon,lat,np.transpose(inp_fco2[:,:,0]))
+        plt.figure()
+        plt.pcolor(lon,lat,np.transpose(mod_fco2[:,:,0]))
+        plt.show()
+
+
+    f = np.where(np.isnan(inp_fco2) == 0)
+    print(f)
+    #
+    inp_fco2[f[0],f[1],f[2]] = mod_fco2[f[0],f[1],f[2]]
+    #inp_fco2 = np.reshape(inp_fco2,s)
+    c.variables[socat_var][:] = inp_fco2
+    c.variables[socat_var].model_modify = 'This dataset has been replace with model output from: ' + gcb_model
+    c.close()
+    direct = {}
+    direct[mod_variable] = mod_fco2
+    append_netcdf(input_data_file,direct,1,1,1)

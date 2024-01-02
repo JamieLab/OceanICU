@@ -96,13 +96,13 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     for v in np.unique(tabl[vars[2]]):
         print(str(v) + ' : '+str(np.argwhere(np.array(tabl[vars[2]]) == v).shape))
 
-    #run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val)
+    run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val)
 
     # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
     # (propagated input parameter uncertainties)
-    #mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
+    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
     # Then we save the fCO2 data
-    #save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,time = time)
+    save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,time = time)
     # Once saved the validation can be extracted, and used to determine the validation uncertainty for each province,
     # which can then be mapped. This function produces validation statistics for the training/validation, test and all data together
     # using both weighted and unweighted statistics.
@@ -517,8 +517,8 @@ def uncertainty_montecarlo(model,scalar,X_vals,unc,repeat = 100):
         # Predict the output with neural network
         mod_out = model.predict(mod_inp)
         #print(mod_out)
-        # Out value is the 2 standard deviaiton of this.
-        outstd[i] = 2*np.std(mod_out)
+        # Out value is the 1 standard deviaiton of this as we assume the input uncertainty values are the 95% confidence.
+        outstd[i] = np.std(mod_out)
     return outstd
 
 def train_val_test_split(X,y,ind, indep = 0.2, train = 0.4):
@@ -605,7 +605,7 @@ def unweight(x,y,ax,c):
     sl = '%.2f' %np.round(stats_un['slope'],2)
     ip = '%.2f' %np.round(stats_un['intercept'],2)
     n = stats_un['n']
-    ax.text(0.55,0.3,f'Unweighted Stats\nRMSD = {rmsd} $\mu$atm\nBias = {bias} $\mu$atm\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
+    ax.text(0.52,0.35,f'Unweighted Stats\nRMSD = {rmsd} $\mu$atm\nBias = {bias} $\mu$atm\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
     #return h2
 
 def weighted(x,y,weights,ax,c):

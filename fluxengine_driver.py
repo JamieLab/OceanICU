@@ -681,7 +681,7 @@ def plot_example_flux(model_save_loc):
     fig.savefig(os.path.join(model_save_loc,'plots','mapped_flux_components_example.png'),format='png',dpi=300)
 
 
-def plot_relative_contribution(model_save_loc):
+def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=False):
     font = {'weight' : 'normal',
             'size'   : 15}
     matplotlib.rc('font', **font)
@@ -741,18 +741,18 @@ def plot_relative_contribution(model_save_loc):
         bottom = 0
         for j in range(combined.shape[1]):
             if i == 1:
-                p = ax[0].bar(year[i],combined[i,j]/totals[i],bottom=bottom,color=cols[j],label=label[j])
+                p = ax[0].bar(year[i],(combined[i,j]/totals[i])*100,bottom=bottom,color=cols[j],label=label[j])
             else:
-                p = ax[0].bar(year[i],combined[i,j]/totals[i],bottom=bottom,color=cols[j])
-            bottom = bottom + (combined[i,j]/totals[i])
+                p = ax[0].bar(year[i],(combined[i,j]/totals[i])*100,bottom=bottom,color=cols[j])
+            bottom = bottom + (combined[i,j]/totals[i])*100
     # ax2.plot(year,-np.sum(np.abs(gross),axis=1),'k-',label = 'Gross Flux',linewidth=3)
     # ax2.plot(year,np.sum(gross,axis=1),'k--', label = 'Net Flux',linewidth=3)
     # ax2.legend(bbox_to_anchor=(1.6, 0.9))
     #
     ax[0].legend(bbox_to_anchor=(0.49, 0.75))
-    ax[0].set_ylabel('Relative contribution to uncertainty')
+    ax[0].set_ylabel('Relative contribution to uncertainty (%)')
     ax[0].set_xlabel('Year')
-    ax[0].set_ylim([0,1])
+    ax[0].set_ylim([0,100])
     #ax2.set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     #
     label = ['fCO$_{2 (sw)}$ Network','fCO$_{2 (sw)}$ Parameter','fCO$_{2 (sw)}$ Evaluation']
@@ -763,14 +763,14 @@ def plot_relative_contribution(model_save_loc):
         bottom = 0
         for j in range(data_fco2.shape[1]):
             if i == 1:
-                p = ax[1].bar(year[i],data_fco2[i,j]/totals[i],bottom=bottom,color=cols[j],label=label[j])
+                p = ax[1].bar(year[i],(data_fco2[i,j]/totals[i])*100,bottom=bottom,color=cols[j],label=label[j])
             else:
-                p = ax[1].bar(year[i],data_fco2[i,j]/totals[i],bottom=bottom,color=cols[j])
-            bottom = bottom + (data_fco2[i,j]/totals[i])
+                p = ax[1].bar(year[i],(data_fco2[i,j]/totals[i])*100,bottom=bottom,color=cols[j])
+            bottom = bottom + (data_fco2[i,j]/totals[i])*100
     ax[1].legend(loc=2)#bbox_to_anchor=(1.14, 0.8))
-    ax[1].set_ylabel('Relative contribution to uncertainty')
+    ax[1].set_ylabel('Relative contribution to uncertainty (%)')
     ax[1].set_xlabel('Year')
-    ax[1].set_ylim([0,1])
+    ax[1].set_ylim([0,100])
     #ax.set_title('fCO$_{2 (sw)}$ total uncertainty contributions')
     #
     label = ['xCO$_{2 (atm)}$','pH$_{2}$O']
@@ -781,14 +781,14 @@ def plot_relative_contribution(model_save_loc):
         bottom = 0
         for j in range(data_atm.shape[1]):
             if i == 1:
-                p = ax[2].bar(year[i],data_atm[i,j]/totals[i],bottom=bottom,color=cols[j],label=label[j])
+                p = ax[2].bar(year[i],(data_atm[i,j]/totals[i])*100,bottom=bottom,color=cols[j],label=label[j])
             else:
-                p = ax[2].bar(year[i],data_atm[i,j]/totals[i],bottom=bottom,color=cols[j])
-            bottom = bottom + (data_atm[i,j]/totals[i])
+                p = ax[2].bar(year[i],(data_atm[i,j]/totals[i])*100,bottom=bottom,color=cols[j])
+            bottom = bottom + (data_atm[i,j]/totals[i])*100
     ax[2].legend(loc=2)#bbox_to_anchor=(1, 0.8))
-    ax[2].set_ylabel('Relative contribution to uncertainty')
+    ax[2].set_ylabel('Relative contribution to uncertainty (%)')
     ax[2].set_xlabel('Year')
-    ax[2].set_ylim([0,1])
+    ax[2].set_ylim([0,100])
     #ax.set_title('fCO$_{2 (atm)}$ uncertainty contributions')
 
     ann = np.loadtxt(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',',skiprows=1)
@@ -801,6 +801,11 @@ def plot_relative_contribution(model_save_loc):
     ax[3].fill_between(a,ann[:,1] - st,ann[:,1] + st,alpha = 0.6,color='k',zorder=5)
     ax[3].fill_between(a,ann[:,1] - (2*st),ann[:,1] + (2*st),alpha=0.4,color='k',zorder=4)
     ax[3].plot(year,-np.sum(np.abs(gross),axis=1),'b--',label = 'Gross Flux',linewidth=3)
+
+    if model_plot:
+        a = np.loadtxt(model_plot,delimiter=',',skiprows=1)
+        ax[3].plot(a[:,0],a[:,1],'b-',label = model_plot_label,linewidth=3,zorder=6)
+
     ax[3].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     ax[3].set_xlabel('Year')
     ax[3].legend(loc = 3)

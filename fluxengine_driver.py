@@ -1015,7 +1015,8 @@ def plot_net_flux_unc(model_save_loc):
     ax.set_xlabel('Year')
     fig.savefig(os.path.join(model_save_loc,'plots','net_flux_uncertainty.png'),format='png',dpi=300)
 
-def variogram_evaluation(model_save_loc,output_file = 'decorrelation.csv',input_array = False,input_datafile = False,ens=100,hemisphere=False):
+def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_array = False,input_datafile = False,ens=100,hemisphere=False,
+    start_yr=1985,end_yr=2022):
     def variogram_run(a,values,coords,ens):
         for j in range(ens):
             if len(values) < 50:
@@ -1091,11 +1092,11 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation.csv',input_
 
     lon_g,lat_g = np.meshgrid(lon,lat); lon_g = np.transpose(lon_g); lat_g = np.transpose(lat_g);
     a = []
-    out = np.zeros((2022-1985+1,5))
+    out = np.zeros((end_yr-start_yr+1,5))
     out[:] = np.nan
-    yr =1985
+    yr =start_yr
     t = 0
-    hei = int(np.ceil((2022-1985+1)/5))
+    hei = int(np.ceil((end_yr-start_yr+1)/5))
 
     fig = plt.figure(figsize=(35,7*hei))
     gs = GridSpec(hei,5, figure=fig, wspace=0.5,hspace=0.2,bottom=0.1,top=0.95,left=0.10,right=0.98)

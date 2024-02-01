@@ -287,6 +287,9 @@ def make_save_tree(model_save_loc):
     inputs = os.path.join(model_save_loc,'inputs')
     if not os.path.isdir(inputs):
         os.mkdir(inputs)
+    decor = os.path.join(model_save_loc,'decorrelation')
+    if not os.path.isdir(decor):
+        os.mkdir(decor)
 
 def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10,tot_lut_val=6000,epochs=200,node_in = range(6,31,3)):
     """

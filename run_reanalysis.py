@@ -55,18 +55,21 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
     #print(time)
     fco2 = np.array(c.variables['fco2_reanalysed_ave_weighted'])
     fco2_std = np.array(c.variables['fco2_reanalysed_std_weighted'])
+    sst = np.array(c.variables['sst_reynolds']) +273.15 #T_reynolds is in degC prefer in K
     c.close()
     f = np.where((time <= end_yr) & (time >= start_yr))
     #print(fco2.shape)
     fco2 = np.transpose(fco2[f[0],:,:],(2,1,0))
     fco2_std = np.transpose(fco2_std[f[0],:,:],(2,1,0))
+    sst = np.transpose(sst[f[0],:,:],(2,1,0))
 
     fco2[fco2<0] = np.nan
     fco2_std[fco2_std<0] = np.nan
+    sst[sst<0] = np.nan
     #print(fco2.shape)
-    append_to_file(output_file,fco2,fco2_std,name,input_file)
+    append_to_file(output_file,fco2,fco2_std,sst,name,input_file)
 
-def append_to_file(output_file,fco2,fco2_std,name,socat_files):
+def append_to_file(output_file,fco2,fco2_std,sst,name,socat_files):
     """
     Function to append the reanalysed fCO2 to the neural network input file
     """
@@ -84,6 +87,13 @@ def append_to_file(output_file,fco2,fco2_std,name,socat_files):
     var_o.sst = name
     #var_o.units = 'uatm'
     var_o.created_from = socat_files
+    var_o = c.createVariable(name+'_reanalysed_sst','f4',('longitude','latitude','time'))
+    var_o[:] = sst
+    # var_o.standard_name = 'Reanalysed fCO2(sw, subskin) std using ' + name + ' datset'
+    var_o.sst = name
+    #var_o.units = 'uatm'
+    var_o.created_from = socat_files
+    var_o.comment = 'SST data that is coincident to the reanalysed fCO2(sw)'
     c.close()
 
 def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GLO-1M-100-SOCAT-CONV.nc',flip=False):

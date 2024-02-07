@@ -10,8 +10,8 @@ era5 = False
 cmems = False
 cmems_daily=False
 bicep = False
-ccmp = True
-oisst = False
+ccmp = False
+oisst = True
 cci = False
 gebco = False
 osisaf = False
@@ -74,8 +74,8 @@ if ccmp:
 
 if oisst:
     import OISST_data_download as OI
-    OI.download_oisst_v21_daily('D:/Data/OISSTv2_1',start_yr=start_yr,end_yr=end_yr)
-    #OI.OISST_monthly_split('sst.mon.mean.nc','D:/Data/OISSTv2_1/monthly')
+    #OI.download_oisst_v21_daily('D:/Data/OISSTv2_1',start_yr=start_yr,end_yr=end_yr)
+    OI.oisst_monthly_av('D:/Data/OISSTv2_1',start_yr=start_yr,end_yr=end_yr)
 
 if cci:
     import cci_sst_retrieve_v2 as cc

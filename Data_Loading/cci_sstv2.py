@@ -66,7 +66,7 @@ def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023,time_cor 
         ye = start_yr
         mon = 1
     i = 0 # Variable for loading lat and lon grid once (set to 1 once loaded for the first time)
-
+    du.makefolder(os.path.join(inp,'monthly',str(ye)))
     while ye <= end_yr:
         print(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc'))
         if os.path.exists(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc')) == 0:

@@ -260,9 +260,9 @@ def province_shape(save_loc,var,lon,lat,start_yr,end_yr,shp_lon,shp_lat):
     prov = np.repeat(vals[:,:,np.newaxis],timesteps,axis=2)
     direct = {}
     direct[var] = prov
-    plt.figure()
-    plt.pcolor(direct[var][:,:,0])
-    plt.show()
+    # plt.figure()
+    # plt.pcolor(direct[var][:,:,0])
+    # plt.show()
     append_netcdf(save_loc,direct,lon,lat,timesteps)
 
 def append_variable(file,o_file,var,new_var=None):

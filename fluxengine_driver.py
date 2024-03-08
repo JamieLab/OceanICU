@@ -969,7 +969,6 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
     if bath_cutoff:
         elev=  np.squeeze(np.array(c.variables['elevation']))
     print(land.shape)
-    print(elev.shape)
     c.close()
 
     if bath_cutoff:
@@ -1155,8 +1154,8 @@ def plot_net_flux_unc(model_save_loc):
     fig.savefig(os.path.join(model_save_loc,'plots','net_flux_uncertainty.png'),format='png',dpi=300)
 
 def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_array = False,input_datafile = False,ens=100,hemisphere=False,
-    start_yr=1985,end_yr=2022):
-    def variogram_run(a,values,coords,ens):
+    start_yr=1985,end_yr=2022,estimator='dowd'):
+    def variogram_run(a,values,coords,ens,estimator):
         for j in range(ens):
             if len(values.shape) == 0:
                 print('Empty')
@@ -1168,7 +1167,7 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
                 else:
                     ran = random.sample(range(len(values)), 200)
                 try:
-                    V = skg.Variogram(coordinates=coords[ran], values=values[ran],dist_func=getDistanceByHaversine,maxlag=8000,fit_method='lm',estimator='dowd')
+                    V = skg.Variogram(coordinates=coords[ran], values=values[ran],dist_func=getDistanceByHaversine,maxlag=10000,fit_method='lm',estimator=estimator)
                     #V.n_lags = 80
                     V.model = 'exponential'
                     V.bin_func = 'scott'
@@ -1179,7 +1178,7 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
 
                     ra = des['effective_range']
                     print(des['effective_range'])
-                    if (ra > 100) & (ra < 8000) & (np.isnan(ra) == 0):
+                    if (ra > 100) & (ra < 12000) & (np.isnan(ra) == 0):
                         a.append(ra)
                     del V
                 except:
@@ -1277,20 +1276,20 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
             coords2 = coords[f,:]
             #print(coords2)
             values2 = values[f]
-            a = variogram_run(a,values2,coords2,int(ens/2))
+            a = variogram_run(a,values2,coords2,int(ens/2),estimator)
 
             f = np.where(coords[:,1] > 0)[0]
             coords2 = coords[f,:]
             values2 = values[f]
-            a = variogram_run(a,values2,coords2,int(ens/2))
+            a = variogram_run(a,values2,coords2,int(ens/2),estimator)
         else:
-            a = variogram_run(a,values,coords,ens)
+            a = variogram_run(a,values,coords,ens,estimator)
 
 
     out[t,0] = yr
     axs[t].hist(a,50)
     axs[t].set_title(out[t,0]); axs[t].set_xlabel('Decorrelation (km)'); axs[t].set_ylabel('Frequency')
-    axs[t].set_xlim([0,8000])
+    axs[t].set_xlim([0,12000])
     yr = time_2[i]
     out[t,1] = np.median(a); out[t,2] = scipy.stats.iqr(a); out[t,3] = np.mean(a); out[t,4] = np.std(a)
 

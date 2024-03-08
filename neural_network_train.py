@@ -46,7 +46,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     print('Creating output directory tree...')
     make_save_tree(model_save_loc)
     print('Neural_Network_Start...')
-    vars = [fco2_sst+'_reanalysed_fCO2_sw',fco2_sst+'_reanalysed_fCO2_sw_std']
+    vars = [fco2_sst+'_reanalysed_fCO2_sw',fco2_sst+'_reanalysed_fCO2_sw_std',fco2_sst+'_reanalysed_sst']
     vars.append(prov)
     if not bath_cutoff == None:
         vars.append(bath)
@@ -93,10 +93,14 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     # For sanity and to check that we have an arbitary amount of data (at least ~1000 observations) in each
     # province we plan to train on. If this needs adjusting, go back to your province map building
     # and modify the map there.
-    for v in np.unique(tabl[vars[2]]):
-        print(str(v) + ' : '+str(np.argwhere(np.array(tabl[vars[2]]) == v).shape))
+    for v in np.unique(tabl[prov]):
+        print(str(v) + ' : '+str(np.argwhere(np.array(tabl[prov]) == v).shape))
 
-    run_neural_network(tabl,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val)
+    net_train_var = [fco2_sst+'_reanalysed_sst']
+    for v in var[1:]:
+        net_train_var.append(v)
+    print(net_train_var)
+    run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val)
 
     # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
     # (propagated input parameter uncertainties)

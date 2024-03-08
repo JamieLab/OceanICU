@@ -14,11 +14,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import Data_Loading.data_utils as du
 
-def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year = 1970):
+def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year = 1970,fill_clim=True):
     #lon,lat = du.reg_grid(lat=resolution,lon=resolution)
     direct = {}
     for a in vars:
-        timesteps,direct[a[0]+'_'+a[1]],month_track,time_track_temp = build_timeseries(a[2],a[1],start_yr,end_yr,lon,lat,a[0])
+        timesteps,direct[a[0]+'_'+a[1]],month_track,time_track_temp = build_timeseries(a[2],a[1],start_yr,end_yr,lon,lat,a[0],fill_clim=fill_clim)
         if a[3] == 1:
             print('Producing anomaly...')
             direct[a[0] + '_' + a[1] + '_anom'] = produce_anomaly(direct[a[0]+'_'+a[1]],month_track)
@@ -28,7 +28,7 @@ def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year =
         #print(time_track)
     save_netcdf(out_file,direct,lon,lat,timesteps,time_track=time_track,ref_year = time_ref_year)
 
-def build_timeseries(load_loc,variable,start_yr,end_yr,lon,lat,name):
+def build_timeseries(load_loc,variable,start_yr,end_yr,lon,lat,name,fill_clim=True):
     """
     Function to construct a monthly timeseries between start yr and end yr for the variable.
     Once the timeseries has been cycled through, missing data at the start (assumed to be) start of
@@ -69,7 +69,8 @@ def build_timeseries(load_loc,variable,start_yr,end_yr,lon,lat,name):
         if mon==13:
             yr += 1
             mon = 1
-    out_data = fill_with_clim(out_data,np.array(avai),np.array(month_track))
+    if fill_clim:
+        out_data = fill_with_clim(out_data,np.array(avai),np.array(month_track))
     return timesteps,out_data,np.array(month_track),time_track
 
 def produce_anomaly(data,month_track):

@@ -36,7 +36,7 @@ def standard_setup_SOCAT(ncfile,timedata,londata,latdata):
    days.long_name = "Time - days since 1970-01-01 00:00:00"
    days.standard_name = "time"
    days[:] = timeobj
-   days.valid_min = 0.0
+   days.valid_min = -1.79769313486232e+308
    days.valid_max = 1.79769313486232e+308
    #Create and add the latitude dimension
    ncfile.createDimension('latitude', len(latdata))

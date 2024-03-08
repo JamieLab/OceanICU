@@ -8,7 +8,7 @@ import data_utils as du
 
 def oc_cci_average(loc,out_folder = '',start_yr = 1993,end_yr = 2020,log='',lag='',conv = False):
     if start_yr <= 1997:
-        start_ye = 1997
+        start_yr = 1997
         st_mon = 9 # Needs to be manually modified - OC-CCI starts in 09 / 1997
     else:
         st_mon = 1
@@ -21,7 +21,7 @@ def oc_cci_average(loc,out_folder = '',start_yr = 1993,end_yr = 2020,log='',lag=
         du.makefolder(os.path.join(out_folder,str(ye)))
 
         file = os.path.join(loc,str(ye),'ESACCI-OC-L3S-CHLOR_A-MERGED-1M_MONTHLY_4km_GEO_PML_OCx-'+str(ye)+du.numstr(mon)+'-fv6.0.nc')
-        file_o = os.path.join(out_folder,str(ye),str(ye)+'_'+du.numstr(mon)+f'ESACCI-OC-L3S-CHLOR_A-MERGED-1M_MONTHLY_-fv6.0_{res}_deg.nc')
+        file_o = os.path.join(out_folder,str(ye),str(ye)+'_'+du.numstr(mon)+f'_ESACCI-OC-L3S-CHLOR_A-MERGED-1M_MONTHLY_-fv6.0_{res}_deg.nc')
         print(file)
         if t == 0:
             [lon,lat] = du.load_grid(file,latv = 'lat',lonv = 'lon')

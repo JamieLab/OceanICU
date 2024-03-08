@@ -25,7 +25,7 @@ def load_netcdf_var(file, variable):
 
 def oneDegreeArea(latDegrees,res):
     re, rp = 6378.137, 6356.7523
-    dtor = np.radians(res)
+    dtor = np.radians(1.0)
     # area of a 1x1 degree box at a given latitude in radians
     latRadians = latDegrees * dtor
     cosLat, sinLat = np.cos(latRadians), np.sin(latRadians)
@@ -33,7 +33,7 @@ def oneDegreeArea(latDegrees,res):
     r2c, r2s = re * re * cosLat, rp * rp * sinLat
     earth_radius = np.sqrt((r2c * r2c + r2s * r2s) / (rc * rc + rs * rs))
     erd = earth_radius * dtor
-    return erd * erd * cosLat
+    return erd * erd * cosLat / (1/res)**2
 
 def reg_grid(lat=1,lon=1,latm = [-90,90],lonm = [-180,180],pad = False):
     """

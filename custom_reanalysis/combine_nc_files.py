@@ -79,7 +79,7 @@ def FromFilelist(filelist,output,weighting=None,outputtime=1e9,combiningregions=
    if combiningregions == True:
       for variable in list(itemdata.keys()):
          itemdata[variable]=numpy.ma.sum(itemdata[variable],axis=0)
-   #if we are not combining regions - i.e. we are combining cruises, then 
+   #if we are not combining regions - i.e. we are combining cruises, then
    #there could be overlap so we need to update the parameters appropriately
    else:
       #need to do std first as it depends on other variables
@@ -94,7 +94,7 @@ def FromFilelist(filelist,output,weighting=None,outputtime=1e9,combiningregions=
       for variable in list(itemdata.keys()):
          if variable.startswith("std_"):
             continue
-         elif variable in ["count_nobs","count_ncruise"]: 
+         elif variable in ["count_nobs","count_ncruise"]:
             # we don't want to average count_nobs or count_ncruise as these are number of observations
             itemdata[variable]=itemdata[variable].sum(axis=0)
          elif variable.startswith("max_"):
@@ -113,8 +113,11 @@ def FromFilelist(filelist,output,weighting=None,outputtime=1e9,combiningregions=
    #Write out the concatenated variables to a new file
    with netCDF4.Dataset(output, 'w', format = 'NETCDF4') as ncfile:
       netcdf_helper.standard_setup_SOCAT(ncfile,timedata=outputtime,londata=dataitem_dims['longitude'],latdata=dataitem_dims['latitude'])
+      #print(itemdata.keys())
       for variable in list(itemdata.keys()):
+         #print(variable)
          if variable not in filedims:
+            #print(itemvar[variable][0])
             tmpvar = ncfile.createVariable(itemvar[variable][0],'f4',('time','latitude','longitude'),
                                            fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
             tmpvar[:] = itemdata[variable][:]
@@ -309,6 +312,53 @@ def AddNewVariables(filename,newvars):
       pCO2_Tym_data.standard_name = "unweighted_std_pCO2_Tym"
       pCO2_Tym_data.long_name = "Standard deviation of CO2 partial pressure using OC-FLUX methodology (unweighted)"
 
+      SST_data = ncfile.createVariable('unweighted_SST_C','f4',('time','latitude','longitude'),
+                                            fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      SST_data[:] = newvars['SST_C'][:]
+      SST_data.units = 'degC'
+      SST_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      SST_data.valid_min = -5
+      SST_data.valid_max = 1e6
+      SST_data.scale_factor = 1.
+      SST_data.add_offset = 0.
+      SST_data.standard_name = "unweighted_SST_C"
+      SST_data.long_name = "SST using SOCAT methodology (unweighted)"
+
+      SST_std_data = ncfile.createVariable('unweighted_std_SST_C','f4',('time','latitude','longitude'),
+                                            fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      SST_std_data[:] = newvars['stds']['SST_C'][:]
+      SST_std_data.units = 'degC'
+      SST_std_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      SST_std_data.valid_min = 0.
+      SST_std_data.valid_max = 1e6
+      SST_std_data.scale_factor = 1.
+      SST_std_data.add_offset = 0.
+      SST_std_data.standard_name = "unweighted_std_SST_C"
+      SST_std_data.long_name = "Standard deviation of SST using SOCAT methodology (unweighted)"
+
+      TSST_data = ncfile.createVariable('unweighted_Tcl_C','f4',('time','latitude','longitude'),
+                                            fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      TSST_data[:] = newvars['Tcl_C'][:]
+      TSST_data.units = 'degC'
+      TSST_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      TSST_data.valid_min = -5
+      TSST_data.valid_max = 1e6
+      TSST_data.scale_factor = 1.
+      TSST_data.add_offset = 0.
+      TSST_data.standard_name = "unweighted_Tcl_C"
+      TSST_data.long_name = "SST using OC-FLUX methodology (unweighted)"
+
+      TSST_std_data = ncfile.createVariable('unweighted_std_Tcl_C','f4',('time','latitude','longitude'),
+                                            fill_value=netcdf_helper.MISSINGDATAVALUE,zlib=True)
+      TSST_std_data[:] = newvars['stds']['Tcl_C'][:]
+      TSST_std_data.units = 'degC'
+      TSST_std_data.missing_value = netcdf_helper.MISSINGDATAVALUE
+      TSST_std_data.valid_min = 0.
+      TSST_std_data.valid_max = 1e6
+      TSST_std_data.scale_factor = 1.
+      TSST_std_data.add_offset = 0.
+      TSST_std_data.standard_name = "unweighted_std_SST_C"
+      TSST_std_data.long_name = "Standard deviation of SST using OC-FLUX methodology (unweighted)"
 #Function for combining the global year/month files into an average for the whole stack of dates
 def Climatology(filelist,output,varswewant):
 
@@ -345,7 +395,7 @@ def Climatology(filelist,output,varswewant):
                   print("Dimensions are not the same for %s  what does this mean, they should be. "%variable)
                   print(dataitem_dims[variable],fin.variables[variable][:])
                   sys.exit(1)
-               elif variable == "time": 
+               elif variable == "time":
                   #time could be a different value so this is OK
                   dataitem_dims['time']=numpy.vstack([dataitem_dims['time'],copy.copy(fin.variables[variable][:])])
          if variable in varswewant:
@@ -374,4 +424,3 @@ def Climatology(filelist,output,varswewant):
             tmpvar.standard_name = itemvar[variable].standard_name
             tmpvar.long_name = itemvar[variable].long_name
    return True
-

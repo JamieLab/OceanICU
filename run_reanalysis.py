@@ -45,36 +45,69 @@ def reanalyse(socat_dir=None,socat_files=None,sst_dir=None,sst_tail=None,out_dir
         fco2_sst = fco2_sst+273.15
     append_to_file(outfile,fco2,fco2_std,fco2_sst,name,socat_files[0])
 
-def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=''):
+def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name='',kelvin=True):
     """
     Function loads the reanlysed fCO2 data produced by JamieLab, instead of running the reanalysis process.
+
+    input_file = the location of the prereanalysed NetCDF file
+    output_file = the NetCDF file the data should be appended to
+    start_yr = the start year for data extraction
+    end_yr = the end year for data extraction (inclusive)
+    name = the name of the SST dataset used for reanalysis
+    kelvin = toggle to output the SST data as Kelvin or degress C
     """
     c = Dataset(input_file)
     ti = np.array(c.variables['tmnth'])
     time = []
+    #Construct time array of years, to allow slicing of the data
     for t in ti:
         time.append((datetime.datetime(1970,1,1) + datetime.timedelta(days=int(t))).year)
     time = np.array(time)
     #print(time)
+
+    #Extracting the reanalysed fCO2 data
     fco2 = np.array(c.variables['fco2_reanalysed_ave_weighted'])
     fco2_std = np.array(c.variables['fco2_reanalysed_std_weighted'])
-    sst = np.array(c.variables['sst_reynolds']) +273.15 #T_reynolds is in degC prefer in K
+    #Toggle to allow the function to output the SST paired to the observations as degC or K
+    if kelvin:
+        #Kelvin output (as prereanalysed files are in degC)
+        sst = np.array(c.variables['sst_reynolds']) +273.15 #T_reynolds is in degC prefer in K
+    else:
+        #degC output
+        sst = np.array(c.variables['sst_reynolds'])
     c.close()
+    # Find where the data within the reanalysed file match the specified time period
     f = np.where((time <= end_yr) & (time >= start_yr))
     #print(fco2.shape)
+    # Trim the arrays to the time (first dimension is time), then transpose to
+    # (lon,lat,time) dimensions
     fco2 = np.transpose(fco2[f[0],:,:],(2,1,0))
     fco2_std = np.transpose(fco2_std[f[0],:,:],(2,1,0))
     sst = np.transpose(sst[f[0],:,:],(2,1,0))
 
+    # Remove data that is either fill or isn't representative (i.e fCO2sw of 0 isn't really possible)
+    # in seawater.
+    # Need better solution to this...
     fco2[fco2<0] = np.nan
     fco2_std[fco2_std<0] = np.nan
-    sst[sst<0] = np.nan
+    if kelvin:
+        sst[sst<0] = np.nan
+    else:
+        sst[sst<-2.5] = np.nan
     #print(fco2.shape)
+    # Append to data to the output file.
     append_to_file(output_file,fco2,fco2_std,sst,name,input_file)
 
 def append_to_file(output_file,fco2,fco2_std,sst,name,socat_files):
     """
     Function to append the reanalysed fCO2 to the neural network input file
+
+    output_file = the file to append the fCO2 data to
+    fco2 = 3D array of fCO2 data
+    fco2_std = 3D array of fCO2 standard deviation data
+    sst = 3D array of SST data coincident to the fCO2
+    name = name of the SST data used within the reanalysis
+    socat_files = string of the reanalysed SOCAT file location
     """
     c = Dataset(output_file,'a',format='NETCDF4_CLASSIC')
     var_o = c.createVariable(name+'_reanalysed_fCO2_sw','f4',('longitude','latitude','time'))
@@ -102,22 +135,31 @@ def append_to_file(output_file,fco2,fco2_std,sst,name,socat_files):
 def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GLO-1M-100-SOCAT-CONV.nc',flip=False):
     """
     Function to iteratively load the fCO2sw from the reanalysis folder (i.e one netcdf per month_year combo)
+
+    rean_dir = Top level location of the reanalysis data (i.e the folder that contains 'reanalysed_global' folder)
+    start_yr = the start year for data extraction
+    end_yr = the end year for data extraction (inclusive)
+    prefix = the file name of the reanalysed files (where %Y becomes the 4 digit year and %m becomes two digit month)
+    flip = Flip data on the latitude axis - I don't think this needs to ever be set to true now...
     """
     print('Retrieving fCO2 from reanlysis')
+    # Calculate how many months of data should be avaiable based on start and end years
     months = (end_yr-start_yr+1)*12
+    # Setup the while loop, to cycle through all of the files in the time period
     yr = start_yr
     mon = 1
-    t = 0
-    inits = 0
+    t = 0 # Counting variable
+    inits = 0 # A toggle for the first time we are able to load data
     while yr <= end_yr:
-        da = datetime.datetime(yr,mon,1)
+        da = datetime.datetime(yr,mon,1) # Datetime to make getting file names easier
         loc = os.path.join(rean_dir,'reanalysed_global',da.strftime('%m'),da.strftime(prefix))
         print(loc)
-        if du.checkfileexist(loc):
+        if du.checkfileexist(loc): # Checking the file exists
             #print('True')
+            # Loading the data
             c = Dataset(loc,'r')
-            fco2_temp = np.squeeze(c.variables['unweighted_fCO2_Tym'])
-            fco2_temp = np.transpose(fco2_temp)
+            fco2_temp = np.squeeze(c.variables['unweighted_fCO2_Tym']) #FluxEngine files have time dimension of 1 so we squeeze that out
+            fco2_temp = np.transpose(fco2_temp) # Tranpose from lat/lon to lon/lat
             if flip:
                 fco2_temp = np.fliplr(fco2_temp)
 
@@ -131,48 +173,83 @@ def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GL
             if flip:
                 fco2_sst_temp = np.fliplr(fco2_sst_temp)
             c.close()
-            if inits == 0:
+            if inits == 0: # On first avaiable file we create the output arrays
                 fco2 = np.empty((fco2_temp.shape[0],fco2_temp.shape[1],months))
                 fco2[:] = np.nan
                 fco2_std = np.copy(fco2)
                 fco2_sst = np.copy(fco2)
-                inits = 1
-            fco2[:,:,t] = fco2_temp
+                inits = 1 # Set toggle to 1 so we don't create recreating the output arrays
+            fco2[:,:,t] = fco2_temp # Putting the data into the array
             fco2_std[:,:,t] = fco2_std_temp
             fco2_sst[:,:,t] = fco2_sst_temp
-        t += 1
-        mon += 1
-        if mon == 13:
+        t += 1 # Add to counting
+        mon += 1 # Add another month
+        if mon == 13: # If month gets to 13 we need to increment the year and set month to 1
             yr += 1
             mon=1
+    # Remove data that is either fill or isn't representative (i.e fCO2sw of 0 isn't really possible)
+    # in seawater.
+    # Need better solution to this...
     fco2[fco2<0] = np.nan
     fco2_std[fco2_std<0] = np.nan
     fco2_sst[fco2_sst<-5] = np.nan
     return fco2,fco2_std,fco2_sst
 
 def read_socat(file,pad=7302):
+    """
+    Function to read the SOCAT tsv file
+
+    file = is the file to open (should be a .tsv file)
+    pad = is the number of rows at the top of file to miss (7302 seems to be the number for the reanalysed files)
+    """
     data=pd.read_csv(file,sep='\t',skiprows=pad)#,low_memory=False)#,usecols=list(range(3,36)))
     lon = data['longitude [dec.deg.E]']
-    lon[lon>180] = lon[lon>180] - 360
-    data['longitude [dec.deg.E]'] = lon
+    lon[lon>180] = lon[lon>180] - 360 # Prefer longitude in -180 to 180 then 0-360
+    data['longitude [dec.deg.E]'] = lon # Save back
     return data
 
 def find_socat(data,lat,lon):
-    res_lat = np.abs(lat[0]-lat[1])/2
-    mlat = [np.min(lat)-res_lat,np.max(lat)+res_lat]
+    """
+    Function to find all the SOCAT data in a latitude/longitude region
 
+    data = is the SOCAT data as a Pandas table, read with 'read_socat' function
+    lat = latitude grid
+    lon = longitude grid
+    """
+    res_lat = np.abs(lat[0]-lat[1])/2 # Find the resoltion of the latitude grid
+    mlat = [np.min(lat)-res_lat,np.max(lat)+res_lat] # Find the max and min of the latitude, and add resolution back so we have the whole box at grid ends
     print(mlat)
+    #Same as above for the Longitude
     res_lon = np.abs(lon[0]-lon[1])/2
     mlon = [np.min(lon)-res_lon,np.max(lon)+res_lon]
     print(mlon)
     soclat = data['latitude [dec.deg.N]']
     #print(soclat)
     soclon = data['longitude [dec.deg.E]']
+    # Find where the data falls within these bounds...
     d = data[(soclat > mlat[0]) & (soclat < mlat[1]) & (soclon > mlon[0]) & (soclon < mlon[1])]
     return d
 
 def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = [],grid=True,fco2var = 'fCO2_reanalysed [uatm]',pco2var = 'pCO2_reanalysed [uatm]',sstvar = 'T_reynolds [C]',
     save_file ='socat.tsv',save_fold = False,pad = 7302):
+    """
+    Function to regrid the SOCAT tsv into a gridded file consistent to that produced by SOCAT and JamieLab, but with additional extras
+    to allow daily data, different spatial resolutions or other data to also be appended.
+
+    file = reanalysed SOCAT.tsv file data_location
+    latg = regularly gridded latitude array (1D)
+    long = regularly gridded longitude array (1D)
+    start_yr = the start year for data extraction
+    end_yr = the end year for data extraction (inclusive)
+    save_loc = the save folder location the data should be saved (this is top level, as an additional folder of 'socat' is created one level down)
+    grid = Whether to actually grid the data, or just produce a SOCAT.tsv file with data within the latg - long bounds
+    fco2var = the column name in the SOCAT tsv file for the fCO2sw data
+    pco2var = the column name in the SOCAT tsv file for the pCO2sw data
+    sstvar = the column name in the SOCAT tsv file for the SST data paired to the f/pCO2sw
+    save_file = the name of the .tsv save file
+    save_fold = the direct name of the folder the data should be saved in (allowing the function to be used outside the OceanICU framework)
+    pad = the number of rows at the top of file to miss (7302 seems to be the number for the reanalysed files)
+    """
     import custom_reanalysis.combine_nc_files as combine_nc_files
     import glob
     if not save_fold:
@@ -274,7 +351,11 @@ def geo_idx(dd, dd_array):
 
 def CreateBinnedData(month_data,latg,long):
     """
+    Updated FluxEngine reanalysis function to allow the creation of varying reanalysis files (both the orginial but also with different SST data i.e daily)
 
+    month_data = Pandas table of all the variable used to create the gridded data (produced within 'regrid_fco2_data' function)
+    latg = regularly gridded latitude array (1D)
+    long = regularly gridded longitude array (1D)
     """
     import custom_reanalysis.netcdf_helper as netcdf_helper
     #import pandas as pd;
@@ -403,6 +484,16 @@ def CreateBinnedData(month_data,latg,long):
     return vardict
 
 def WriteOutToNCAsGrid(vardict,outputfile,extrapolatetoyear,long,latg,outputtime=1e9):
+    """
+    Updated FluxEngine function to write out the data created by 'CreateBinnedData' into a consistent netCDF file format
+
+    vardict = the dictionary output by 'CreateBinnedData' with all the required data
+    outputfile = outputfile name
+    extrapolatetoyear = year to extrapolate the data to (I think this is a year number but I don't use it...)
+    latg = regularly gridded latitude array (1D)
+    long = regularly gridded longitude array (1D)
+    outputtime = a time number given to 'standard_setup_SOCAT' function
+    """
     import custom_reanalysis.netcdf_helper as netcdf_helper
     #Write out the data into a netCDF file
     print("Writing to: %s"%outputfile)
@@ -611,6 +702,15 @@ def WriteOutToNCAsGrid(vardict,outputfile,extrapolatetoyear,long,latg,outputtime
                 stdf_data.long_name = "Standard deviation of "+var+varext+" occupying binned cell"
 
 def correct_fco2_daily(socat_file,month_fco2,month_sst,daily_sst,co2 = '_fco2'):
+    """
+    Function to correct the monthly reanalysed fCO2sw data (at a monthly SST) to a respective daily SST data
+
+    socat_file = the SOCAT tsv file with the reanalysed data and additional daily SST column (this should be a saved tsv file that's already been loaded previously by 'read_socat' function)
+    month_fco2 = the monthly f/pCO2sw data column name
+    month_sst = the monthly SST data column name, paired to the monthly fCO2_sw data
+    daily_sst = the daily SST data column name
+    co2 = string defining whether the month_fCO2 column is fCO2sw or pCO2sw
+    """
     data = pd.read_table(socat_file,sep='\t')
     daily_fco2 = daily_sst + co2 + ' [uatm]'
     # Conversion value from Wanninkhof et al. (2022)

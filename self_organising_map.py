@@ -12,6 +12,7 @@ import Data_Loading.data_utils as du
 import tf_som
 from sklearn.preprocessing import StandardScaler
 import construct_input_netcdf as cinp
+import os
 
 # This is needed due to duplicate librarys... I spent hours trying to fix the duplication,
 # but couldn't. I haven't seen an adverse effects of this yet...

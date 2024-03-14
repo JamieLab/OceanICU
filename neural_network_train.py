@@ -856,11 +856,12 @@ def add_validation_unc(model_save_loc,prov):
 
     val_unc = np.zeros((prov.shape))
     val_unc[:] = np.nan
-    for v in range(0,val.shape[0]):
-        if val.shape[0] == 2:
-            val_unc[prov == v+1] = val[1]
-        else:
-            val_unc[prov == v+1] = val[v,1] # For each province we put the validaiton RMSD as the value...
+    if len(val.shape)>1:# So if we have a single province this should be 1, otherwise it should be 2 (i.e 2 dimensions)
+        for v in range(0,val.shape[0]):# Iterate through the provinces and add the validation to the province areas
+            print(v)
+            val_unc[prov == val[v,0]] = val[v,1] # For each province we put the validaiton RMSD as the value...
+    else: #Single province must be handled differently
+        val_unc[prov == val[0]] = val[1] # val[0] is the province number, and val[1] is the RMSD
     val_unc = np.reshape(val_unc,s)
 
     # Need to add a check if the fCO2_val_unc variable has been created already - if it has we just overwrite with the new data...

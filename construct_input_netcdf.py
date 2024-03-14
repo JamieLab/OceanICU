@@ -277,9 +277,9 @@ def append_variable(file,o_file,var,new_var=None):
 
     append_netcdf(o_file,direct,1,1,1,flip=False)
 
-def append_longhurst_prov(model_save_loc,longhurstfile,long_prov,prov_val):
+def append_longhurst_prov(model_save_loc,longhurstfile,long_prov,prov_val,prov_var):
     c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'a')
-    prov = np.array(c.variables['prov'][:])
+    prov = np.array(c.variables[prov_var][:])
 
     d = Dataset(longhurstfile,'r')
     long = np.array(d.variables['longhurst'])
@@ -295,12 +295,12 @@ def append_longhurst_prov(model_save_loc,longhurstfile,long_prov,prov_val):
         prov[f[0],f[1],:] = prov_val
     f = np.where(bath == 0)
     prov[f[0],f[1],:] = np.nan
-    c.variables['prov'][:] = prov
+    c.variables[prov_var][:] = prov
     c.close()
 
-def manual_prov(model_save_loc,lat_g,lon_g,fill=np.nan):
+def manual_prov(model_save_loc,lat_g,lon_g,prov_var,fill=np.nan):
     c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'a')
-    prov = np.array(c.variables['prov'][:])
+    prov = np.array(c.variables[prov_var][:])
     lat = np.array(c.variables['latitude'][:])
     lon = np.array(c.variables['longitude'][:])
 
@@ -309,7 +309,7 @@ def manual_prov(model_save_loc,lat_g,lon_g,fill=np.nan):
     [g,f] = np.meshgrid(g,f)
     for i in range(prov.shape[2]):
         prov[g,f,i] = fill
-    c.variables['prov'][:] = prov
+    c.variables[prov_var][:] = prov
     c.close()
 
 def fill_with_var(model_save_loc,var_o,var_f,log,lag,mod = None):
@@ -350,6 +350,26 @@ def land_clear(model_save_loc):
         print(var)
         data = c.variables[var][:]
         data[ocean == 0.0] = np.nan
+        c.variables[var][:] = data
+    c.close()
+
+def clear_on_prov(data_file,var_p,val):
+    """
+    Function to clear a data file based on a province area (i.e remove all the data thats not in the province)
+    """
+
+    c = Dataset(data_file,'a')
+    time = c.variables['time'][:]
+    var_p = c.variables[var_p][:]
+    v = list(c.variables.keys())
+    v.remove('time')
+    v.remove('latitude')
+    v.remove('longitude')
+
+    for var in v:
+        print(var)
+        data = c.variables[var][:]
+        data[var_p != val] = np.nan
         c.variables[var][:] = data
     c.close()
 

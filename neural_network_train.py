@@ -38,7 +38,7 @@ matplotlib.rc('font', **font)
 tf.autograph.set_verbosity(0)
 
 def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_save_loc = None,
-    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000):
+    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,activ = 'sigmoid'):
     """
     This is the driver function to load the data from the input file, trim the data extremes(?) and then call
     the neural network package.
@@ -100,7 +100,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     for v in var[1:]:
         net_train_var.append(v)
     print(net_train_var)
-    run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val)
+    run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,activ = activ)
 
     # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
     # (propagated input parameter uncertainties)
@@ -295,7 +295,7 @@ def make_save_tree(model_save_loc):
     if not os.path.isdir(decor):
         os.mkdir(decor)
 
-def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10,tot_lut_val=6000,epochs=200,node_in = range(6,31,3)):
+def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10,tot_lut_val=6000,epochs=200,node_in = range(6,31,3),activ = 'sigmoid'):
     """
     Function to run the nerual network training, and saving the best performing model. This function
     produces the model, scaler, uncertainty look up table and validation results for use in producing
@@ -379,7 +379,7 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
             print(n)
             # Here we setup the Tensor Flow Model (Thanks to Josh Blannin for example code)
             model = tf.keras.models.Sequential(name='PROV_'+str(v)) # Setup the model
-            model.add(tf.keras.layers.Dense(n, input_dim=len(var),activation='sigmoid')) # Add Hidden layer - changed from relu to sigmoid as seems to produce better results.
+            model.add(tf.keras.layers.Dense(n, input_dim=len(var),activation=activ)) # Add Hidden layer - changed from relu to sigmoid as seems to produce better results.
             #model.add(tf.keras.layers.Dense(n, activation='sigmoid')) # Add Hidden layer - changed from relu to sigmoid as seems to produce better results.
             model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
             model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
@@ -416,7 +416,7 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
             Neural network setup and training.
             """
             model = tf.keras.models.Sequential(name='PROV_'+str(v)) # Setup the model
-            model.add(tf.keras.layers.Dense(min_n, input_dim=len(var), activation='sigmoid')) # Add Hidden layer
+            model.add(tf.keras.layers.Dense(min_n, input_dim=len(var), activation=activ)) # Add Hidden layer
             #model.add(tf.keras.layers.Dense(n, activation='sigmoid'))
             model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
             model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results

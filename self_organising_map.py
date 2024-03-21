@@ -20,7 +20,7 @@ import os
 # different versions.
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-def som_feed_forward(model_save_loc,data_file,inp_vars,ref_year = 1970,o_var = 'prov',box=5,m=4, plot=True):
+def som_feed_forward(model_save_loc,data_file,inp_vars,ref_year = 1970,o_var = 'prov',box=[7,5,3],m=4, plot=True):
     """
     This function takes variables out of the data file generated with
     construct_input_netcdf.py, and uses them to train and implement a SOM approach. Here
@@ -69,14 +69,14 @@ def som_feed_forward(model_save_loc,data_file,inp_vars,ref_year = 1970,o_var = '
 
     # Now we need to transform these variables so they have a mean of ~0,
     # so we use StandardScaler like in the Neural network training
-    StdScl = StandardScaler()
-    StdScl.fit(som_inp)
-    som_inp = StdScl.transform(som_inp)
+    # StdScl = StandardScaler()
+    # StdScl.fit(som_inp)
+    # som_inp = StdScl.transform(som_inp)
 
     #Now we setup the SOM training, where m is the number nodes. So a m=4 would be
     #a 16 node SOM (we only run with consitent rows and columns)
     # We run this for 100 epochs
-    som = tf_som.SOM(m, m, len(inp_vars), dtype = np.float32, learning_rate = 0.3, sigma = 1, epochs = 100)
+    som = tf_som.SOM(m, m, len(inp_vars), dtype = np.float32, learning_rate = 0.3, sigma = 1, epochs = 200)
     som.train(som_inp)
     # Now we extract the winners (or the SOM node that corresponds to each varibale combination)
     win = som.winners(som_inp)
@@ -97,9 +97,17 @@ def som_feed_forward(model_save_loc,data_file,inp_vars,ref_year = 1970,o_var = '
     # So we use a mode filter to smooth the province and remove the majority of the small
     # few pixel provinces, which is run seperately for each month in the climatology
     map_filtered = np.zeros((map.shape)); map_filtered[:] = np.nan
-    for i in range(map.shape[2]):
-        print(i)
-        map_filtered[:,:,i] = mode_smooth(map[:,:,i],box=box)
+    if isinstance(box, list):
+        map_filtered = np.copy(map)
+        for j in box:
+            print('Filtering by ' + str(j))
+            for i in range(map.shape[2]):
+                print(i)
+                map_filtered[:,:,i] = mode_smooth(map_filtered[:,:,i],box=j)
+    else:
+        for i in range(map.shape[2]):
+            print(i)
+            map_filtered[:,:,i] = mode_smooth(map[:,:,i],box=j)
     # THis filtering (or how it's implemented) extends the provinces far into the land,
     # so we whereever the orginial SOM output was NAN we set this to NAN.
     # To maintain consistency

@@ -884,7 +884,7 @@ def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=
     #ax.plot(a,out,zorder=2)
     ax[3].fill_between(a,ann[:,1] - st,ann[:,1] + st,alpha = 0.6,color='k',zorder=5)
     ax[3].fill_between(a,ann[:,1] - (2*st),ann[:,1] + (2*st),alpha=0.4,color='k',zorder=4)
-    ax[3].plot(year,-np.sum(np.abs(gross),axis=1),'b--',label = 'Gross Flux',linewidth=3)
+    ax[3].plot(year,-np.sum(np.abs(gross),axis=1),'b--',label = 'Absolute Flux',linewidth=3)
 
     if model_plot:
         a = np.loadtxt(model_plot,delimiter=',',skiprows=1)

@@ -99,8 +99,8 @@ def fill_with_clim(data,avai,month_track):
     timesteps = 10 * 12 #10 years in months
     total = len(avai)
     f = np.squeeze(np.where((avai == 0)))
-    print(f)
-    print(np.diff(f))
+    #print(f)
+    #print(np.diff(f))
     if f.size != 0:
         dif = np.squeeze(np.where((np.diff(f) > 1)))
         print(dif)
@@ -140,13 +140,13 @@ def fill_with_clim(data,avai,month_track):
             """
             #Filling the start of the timeseries
             fs = f[0:dif+1]
-            print(fs)
+            #print(fs)
             clim = construct_climatology(data[:,:,fs[-1]+1:fs[-1]+timesteps],month_track[fs[-1]+1:fs[-1]+timesteps])
             for i in range(0,len(fs)):
                 data[:,:,fs[i]] = clim[:,:,month_track[fs[i]]-1]
             #Filling the end of the timeseries
             fs = f[dif+1:]
-            print(fs)
+            #print(fs)
             clim = construct_climatology(data[:,:,fs[0]-timesteps:fs[0]-1],month_track[fs[0]-timesteps:fs[0]-1])
             for i in range(0,len(fs)):
                 data[:,:,fs[i]] = clim[:,:,month_track[fs[i]]-1]
@@ -208,7 +208,7 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,re
     lon_o.units = 'Degrees'
     lon_o.standard_name = 'Longitude'
     lon_o[:] = lon
-    print(time_track)
+    #print(time_track)
     if time_track:
         time_o = c.createVariable('time','f4',('time'))
         time_o[:] = time_track

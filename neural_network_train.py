@@ -38,7 +38,7 @@ matplotlib.rc('font', **font)
 tf.autograph.set_verbosity(0)
 
 def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_save_loc = None,
-    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,activ = 'sigmoid'):
+    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,activ = 'sigmoid',socat_sst=False):
     """
     This is the driver function to load the data from the input file, trim the data extremes(?) and then call
     the neural network package.
@@ -96,9 +96,12 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     for v in np.unique(tabl[prov]):
         print(str(v) + ' : '+str(np.argwhere(np.array(tabl[prov]) == v).shape))
 
-    net_train_var = [fco2_sst+'_reanalysed_sst']
-    for v in var[1:]:
-        net_train_var.append(v)
+    if socat_sst:
+        net_train_var = [fco2_sst+'_reanalysed_sst']
+        for v in var[1:]:
+            net_train_var.append(v)
+    else:
+        net_train_var = var
     print(net_train_var)
     run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,activ = activ)
 

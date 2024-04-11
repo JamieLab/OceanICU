@@ -56,3 +56,39 @@ def socat_append_prov(socat_file,shp_lon,shp_lat,prov_no):
     prov[vals == True] = prov_no
     data['prov'] = prov
     data.to_csv(socat_file,sep='\t',index=False)
+
+def append_som_prov(file,data_file,lon,lat,sep='\t',lon_var = 'longitude [dec.deg.E]',lat_var = 'latitude [dec.deg.N]',mon_var = 'mon',prov_var = 'prov',out_file = False):
+    import pandas as pd
+    from netCDF4 import Dataset
+    c = Dataset(data_file,'r')
+    m_prov = np.array(c[prov_var])[:,:,0:12]
+    c.close()
+    res = np.abs(lon[0]-lon[1])
+    data = pd.read_table(file,sep=sep)
+
+    if prov_var in list(data):
+        prov = np.array(data[prov_var])
+    else:
+        prov = np.zeros((len(data)))
+        prov[:] = np.nan
+
+    lon_d = np.array(data[lon_var])
+    lat_d = np.array(data[lat_var])
+    mons = np.array(data[mon_var])
+    for i in range(len(prov)):
+        #print(data[mon_var][i])
+        g = np.abs(lon_d[i] - lon)
+        f = np.abs(lat_d[i] - lat)
+        f_min = np.min(f)
+        g_min = np.min(g)
+        f = np.where(f == f_min)[0][0]
+        g = np.where(g == g_min)[0][0]
+        if (f_min < res) & (g_min < res):
+            prov[i] = m_prov[g,f,int(mons[i])-1]
+        else:
+            prov[i] = np.nan
+    data[prov_var] = prov
+    if out_file:
+        data.to_csv(out_file,sep=sep,index=False)
+    else:
+        data.to_csv(file,sep=sep,index=False)

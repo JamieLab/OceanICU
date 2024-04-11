@@ -20,7 +20,7 @@ import os
 # different versions.
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-def som_feed_forward(model_save_loc,data_file,inp_vars,ref_year = 1970,o_var = 'prov',box=[7,5,3],m=4, plot=True):
+def som_feed_forward(model_save_loc,data_file,inp_vars,ref_year = 1970,o_var = 'prov',box=[7,5,3],m=4, plot=True,normalise = False):
     """
     This function takes variables out of the data file generated with
     construct_input_netcdf.py, and uses them to train and implement a SOM approach. Here
@@ -69,9 +69,10 @@ def som_feed_forward(model_save_loc,data_file,inp_vars,ref_year = 1970,o_var = '
 
     # Now we need to transform these variables so they have a mean of ~0,
     # so we use StandardScaler like in the Neural network training
-    # StdScl = StandardScaler()
-    # StdScl.fit(som_inp)
-    # som_inp = StdScl.transform(som_inp)
+    if normalise:
+        StdScl = StandardScaler()
+        StdScl.fit(som_inp)
+        som_inp = StdScl.transform(som_inp)
 
     #Now we setup the SOM training, where m is the number nodes. So a m=4 would be
     #a 16 node SOM (we only run with consitent rows and columns)

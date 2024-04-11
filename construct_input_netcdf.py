@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import Data_Loading.data_utils as du
 
-def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year = 1970,fill_clim=True):
+def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year = 1970,fill_clim=True,append = False):
     #lon,lat = du.reg_grid(lat=resolution,lon=resolution)
     direct = {}
     for a in vars:
@@ -26,7 +26,10 @@ def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year =
     for i in range(len(time_track_temp)):
         time_track.append((time_track_temp[i] - datetime.datetime(time_ref_year,1,15)).days)
         #print(time_track)
-    save_netcdf(out_file,direct,lon,lat,timesteps,time_track=time_track,ref_year = time_ref_year)
+    if append:
+        append_netcdf(out_file,direct,lon,lat,timesteps)
+    else:
+        save_netcdf(out_file,direct,lon,lat,timesteps,time_track=time_track,ref_year = time_ref_year)
 
 def build_timeseries(load_loc,variable,start_yr,end_yr,lon,lat,name,fill_clim=True):
     """
@@ -216,7 +219,7 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,re
         time_o.standard_name = 'Time of observations'
     c.close()
 
-def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False):
+def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False,longname =False):
     c = Dataset(save_loc,'a',format='NETCDF4_CLASSIC')
     v = c.variables.keys()
     for var in list(direct.keys()):
@@ -235,6 +238,8 @@ def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False):
         var_o = c.variables[var]
         if units:
             var_o.units = units[var]
+        if longname:
+            var_o.long_name = longname[var]
         var_o.date_variable = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
     c.close()
 
@@ -333,6 +338,9 @@ def fill_with_var(model_save_loc,var_o,var_f,log,lag,mod = None):
     c.close()
 
 def land_clear(model_save_loc):
+    """
+    Function to clear all data that is deemed on land by the ocean_proportion calculated from bathymetry data.
+    """
     c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
     ocean = c.variables['ocean_proportion'][:]
     #ocean = ocean[:,:,np.newaxis]
@@ -416,3 +424,15 @@ def replace_socat_with_model(input_data_file,start_yr,end_yr,socat_var = False,g
     direct = {}
     direct[mod_variable] = mod_fco2
     append_netcdf(input_data_file,direct,1,1,1)
+
+def copy_netcdf_vars(file,vars,outfile):
+    c = Dataset(file,'r')
+    direct = {}
+    units = {}
+    longname={}
+    for v in vars:
+        direct[v] = np.array(c[v])
+        units[v] = c[v].units
+        longname[v] = c[v].long_name
+    c.close()
+    append_netcdf(outfile,direct,1,1,1,units=units,longname=longname)

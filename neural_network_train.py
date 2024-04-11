@@ -120,9 +120,11 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     # Plot the mean of the last year of the timeseries for a sanity check.
     plot_mapped(model_save_loc)
 
-def daily_socat_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_var=[],mapping_prov = [],unc = None, model_save_loc = None,
-    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,mapping_file=[],ktoc = None,epochs=200,node_in = range(6,31,3)):
-    vars = [fco2_sst,fco2_sst+'_std']
+def daily_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_var=[],mapping_prov = [],unc = None, model_save_loc = None,
+    bath = None, bath_cutoff = None, cutoff_low = None, cutoff_high = None,sea_ice=None,tot_lut_val=6000,mapping_file=[],ktoc = None,epochs=200,node_in = range(6,31,3),
+    sep = '\t',name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm',c = [0,1500],learning_rate=0.01,plot_unit = '$\mu$atm',plot_parameter = 'fCO$_{2 (sw)}$',
+    lat_v = '',lon_v=''):
+    vars = [fco2_sst,fco2_sst+'_std',lat_v,lon_v]
     vars.append(prov)
     if not bath_cutoff == None:
         vars.append(bath)
@@ -131,35 +133,40 @@ def daily_socat_neural_driver(data_file,fco2_sst = None, prov = None,var = [],ma
 
     for v in var:
         vars.append(v)
-    data = pd.read_table(data_file,sep='\t')
+    data = pd.read_table(data_file,sep=sep)
     data[fco2_sst+'_std'] = np.zeros((len(data)))
     data = data[vars]
-    if not fco2_cutoff_low == None:
-        print(f'Trimming fCO2(sw) less than {fco2_cutoff_low} uatm...')
+    if not cutoff_low == None:
+        print(f'Trimming fCO2(sw) less than {cutoff_low} uatm...')
         print(data.shape)
-        data = data[(data[vars[0]] > fco2_cutoff_low)]
+        data = data[(data[vars[0]] > cutoff_low)]
         print(data.shape)
 
-    if not fco2_cutoff_high == None:
-        print(f'Trimming fCO2(sw) greater than {fco2_cutoff_high} uatm...')
+    if not cutoff_high == None:
+        print(f'Trimming fCO2(sw) greater than {cutoff_high} uatm...')
         print(data.shape)
-        data = data[(data[vars[0]] < fco2_cutoff_high)]
+        data = data[(data[vars[0]] < cutoff_high)]
         print(data.shape)
     data = data[(np.isnan(data) == 0).all(axis=1)]
 
-    run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,epochs=epochs,node_in = node_in)
-    plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov,daily=True,var=var)
-    # print(mapping_var)
-    # map_vars = mapping_var.copy()
-    # map_vars.append(mapping_prov)
-    # tabl,output_size,lon,lat = load_data(mapping_file,map_vars,model_save_loc,outp=False)
-    # if ktoc:
-    #     tabl[ktoc] = tabl[ktoc] - 273.15
-    # print(tabl)
-    # print(mapping_var)
-    # mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc)
-    #
-    # save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat)
+    for v in np.unique(data[prov]):
+        print(str(v) + ' : '+str(np.argwhere(np.array(data[prov]) == v).shape))
+
+    #run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,epochs=epochs,node_in = node_in,learning_rate = learning_rate)
+    #plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov,daily=True,var=var,fco2_cutoff_low = cutoff_low,fco2_cutoff_high=cutoff_high,c=np.array(c),unit = plot_unit,parameter = plot_parameter)
+    print(mapping_var)
+    map_vars = mapping_var.copy()
+    map_vars.append(mapping_prov)
+    tabl,output_size,lon,lat,time = load_data(mapping_file,map_vars,model_save_loc,outp=False)
+    if ktoc:
+        tabl[ktoc] = tabl[ktoc] - 273.15
+    print(tabl)
+    print(mapping_var)
+    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc)
+
+    save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,name = name,longname=longname,unit = unit)
+    add_validation_unc(model_save_loc,mapping_file,prov,name = name,longname=longname,unit = unit)
+    add_total_unc(model_save_loc,name = name,longname=longname,unit = unit)
 
 """
 Flag E valdiation needs updating to the new construct. Treat this as a independent test dataset (29/07/2023).
@@ -298,7 +305,8 @@ def make_save_tree(model_save_loc):
     if not os.path.isdir(decor):
         os.mkdir(decor)
 
-def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10,tot_lut_val=6000,epochs=200,node_in = range(6,31,3),activ = 'sigmoid'):
+def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10,tot_lut_val=6000,epochs=200,node_in = range(6,31,3),activ = 'sigmoid',
+    learning_rate =0.01):
     """
     Function to run the nerual network training, and saving the best performing model. This function
     produces the model, scaler, uncertainty look up table and validation results for use in producing
@@ -322,7 +330,7 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
     #rmse = tf.keras.metrics.MeanAbsoluteError(name='mean_absolute_error', dtype=None)
 
     #Optimizer was set to Adam in Josh Blannin's code but the SGD optimizer on testing produced better overall results.
-    opt = tf.keras.optimizers.SGD(learning_rate=0.01)
+    opt = tf.keras.optimizers.SGD(learning_rate=learning_rate)
     #opt = tf.keras.optimizers.Adam()
     #Set the node increments (set initially as 2**i (i.e base 2 values)) - changed 07/2023 to mutliples of 5. and then to multiples of 10 (26/07/2023)
     # Found that using low numbers of neurons were hurting the neural network performance so upped the numbers.
@@ -408,27 +416,41 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
         2. Start nerual network ensemble training.
         """
         for i in range(ens):
-            # Extract the same independent test data for all nerual networks, but trainign and validation split varies with each nerual network.
-            # Trainign and validation are therefore quasi seperate... and should be deemed as 1 dataset when validating.
-            X_train, X_val, X_test, y_train, y_val, y_test,ind_train,ind_val,ind_test = train_val_test_split(X[mask,:], y[mask,:],inds, indep = 0.05, train = 0.2)
-            # Apply the standard scalar...
-            X_train = StdScl.transform(X_train); X_val = StdScl.transform(X_val); X_test = StdScl.transform(X_test);
+            loss_check=0
+            loss_count = 0
+            while loss_check == 0:
+                # Extract the same independent test data for all nerual networks, but trainign and validation split varies with each nerual network.
+                # Trainign and validation are therefore quasi seperate... and should be deemed as 1 dataset when validating.
+                X_train, X_val, X_test, y_train, y_val, y_test,ind_train,ind_val,ind_test = train_val_test_split(X[mask,:], y[mask,:],inds, indep = 0.05, train = 0.2)
+                # Apply the standard scalar...
+                X_train = StdScl.transform(X_train); X_val = StdScl.transform(X_val); X_test = StdScl.transform(X_test);
 
-            print(f'Running ensemble {i} for prov {v}')
-            """
-            Neural network setup and training.
-            """
-            model = tf.keras.models.Sequential(name='PROV_'+str(v)) # Setup the model
-            model.add(tf.keras.layers.Dense(min_n, input_dim=len(var), activation=activ)) # Add Hidden layer
-            #model.add(tf.keras.layers.Dense(n, activation='sigmoid'))
-            model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
-            model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
-            # Here we train the neural network.
-            history = model.fit(X_train, y_train[:,0], epochs=epochs, validation_data=[X_val,y_val[:,0]], verbose=0, callbacks=[es],shuffle=False, batch_size=int(len(X_train)/50))
-            loss = history.history['loss'][-1]
-            print(f'Ensemble Loss = { loss } ensemble {i}')
-            # Save each of the ensemble outputs
-            model.save(os.path.join(model_save_loc,'networks',f'prov_{v}_model_ens{i}'))
+                print(f'Running ensemble {i} for prov {v}')
+                """
+                Neural network setup and training.
+                """
+
+                model = tf.keras.models.Sequential(name='PROV_'+str(v)) # Setup the model
+                model.add(tf.keras.layers.Dense(min_n, input_dim=len(var), activation=activ)) # Add Hidden layer
+                #model.add(tf.keras.layers.Dense(n, activation='sigmoid'))
+                model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
+                model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
+                # Here we train the neural network.
+                history = model.fit(X_train, y_train[:,0], epochs=epochs, validation_data=[X_val,y_val[:,0]], verbose=0, callbacks=[es],shuffle=False, batch_size=int(len(X_train)/50))
+                loss = history.history['loss'][-1]
+                print(f'Ensemble Loss = { loss } ensemble {i}')
+                # Save each of the ensemble outputs
+                model.save(os.path.join(model_save_loc,'networks',f'prov_{v}_model_ens{i}'))
+                if (np.abs(min_rmse - loss)/min_rmse <0.4) or (loss < min_rmse):
+                    loss_check=1
+                    print(f'Loss similar - ensemble member {i} accepted...')
+                else:
+                    print(f'Loss not similar - restarting ensemble {i}')
+                    loss_count = loss_count+1
+                if loss_count == 5:
+                    print(f'Loss appears to not be achievable... Doubling the achieveable loss...')
+                    min_rmse = (min_rmse + loss)/2
+                    loss_count = 0
         # Here we dump the indexes of each of the trainign datasets. These are reuse for the validation step and producing the validation unc...
         dump([ind_train,ind_val,ind_test], open(os.path.join(model_save_loc,'validation',f'prov_{v}_validation.pkl'), 'wb'))
 
@@ -540,71 +562,75 @@ def train_val_test_split(X,y,ind, indep = 0.2, train = 0.4):
     X_train, X_val, y_train, y_val,ind_train,ind_val = train_test_split(X_train, y_train, ind_train, test_size=train) # 0.25 x 0.8 = 0.2
     return np.squeeze(X_train), np.squeeze(X_val), np.squeeze(X_test), np.squeeze(y_train), np.squeeze(y_val), np.squeeze(y_test), np.squeeze(ind_train), np.squeeze(ind_val),np.squeeze(ind_test)
 
-def plot_total_validation(model_save_loc,gcb = False):
-    """
-    Function to produce a validation statistic without determine if the data was training/validation/test. I.e just combine all the data.
-    This fucntion can be called seperate on other datasets to produce a GCB like validation.
-    Need to rewrite!!! - 29/07/2023 DJF
-    """
-    print('Plotting validation....')
-    files = glob.glob(os.path.join(model_save_loc,'validation','*_validation.pkl'))
-    #files = files[0:-1]
-    #print(files)
-    y_test_total = np.array(np.nan)
-    y_test_preds_total = np.array(np.nan)
-    fig = plt.figure()
-    c = np.array([0,800])
-    t = 0
-    for v in files:
-        print(v)
-        y_train,y_train_preds,y_val,y_val_preds,y_test,y_test_preds = load(open(v,'rb'))
-        if t == 0:
-            y_test_all = np.copy(y_test[:,0])
-            y_test_preds_all = np.copy(y_test_preds)
-            t = 1
-            if gcb:
-                y_test_all = np.concatenate((y_test_all,y_train[:,0],y_val[:,0]))
-                y_test_preds_all =  np.concatenate((y_test_preds_all,y_train_preds,y_val_preds))
-        else:
-            if gcb:
-                y_test_all = np.concatenate((y_test_all,y_test[:,0],y_train[:,0],y_val[:,0]))
-                y_test_preds_all =  np.concatenate((y_test_preds_all,y_test_preds,y_train_preds,y_val_preds))
-            else:
-                y_test_all = np.concatenate((y_test_all,y_test[:,0]))
-                y_test_preds_all = np.concatenate((y_test_preds_all,y_test_preds))
+"""
+This function is not needed - unweighted statistics are produced with the weighted ones.
+The neural network approach here is all about defined uncertainties, so this is obsolete.
+"""
+# def plot_total_validation(model_save_loc,gcb = False):
+#     """
+#     Function to produce a validation statistic without determine if the data was training/validation/test. I.e just combine all the data.
+#     This fucntion can be called seperate on other datasets to produce a GCB like validation.
+#     Need to rewrite!!! - 29/07/2023 DJF
+#     """
+#     print('Plotting validation....')
+#     files = glob.glob(os.path.join(model_save_loc,'validation','*_validation.pkl'))
+#     #files = files[0:-1]
+#     #print(files)
+#     y_test_total = np.array(np.nan)
+#     y_test_preds_total = np.array(np.nan)
+#     fig = plt.figure()
+#     c = np.array([0,800])
+#     t = 0
+#     for v in files:
+#         print(v)
+#         y_train,y_train_preds,y_val,y_val_preds,y_test,y_test_preds = load(open(v,'rb'))
+#         if t == 0:
+#             y_test_all = np.copy(y_test[:,0])
+#             y_test_preds_all = np.copy(y_test_preds)
+#             t = 1
+#             if gcb:
+#                 y_test_all = np.concatenate((y_test_all,y_train[:,0],y_val[:,0]))
+#                 y_test_preds_all =  np.concatenate((y_test_preds_all,y_train_preds,y_val_preds))
+#         else:
+#             if gcb:
+#                 y_test_all = np.concatenate((y_test_all,y_test[:,0],y_train[:,0],y_val[:,0]))
+#                 y_test_preds_all =  np.concatenate((y_test_preds_all,y_test_preds,y_train_preds,y_val_preds))
+#             else:
+#                 y_test_all = np.concatenate((y_test_all,y_test[:,0]))
+#                 y_test_preds_all = np.concatenate((y_test_preds_all,y_test_preds))
+#
+#         # print(y_test.shape)
+#         # print(y_test_preds.shape)
+#         if gcb:
+#             plt.scatter(np.concatenate((y_test[:,0],y_val[:,0],y_train[:,0])),np.concatenate((y_test_preds,y_val_preds,y_train_preds)),s=4)
+#         else:
+#             plt.scatter(y_test[:,0],y_test_preds,s=4)
+#     print(y_test_all.shape)
+#     print(y_test_preds_all.shape)
+#     y_test_preds_all = np.squeeze(y_test_preds_all)
+#     plt.xlim(c); plt.ylim(c); plt.plot(c,c,'k-');
+#     stats_un = ws.unweighted_stats(y_test_all,y_test_preds_all,'val')
+#     h2 = plt.plot(c,c*stats_un['slope']+stats_un['intercept'],'k-.',zorder=5, label = 'Unweighted')
+#     plt.xlabel('in situ fCO$_{2 (sw,subskin)}$ ($\mu$atm)')
+#     plt.ylabel('Predicted fCO$_{2 (sw,subskin)}$ ($\mu$atm)')
+#     s = model_save_loc.split('/')
+#     if gcb:
+#         plt.title(s[-1] + ' - GCB Evaluation = True')
+#     else:
+#         plt.title(s[-1] + ' - GCB Evaluation = False')
+#     ax = plt.gca()
+#     rmsd = np.round(stats_un['rmsd'],2)
+#     bias = np.round(stats_un['rel_bias'],2)
+#     sl = np.round(stats_un['slope'],2)
+#     ip = np.round(stats_un['intercept'],2)
+#     n = stats_un['n']
+#     ax.text(0.70,0.3,f'Unweighted Stats\nRMSD = {rmsd} $\mu$atm\nBias = {bias} $\mu$atm\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
+#     if gcb:
+#         fig.savefig(os.path.join(model_save_loc,'plots','total_validation_gcb.png'),format='png',dpi=300)
+#     else:
+#         fig.savefig(os.path.join(model_save_loc,'plots','total_validation.png'),format='png',dpi=300)
 
-        # print(y_test.shape)
-        # print(y_test_preds.shape)
-        if gcb:
-            plt.scatter(np.concatenate((y_test[:,0],y_val[:,0],y_train[:,0])),np.concatenate((y_test_preds,y_val_preds,y_train_preds)),s=4)
-        else:
-            plt.scatter(y_test[:,0],y_test_preds,s=4)
-    print(y_test_all.shape)
-    print(y_test_preds_all.shape)
-    y_test_preds_all = np.squeeze(y_test_preds_all)
-    plt.xlim(c); plt.ylim(c); plt.plot(c,c,'k-');
-    stats_un = ws.unweighted_stats(y_test_all,y_test_preds_all,'val')
-    h2 = plt.plot(c,c*stats_un['slope']+stats_un['intercept'],'k-.',zorder=5, label = 'Unweighted')
-    plt.xlabel('in situ fCO$_{2 (sw,subskin)}$ ($\mu$atm)')
-    plt.ylabel('Predicted fCO$_{2 (sw,subskin)}$ ($\mu$atm)')
-    s = model_save_loc.split('/')
-    if gcb:
-        plt.title(s[-1] + ' - GCB Evaluation = True')
-    else:
-        plt.title(s[-1] + ' - GCB Evaluation = False')
-    ax = plt.gca()
-    rmsd = np.round(stats_un['rmsd'],2)
-    bias = np.round(stats_un['rel_bias'],2)
-    sl = np.round(stats_un['slope'],2)
-    ip = np.round(stats_un['intercept'],2)
-    n = stats_un['n']
-    ax.text(0.70,0.3,f'Unweighted Stats\nRMSD = {rmsd} $\mu$atm\nBias = {bias} $\mu$atm\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
-    if gcb:
-        fig.savefig(os.path.join(model_save_loc,'plots','total_validation_gcb.png'),format='png',dpi=300)
-    else:
-        fig.savefig(os.path.join(model_save_loc,'plots','total_validation.png'),format='png',dpi=300)
-
-def unweight(x,y,ax,c):
+def unweight(x,y,ax,c,unit = '$\mu$atm'):
     """
     Function to calculate the unweighted statistics and add them to a scatter plot (well any plot really, in the bottom right corner)
     """
@@ -615,10 +641,10 @@ def unweight(x,y,ax,c):
     sl = '%.2f' %np.round(stats_un['slope'],2)
     ip = '%.2f' %np.round(stats_un['intercept'],2)
     n = stats_un['n']
-    ax.text(0.52,0.35,f'Unweighted Stats\nRMSD = {rmsd} $\mu$atm\nBias = {bias} $\mu$atm\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
+    ax.text(0.52,0.35,f'Unweighted Stats\nRMSD = {rmsd} {unit}\nBias = {bias} {unit}\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
     #return h2
 
-def weighted(x,y,weights,ax,c):
+def weighted(x,y,weights,ax,c,unit = '$\mu$atm'):
     """
     Function to calculate the weighted statistics and add them to a scatter plot (well any plot really, in the top left corner)
     """
@@ -630,10 +656,10 @@ def weighted(x,y,weights,ax,c):
     sl = '%.2f' %np.round(stats['slope'],2)
     ip = '%.2f' %np.round(stats['intercept'],2)
     n = stats['n']
-    ax.text(0.02,0.95,f'Weighted Stats\nRMSD = {rmsd} $\mu$atm\nBias = {bias} $\mu$atm\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
+    ax.text(0.02,0.95,f'Weighted Stats\nRMSD = {rmsd} {unit}\nBias = {bias} {unit}\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
     return h1
 
-def neural_val_run(data,model_save_loc,var,provs,ens=10,unc=True):
+def neural_val_run(data,model_save_loc,var,provs,ens=10,unc=True,name='fco2'):
     inp = np.array(data[var])
     #print(inp.shape)
     prov = np.array(data[provs])
@@ -663,14 +689,15 @@ def neural_val_run(data,model_save_loc,var,provs,ens=10,unc=True):
             lut = load(open(os.path.join(model_save_loc,'unc_lut',f'prov_{v}_lut.pkl'),'rb'))
             lut = lut[0]
             unc_para[f] = np.squeeze(lut_retr(lut,mod_inp))
-    data['fco2_sw'] = out
-    data['fco2_sw_net_unc'] = unc_net
-    data['fco2_sw_para_unc'] = unc_para
-    data.to_csv(os.path.join(model_save_loc,'training_addedfco2.tsv'),sep='\t')
+    data[name] = out
+    data[name+'_net_unc'] = unc_net
+    data[name+'_para_unc'] = unc_para
+    data.to_csv(os.path.join(model_save_loc,'training_addedneural.tsv'),sep='\t',index=False)
     return data
 
 
-def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=False,fco2_cutoff_low = 50,fco2_cutoff_high = 750,ice = None,per_prov=True,prov = None,daily = False,var = []):
+def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=False,fco2_cutoff_low = 50,fco2_cutoff_high = 750,ice = None,per_prov=True,prov = None,daily = False,var = [],
+    c = np.array([0,800]),name='fco2',unit = '$\mu$atm',parameter = 'fCO$_{2 (sw)}$'):
     """
     Function to produce validation statistics with respect to the train/validation/test datasets. This step is extremely sensitive to the indexes used, see note below as to
     a change needed in the code to stop issues.
@@ -682,15 +709,15 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         if per_prov:
             save_file_p = os.path.join(model_save_loc,'plots','per_prov_validation.png')
     if daily:
-        if du.checkfileexist(os.path.join(model_save_loc,'training_addedfco2.tsv')):
-            data = pd.read_table(os.path.join(model_save_loc,'training_addedfco2.tsv'),sep='\t')
-        else:
-            data = pd.read_table(os.path.join(model_save_loc,'training.tsv'),sep='\t')
-            print(data)
-            data = neural_val_run(data,model_save_loc,var=var,provs=prov)
+        # if du.checkfileexist(os.path.join(model_save_loc,'training_addedneural.tsv')):
+        #     data = pd.read_table(os.path.join(model_save_loc,'training_addedneural.tsv'),sep='\t')
+        # else:
+        data = pd.read_table(os.path.join(model_save_loc,'training.tsv'),sep='\t')
+        print(data)
+        data = neural_val_run(data,model_save_loc,var=var,provs=prov,name=name)
         prov = np.array(data[prov])
-        fco2 = np.array(data['fco2_sw'])
-        fco2_unc = np.array(np.sqrt(data['fco2_sw_net_unc']**2 + data['fco2_sw_para_unc']**2))
+        fco2 = np.array(data[name])
+        fco2_unc = np.array(np.sqrt(data[name+'_net_unc']**2 + data[name+'_para_unc']**2))
         soc = np.array(data[fco2_sst])
         soc_s = np.array(data[fco2_sst+'_std'])
 
@@ -743,7 +770,7 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     # Setting up the figure for the training/validaiton, test and total validation plots
     fig = plt.figure(figsize=(15,15))
     gs = GridSpec(2,2, figure=fig, wspace=0.25,hspace=0.25,bottom=0.1,top=0.95,left=0.1,right=0.98)
-    c = np.array([0,800])
+    #c = np.array([0,800])
     ax = [fig.add_subplot(gs[0,0]),fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,0]),fig.add_subplot(gs[1,1])]
 
     # Training/validaiton plotting
@@ -761,8 +788,8 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
             tot_n = np.concatenate((tot_n,np.stack((fco2[ind_trval],fco2_unc[ind_trval]),axis=1)))
     ax[0].scatter(tot_s[:,0],tot_n[:,0],s=2) # Scatter the data onto the plot
     # Produce the scatter validation text and put onto the plot (both weighted and unweighted versions)
-    h2 = unweight(tot_s[:,0],tot_n[:,0],ax[0],c)
-    h1 = weighted(tot_s[:,0],tot_n[:,0],1/np.sqrt(tot_s[:,1]**2 + tot_n[:,1]**2),ax[0],c)
+    h2 = unweight(tot_s[:,0],tot_n[:,0],ax[0],c,unit=unit)
+    h1 = weighted(tot_s[:,0],tot_n[:,0],1/np.sqrt(tot_s[:,1]**2 + tot_n[:,1]**2),ax[0],c,unit=unit)
 
     # Start independent test plotting
     # Here we have an additional step to do per province test dataset plots so we have the validation uncertainty for the mapping.
@@ -787,12 +814,12 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         if per_prov: # Plot the scatter plot for each province with the in plot statistics
 
             axs[tp].scatter(soc[ind_test],fco2[ind_test])
-            unweight(soc[ind_test],fco2[ind_test],axs[tp],c)
-            weighted(soc[ind_test],fco2[ind_test],1/np.sqrt(soc_s[ind_test]**2 + fco2_unc[ind_test]**2),axs[tp],c)
+            unweight(soc[ind_test],fco2[ind_test],axs[tp],c,unit=unit)
+            weighted(soc[ind_test],fco2[ind_test],1/np.sqrt(soc_s[ind_test]**2 + fco2_unc[ind_test]**2),axs[tp],c,unit=unit)
             axs[tp].set_title(f'Province {v}')
             axs[tp].set_xlim(c); axs[tp].set_ylim(c); axs[tp].plot(c,c,'k-');
-            axs[tp].set_xlabel('in situ SOCAT fCO$_{2 (sw)}$ ($\mu$atm)')
-            axs[tp].set_ylabel('Neural Network fCO$_{2 (sw)}$ ($\mu$atm)')
+            axs[tp].set_xlabel('in situ '+parameter+' ('+ unit+')')
+            axs[tp].set_ylabel('Neural Network '+parameter+' ('+unit+')')
             tp = tp+1
         if t == 0: # Start the combination array
             tot_ts = np.stack((soc[ind_test],soc_s[ind_test]),axis=1)
@@ -812,15 +839,15 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     np.savetxt(os.path.join(model_save_loc,'validation','independent_test_rmsd.csv'), rmsd, delimiter=",") # Save this rmsd data to a csv file to load later...
     # Produce the scatter plot for the test dataset
     ax[1].scatter(tot_ts[:,0],tot_tn[:,0],s=2)
-    h2 = unweight(tot_ts[:,0],tot_tn[:,0],ax[1],c)
-    h1 = weighted(tot_ts[:,0],tot_tn[:,0],1/np.sqrt(tot_ts[:,1]**2 + tot_tn[:,1]**2),ax[1],c)
+    h2 = unweight(tot_ts[:,0],tot_tn[:,0],ax[1],c,unit=unit)
+    h1 = weighted(tot_ts[:,0],tot_tn[:,0],1/np.sqrt(tot_ts[:,1]**2 + tot_tn[:,1]**2),ax[1],c,unit=unit)
 
     # Merged all the data together and produce a final validation plot
     ts = np.concatenate((tot_ts,tot_s))
     tn = np.concatenate((tot_tn,tot_n))
     ax[2].scatter(ts[:,0],tn[:,0],s=2)
-    h2 = unweight(ts[:,0],tn[:,0],ax[2],c)
-    h1 = weighted(ts[:,0],tn[:,0],1/np.sqrt(ts[:,1]**2 + tn[:,1]**2),ax[2],c)
+    h2 = unweight(ts[:,0],tn[:,0],ax[2],c,unit=unit)
+    h1 = weighted(ts[:,0],tn[:,0],1/np.sqrt(ts[:,1]**2 + tn[:,1]**2),ax[2],c,unit=unit)
 
     # Produce a scatter plot with the errorbars as well...
     ax[3].scatter(ts[:,0],tn[:,0],s=2,c='r',zorder = 3)
@@ -830,8 +857,8 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     let = ['a','b','c','d','e','f','g','h']
     for i in [0,1,2,3]:
         ax[i].set_xlim(c); ax[i].set_ylim(c); ax[i].plot(c,c,'k-');
-        ax[i].set_xlabel('in situ SOCAT fCO$_{2 (sw)}$ ($\mu$atm)')
-        ax[i].set_ylabel('Neural Network fCO$_{2 (sw)}$ ($\mu$atm)')
+        ax[i].set_xlabel('in situ '+parameter+' ('+ unit+')')
+        ax[i].set_ylabel('Neural Network '+parameter+' ('+unit+')')
         ax[i].text(0.03,1.07,f'({let[i]})',transform=ax[i].transAxes,va='top',fontweight='bold',fontsize = 26)
     ax[0].set_title('Training and Validation')
     ax[1].set_title('Independent Test')
@@ -843,13 +870,13 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     if per_prov:
         fig2.savefig(save_file_p,format='png',dpi=300)
 
-def add_validation_unc(model_save_loc,prov):
+def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm'):
     """
     Function to take the independent test rmsd values produced in plot_total_validation_unc and produce a array within the output netcdf
     with the validation uncertainity for each province mapped
     """
     # Load the province data
-    c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_train_input_values.nc'))
+    c = Dataset(data_file)
     prov = c.variables[prov][:]
     s = prov.shape
     prov = np.reshape(prov,(-1,1))
@@ -870,40 +897,41 @@ def add_validation_unc(model_save_loc,prov):
     # Need to add a check if the fCO2_val_unc variable has been created already - if it has we just overwrite with the new data...
     c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
     keys = c.variables.keys()
-    if 'fco2_val_unc' in keys:
-        c.variables['fco2_val_unc'][:] = val_unc
-        c.variables['fco2_val_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    if name+'_val_unc' in keys:
+        c.variables[name+'_val_unc'][:] = val_unc
+        c.variables[name+'_val_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
     else:
 
-        var_o = c.createVariable('fco2_val_unc','f4',('longitude','latitude','time'))
+        var_o = c.createVariable(name+'_val_unc','f4',('longitude','latitude','time'))
         var_o[:] = val_unc
-        var_o.long_name = 'Fugacity of CO2 in seawater evaluation uncertainty'
+        var_o.long_name = longname+' evaluation uncertainty'
         var_o.date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+        var_o.units = unit
     c.close()
 
-def add_total_unc(model_save_loc):
+def add_total_unc(model_save_loc,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm'):
     """
     Function to produce the total fCO2 uncertainity by combining the uncertainity components in quadrature.
     """
     # Load the uncertainity components
     c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
     keys = c.variables.keys()
-    ne = c.variables['fco2_net_unc'][:]
-    pa = c.variables['fco2_para_unc'][:]
-    va = c.variables['fco2_val_unc'][:]
+    ne = c.variables[name+'_net_unc'][:]
+    pa = c.variables[name+'_para_unc'][:]
+    va = c.variables[name+'_val_unc'][:]
 
     tot = np.sqrt(ne**2 + pa**2 + va**2) # Combine these in quadrature
     # Need to add a check if the fCO2_tot_unc variable has been created already - if it has we just overwrite with the new data...
-    if 'fco2_tot_unc' in keys:
-        c.variables['fco2_tot_unc'][:] = tot
-        c.variables['fco2_tot_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    if name+'_tot_unc' in keys:
+        c.variables[name+'_tot_unc'][:] = tot
+        c.variables[name+'_tot_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
     else:
-        var_o = c.createVariable('fco2_tot_unc','f4',('longitude','latitude','time'))
+        var_o = c.createVariable(name+'_tot_unc','f4',('longitude','latitude','time'))
         var_o[:] = tot
-        var_o.long_name = 'Fugacity of CO2 in seawater total uncertainty'
+        var_o.long_name = longname+' total uncertainty'
         var_o.date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
-        var_o.comment = 'Combination of fco2_val_unc, fco2_net_unc and fco2_para_unc in quadrature'
-        var_o.units = 'uatm'
+        var_o.comment = 'Combination of'+name+'_val_unc, '+name+'_net_unc and '+name+'_para_unc in quadrature'
+        var_o.units = unit
     c.close()
 
 def plot_mapped(model_save_loc,dat=300):
@@ -1014,28 +1042,32 @@ def neural_network_map(mapping_data,var=None,model_save_loc=None,prov = None,out
     unc_para = np.reshape(unc_para,(output_size))
     return out,unc_net,unc_para
 
-def save_mapped_fco2(data,net_unc,para_unc,data_shape = None, model_save_loc = None, lon = None,lat = None,time = None):
+def save_mapped_fco2(data,net_unc,para_unc,data_shape = None, model_save_loc = None, lon = None,lat = None,time = None,name = 'fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm'):
     """
     Function to save the mapped fco2 data produced by nerual_network_map.
     """
     from construct_input_netcdf import save_netcdf
-    direct = {}; direct['fco2'] = data; direct['fco2_net_unc'] = net_unc; direct['fco2_para_unc'] = para_unc
-    units = {}; units['fco2'] = 'uatm'; units['fco2_net_unc'] = 'uatm'; units['fco2_para_unc'] = 'uatm'
+    direct = {}; direct[name] = data; direct[name+'_net_unc'] = net_unc; direct[name+'_para_unc'] = para_unc
+    units = {}; units[name] = unit; units[name+'_net_unc'] = unit; units[name+'_para_unc'] = unit
     long_name={};
-    long_name['fco2'] = 'Fugacity of CO2 in seawater'
-    long_name['fco2_net_unc'] = 'Fugacity of CO2 in seawater network uncertainty'
-    long_name['fco2_para_unc'] = 'Fugacity of CO2 in seawater parameter uncertainty'
+    long_name[name] = longname
+    long_name[name+'_net_unc'] = longname+' network uncertainty'
+    long_name[name+'_para_unc'] = longname+' parameter uncertainty'
 
     save_netcdf(os.path.join(model_save_loc,'output.nc'),direct,lon,lat,data.shape[2],time_track=time,units = units,long_name=long_name)
 
-
-def spatial_smooth(data):
-    import scipy.signal as sg
-    kernel_shape = (3, 3)
-    kernel = np.full(kernel_shape, 1/np.prod(kernel_shape))
-    data_smooth = np.empty((data.shape))
-    data_smooth[:] = np.nan
-    for i in range(data.shape[2]):
-        data_smooth[:,:,i] = sg.convolve2d(data[:,:,i], kernel, mode='same',boundary = 'wrap')
-    data_smooth[np.isnan(data_smooth) == 1] = data[np.isnan(data_smooth) == 1]
-    return data_smooth
+def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_lat = False,plot_file = 'mapped_residuals.png'):
+    import geopandas as gpd
+    import cmocean
+    data = pd.read_table(os.path.join(model_save_loc,'training_addedneural.tsv'),sep='\t')
+    worldmap = gpd.read_file(gpd.datasets.get_path("ne_50m_land"))
+    fig = plt.figure(figsize=(15,7))
+    gs = GridSpec(1,1, figure=fig, wspace=0.18,hspace=0.18,bottom=0.05,top=0.95,left=0.05,right=0.95)
+    ax = fig.add_subplot(gs[0,0])
+    worldmap.plot(color="lightgrey", ax=ax)
+    a = plt.scatter(data[lonv],data[latv],c = data[var] - data[out_var],vmin = -30, vmax=30,cmap = cmocean.cm.balance)
+    cbar = fig.colorbar(a); cbar.set_label(var + ' - ' + out_var)
+    if zoom_lat:
+        ax.set_xlim(zoom_lon)
+        ax.set_ylim(zoom_lat)
+    fig.savefig(os.path.join(model_save_loc,'plots',plot_file),dpi=300)

@@ -152,8 +152,8 @@ def daily_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_
     for v in np.unique(data[prov]):
         print(str(v) + ' : '+str(np.argwhere(np.array(data[prov]) == v).shape))
 
-    #run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,epochs=epochs,node_in = node_in,learning_rate = learning_rate)
-    #plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov,daily=True,var=var,fco2_cutoff_low = cutoff_low,fco2_cutoff_high=cutoff_high,c=np.array(c),unit = plot_unit,parameter = plot_parameter)
+    run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,epochs=epochs,node_in = node_in,learning_rate = learning_rate)
+    plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov,daily=True,var=var,fco2_cutoff_low = cutoff_low,fco2_cutoff_high=cutoff_high,c=np.array(c),unit = plot_unit,parameter = plot_parameter)
     print(mapping_var)
     map_vars = mapping_var.copy()
     map_vars.append(mapping_prov)
@@ -1056,18 +1056,43 @@ def save_mapped_fco2(data,net_unc,para_unc,data_shape = None, model_save_loc = N
 
     save_netcdf(os.path.join(model_save_loc,'output.nc'),direct,lon,lat,data.shape[2],time_track=time,units = units,long_name=long_name)
 
-def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_lat = False,plot_file = 'mapped_residuals.png'):
+def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_lat = False,plot_file = 'mapped_residuals.png',bin = False,log = False,lag = False):
     import geopandas as gpd
     import cmocean
     data = pd.read_table(os.path.join(model_save_loc,'training_addedneural.tsv'),sep='\t')
     worldmap = gpd.read_file(gpd.datasets.get_path("ne_50m_land"))
-    fig = plt.figure(figsize=(15,7))
-    gs = GridSpec(1,1, figure=fig, wspace=0.18,hspace=0.18,bottom=0.05,top=0.95,left=0.05,right=0.95)
+    cmap = cmocean.cm.balance
+    cmap = cmocean.tools.crop_by_percent(cmap, 20, which='both', N=None)
+    if bin:
+        fig = plt.figure(figsize=(15,15))
+        gs = GridSpec(2,1, figure=fig, wspace=0.18,hspace=0.18,bottom=0.05,top=0.95,left=0.05,right=0.95)
+    else:
+        fig = plt.figure(figsize=(15,7))
+        gs = GridSpec(1,1, figure=fig, wspace=0.18,hspace=0.18,bottom=0.05,top=0.95,left=0.05,right=0.95)
     ax = fig.add_subplot(gs[0,0])
     worldmap.plot(color="lightgrey", ax=ax)
-    a = plt.scatter(data[lonv],data[latv],c = data[var] - data[out_var],vmin = -30, vmax=30,cmap = cmocean.cm.balance)
+    a = plt.scatter(data[lonv],data[latv],c = data[var] - data[out_var],vmin = -30, vmax=30,cmap = cmap)
     cbar = fig.colorbar(a); cbar.set_label(var + ' - ' + out_var)
     if zoom_lat:
         ax.set_xlim(zoom_lon)
         ax.set_ylim(zoom_lat)
+    if bin:
+        ax = fig.add_subplot(gs[1,0])
+        worldmap.plot(color="lightgrey", ax=ax)
+        lat = np.array(data[latv])
+        lon = np.array(data[lonv])
+        res = np.abs(log[0]-log[1])/2
+        bi = np.zeros((len(log),len(lag)))
+        for i in range(len(log)):
+            for j in range(len(lag)):
+                f = np.where((lon > log[i]-res) & (lon < log[i]+res) & (lat> lag[j]-res) & (lat<lag[j]+res))[0]
+                #print(f)
+                bi[i,j] = np.nanmean(data[var][f] - data[out_var][f])
+
+        a = ax.pcolor(log,lag,np.transpose(bi),vmin=-30,vmax=30,cmap = cmap)
+        cbar = fig.colorbar(a); cbar.set_label(var + ' - ' + out_var)
+        if zoom_lat:
+            ax.set_xlim(zoom_lon)
+            ax.set_ylim(zoom_lat)
+
     fig.savefig(os.path.join(model_save_loc,'plots',plot_file),dpi=300)

@@ -15,7 +15,8 @@ import PyCO2SYS as pyco2
 import construct_input_netcdf as cinp
 
 def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI_SST_analysed_sst',sst_kelvin = True,sss_var = 'CMEMS_so',sst_var_unc = 'CCI_SST_analysed_sst_uncertainty',
-    sss_var_unc = 0.1):
+    sss_var_unc = 0.1,phosphate_var=False,phosphate_var_unc=False,phosphate_unc_perc=False,silicate_var=False,silicate_var_unc=False,
+    silicate_unc_perc=False):
     """
     data_file: The file containing the fCO2(sw) and Total Alkalinity
     aux_file: The file containing the SST and SSS data
@@ -31,12 +32,16 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
         ['u_dic__par1','dic_fco2_unc','umol/kg','Dissolved Inorganic Carbon in seawater fCO2(sw) uncertainty'],
         ['u_dic__temperature','dic_sst_unc','umol/kg','Dissolved Inorganic Carbon in seawater SST uncertainty'],
         ['u_dic__salinity','dic_sss_unc','umol/kg','Dissolved Inorganic Carbon in seawater SSS uncertainty'],
+        ['u_dic__total_phosphate','dic_phos_unc','umol/kg','Dissolved Inorganic Carbon in seawater phosphate uncertainty'],
+        ['u_dic__total_silicate','dic_sili_unc','umol/kg','Dissolved Inorganic Carbon in seawater silicate uncertainty'],
         ['pH','pH','-log([H+])','pH on total scale'],
         ['u_pH','pH_tot_unc','-log([H+])','pH on total scale total uncertainty'],
         ['u_pH__par2','pH_ta_unc','-log([H+])','pH on total scale alkalinity uncertainty'],
         ['u_pH__par1','pH_fco2_unc','-log([H+])','pH on total scale fCO2(sw) uncertainty'],
         ['u_pH__temperature','pH_sst_unc','-log([H+])','pH on total scale SST uncertainty'],
-        ['u_pH__salinity','pH_sss_unc','-log([H+])','pH on total scale SSS uncertainty']
+        ['u_pH__salinity','pH_sss_unc','-log([H+])','pH on total scale SSS uncertainty'],
+        ['u_pH__total_phosphate','pH_phos_unc','-log([H+])','pH on total scale phosphate uncertainty'],
+        ['u_pH__total_silicate','pH_sili_unc','-log([H+])','pH on total scale silicate uncertainty']
         ]
     # var_out_list = ['dic',
     #     'u_dic',
@@ -91,6 +96,42 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
             sss_unc = np.ones((sss.shape))*sss_var_unc
     else:
         sss_unc = np.zeros((sss.shape))
+    """
+    Phosphate variables (if not avaiable everything set to 0; 0 is default for pyCO2sys)
+    """
+    if phosphate_var:
+        phosphate = np.array(c[phosphate_var])
+        if isinstance(phosphate_var_unc,str):
+            phosphate_unc = np.array(c[phosphate_var_unc])
+        elif isinstance(phosphate_var_unc,float):
+            if phosphate_unc_perc:
+                phosphate_unc = phosphate*phosphate_var_unc
+            else:
+                phosphate_unc = np.ones((phosphate.shape))*phosphate_var_unc
+        else:
+            phosphate_unc = np.zeros((sss.shape))
+    else:
+        phosphate = np.zeros((sss.shape))
+        phosphate_unc = np.zeros((sss.shape))
+
+    """
+    Silicate variables (if not avaiable everything set to 0; 0 is default for pyCO2sys)
+    """
+    if silicate_var:
+        silicate = np.array(c[silicate_var])
+        if isinstance(silicate_var_unc,str):
+            silicate_unc = np.array(c[silicate_var_unc])
+        elif isinstance(silicate_var_unc,float):
+            if silicate_unc_perc:
+                silicate_unc = silicate*silicate_var_unc
+            else:
+                silicate_unc = np.ones((silicate.shape))*silicate_var_unc
+        else:
+            silicate_unc = np.zeros((sss.shape))
+    else:
+        silicate = np.zeros((sss.shape))
+        silicate_unc = np.zeros((sss.shape))
+
     c.close()
     direct = {}
     units = {}
@@ -109,8 +150,11 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
             par2_type = 1,
             temperature=sst[:,:,i],
             salinity = sss[:,:,i],
+            total_phosphate=phosphate[:,:,i],
+            total_silicate=silicate[:,:,i],
             uncertainty_into = ['dic','pH'],
-            uncertainty_from = {'par2':ta_unc[:,:,i], 'par1':fco2_unc[:,:,i], 'temperature': sst_unc[:,:,i],'salinity': sss_unc[:,:,i]})
+            uncertainty_from = {'par2':ta_unc[:,:,i], 'par1':fco2_unc[:,:,i], 'temperature': sst_unc[:,:,i],'salinity': sss_unc[:,:,i],'total_phosphate': phosphate_unc[:,:,i],
+                'total_silicate':silicate_unc[:,:,i]})
         for a in var_out:
             direct[a[1]][:,:,i] = py_out[a[0]]
 

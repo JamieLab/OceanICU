@@ -23,8 +23,8 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
     fco2_var: variable name in data_file for fCO2(sw)
     ta_var: Variable name in data_file for TA
     sst_var: Variable name in aux_file for SST
-    sst_kelvin: Is the sst_var in kelvin (If True, then we convert to degC)
-    sss_var: Varble name in aux_file for SSS
+    sst_kelvin: Is the sst_var is in kelvin (If True, then we convert to degC)
+    sss_var: Variable name in aux_file for SSS
     """
     var_out = [['dic','dic','umol/kg','Dissolved Inorganic Carbon in seawater'],
         ['u_dic','dic_tot_unc','umol/kg','Dissolved Inorganic Carbon in seawater total uncertainty'],
@@ -217,6 +217,9 @@ def plot_pyCO2sys_out(data_file,model_save_loc):
     fig.savefig(os.path.join(model_save_loc,'plots','carbonate_system.png'),dpi=300)
 
 def calc_nstar(file,delimiter,nitrate_var,phosphate_var,gridded=False,prefix=''):
+    """
+    This function
+    """
     import pandas as pd
     import construct_input_netcdf as cinp
     def nstar(nitrate, phosphate):
@@ -240,3 +243,37 @@ def calc_nstar(file,delimiter,nitrate_var,phosphate_var,gridded=False,prefix='')
         phos = data[phosphate_var]; phos[phos<0] = np.nan
         data[prefix+'n*_Calculated'] = nstar(nit,phos)
         data.to_csv(file,sep=delimiter,index=False)
+
+def load_DIVA_glodap(file,delimiter,out_file,log,lag,var_name='ta'):
+    """
+    This functions loads a DIVA interpolation of total alkalinity data that represents a quasi-annual grid - This
+    DIVA interpolation must be manually done in Ocean Data Viewer, with the input glodap file for the nerual network.
+    I.e we use all the surface data to produce the annual grid.
+    After loading that file, we interpolate the values onto the grid resolution we are using. As this is only use to inform
+    the SOM provinces. This then outputs into a netcdf file that can be ingested within the construct_input_netcdf framework.
+    #
+    file: txt file output from Ocean Data Viewer with the DIVA interpolated values.
+    delimiter: is the delimiter of file (should be \t but depends on how it is manually exported)
+    out_file: is the netcdf file for the interpolated data (on the latitude/longitude grid for the nerual network) to be output to.
+    log: longitude of the neural network grid
+    lag: latitude of the neural network grid
+    var_name: variable name for the output data to be put under in the netcdf (default is 'ta')
+    """
+    from scipy.interpolate import griddata
+    from Data_Loading.data_utils import netcdf_create_basic
+    lag_o,log_o = np.meshgrid(lag,log)
+    print(log_o.shape)
+    import pandas as pd
+    data = pd.read_table(file,sep=delimiter)
+    print(data)
+    f = data[data['Latitude']==-90.0]
+    g = data[data['Longitude']==-180.0]
+
+    var = np.transpose(np.array(data['Estimated G2talk @ G2talk=first']).reshape((len(g),len(f))))
+    var[var==-1.000000e+10] = np.nan
+    print(np.nanmin(var))
+    print(var.shape)
+    lat,lon = np.meshgrid(g['Latitude'],f['Longitude'])
+    print(lon.shape)
+    out = griddata((lon.ravel(),lat.ravel()), var.ravel(), (log_o.ravel(), lag_o.ravel()), method='linear').reshape(log_o.shape)
+    netcdf_create_basic(out_file,out,var_name,lag,log)

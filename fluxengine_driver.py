@@ -20,6 +20,7 @@ font = {'weight' : 'normal',
         'size'   : 19}
 matplotlib.rc('font', **font)
 let = ['a','b','c','d','e','f','g','h']
+
 def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws2=None,ws3=None,seaice=None,sal=None,msl=None,xCO2=None,coolskin='Donlon02',start_yr=1990, end_yr = 2020,
     coare_out=None,tair=None,dewair=None,rs=None,rl=None,zi=None):
     """
@@ -103,7 +104,7 @@ def solubility_wannink2014(sst,sal):
     sol = np.exp(sol)
     return sol
 
-def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1,sst_unc = 0.27,wind_unc=0.901,sal_unc =0.1,ens=100,unc_input_file=None):
+def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1,sst_unc = 0.27,wind_unc=0.901,sal_unc =0.1,ens=100,unc_input_file=None,single_run = False):
     """
     Function to calculate the time and space varying air-sea CO2 flux uncertainties
     """
@@ -140,13 +141,13 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     fco2sw_net_unc = fco2_net_unc / fco2_sw
     c.close()
     # Here we setup some montecarlo arrays - some equations are more complicated...
-    sal_skin = load_flux_var(fluxloc,'salinity_skin',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    sal_skin = load_flux_var(fluxloc,'salinity_skin',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     sal_skin = np.transpose(sal_skin,(1,0,2))
-    sal_subskin = load_flux_var(fluxloc,'OKS1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    sal_subskin = load_flux_var(fluxloc,'OKS1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     sal_subskin = np.transpose(sal_subskin,(1,0,2))
-    sst_skin = load_flux_var(fluxloc,'ST1_Kelvin_mean',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    sst_skin = load_flux_var(fluxloc,'ST1_Kelvin_mean',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     sst_skin = np.transpose(sst_skin,(1,0,2))
-    sst_subskin = load_flux_var(fluxloc,'FT1_Kelvin_mean',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    sst_subskin = load_flux_var(fluxloc,'FT1_Kelvin_mean',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     sst_subskin = np.transpose(sst_subskin,(1,0,2))
     if type(sst_unc) == str:
         c = Dataset(unc_input_file,'r')
@@ -161,17 +162,17 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
 
 
     # Here we load the concentrations
-    subskin_conc = load_flux_var(fluxloc,'OSFC',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    subskin_conc = load_flux_var(fluxloc,'OSFC',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     subskin_conc = np.transpose(subskin_conc,(1,0,2))
-    skin_conc = load_flux_var(fluxloc,'OIC1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    skin_conc = load_flux_var(fluxloc,'OIC1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     skin_conc = np.transpose(skin_conc,(1,0,2))
-    dconc = load_flux_var(fluxloc,'Dconc',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    dconc = load_flux_var(fluxloc,'Dconc',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     dconc = np.transpose(dconc,(1,0,2))
     # Load the ice data
-    ice = load_flux_var(fluxloc,'P1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    ice = load_flux_var(fluxloc,'P1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     ice = np.transpose(ice,(1,0,2))
     #Load the flux
-    flux = load_flux_var(fluxloc,'OF',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    flux = load_flux_var(fluxloc,'OF',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     """
     Here we correct the flux for the ice coverage...
     """
@@ -181,7 +182,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
 
     #Schmidt number - #Here we do a MonteCarlo as the rules are confusing to implement...
     print('Calculating schmidt uncertainty...')
-    schmidt = load_flux_var(fluxloc,'SC',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    schmidt = load_flux_var(fluxloc,'SC',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     schmidt = np.transpose(schmidt,(1,0,2))
     schmidt_unc = np.zeros((fco2_sw.shape))
     schmidt_unc[:] = np.nan
@@ -205,9 +206,9 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     print('Calculating wind uncertainty...')
     # w_2 = load_flux_var(fluxloc,'windu10_moment2',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
     # w_2 = np.transpose(w_2,(1,0,2))
-    w_1 = load_flux_var(fluxloc,'WS1_mean',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    w_1 = load_flux_var(fluxloc,'WS1_mean',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     w_1 = np.transpose(w_1,(1,0,2))
-    gas_trans = load_flux_var(fluxloc,'OK3',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    gas_trans = load_flux_var(fluxloc,'OK3',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     gas_trans= np.transpose(gas_trans,(1,0,2))
 
 
@@ -225,13 +226,13 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
 
     #pH20 uncertainty - #Here we do a MonteCarlo as the rules are confusing to implement...
     print('Calculation pH20 correction uncertainty...')
-    vco2_atm = load_flux_var(fluxloc,'V_gas',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    vco2_atm = load_flux_var(fluxloc,'V_gas',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     vco2_atm = np.transpose(vco2_atm,(1,0,2))
-    ph2O_t = load_flux_var(fluxloc,'PH2O',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    ph2O_t = load_flux_var(fluxloc,'PH2O',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     ph2O_t = np.transpose(ph2O_t,(1,0,2))
-    pressure = load_flux_var(fluxloc,'air_pressure',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    pressure = load_flux_var(fluxloc,'air_pressure',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     pressure = np.transpose(pressure,(1,0,2))
-    fco2_atm = load_flux_var(fluxloc,'pgas_air',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    fco2_atm = load_flux_var(fluxloc,'pgas_air',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     fco2_atm = np.transpose(fco2_atm,(1,0,2))
 
     ph20 = np.zeros((fco2_sw.shape))
@@ -259,7 +260,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
 
     #Solubility calculations
     print('Calculating subskin solubility uncertainty...')
-    subskin_sol = load_flux_var(fluxloc,'fnd_solubility',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    subskin_sol = load_flux_var(fluxloc,'fnd_solubility',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     subskin_sol = np.transpose(subskin_sol,(1,0,2))
     sol_subskin_unc = np.zeros((fco2_sw.shape))
     sol_subskin_unc[:] = np.nan
@@ -281,7 +282,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     sol_subskin_fixed = (0.002*subskin_conc)/np.abs(dconc)
 
     print('Calculating skin solubility uncertainty...')
-    skin_sol = load_flux_var(fluxloc,'skin_solubility',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2])
+    skin_sol = load_flux_var(fluxloc,'skin_solubility',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     skin_sol = np.transpose(skin_sol,(1,0,2))
     sol_skin_unc = np.zeros((fco2_sw.shape))
     sol_skin_unc[:] = np.nan
@@ -541,7 +542,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.close()
     print('Done uncertainty calculations!')
 
-def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel):
+def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel,single_run=False):
     """
     Load variables out of the fluxengine monthly output files into a single variable.
     """
@@ -573,6 +574,8 @@ def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel):
         if mon == 13:
             yr = yr+1
             mon = 1
+        if single_run:
+            yr = end_yr+1
     out[out<-998] = np.nan
     return out
 

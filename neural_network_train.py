@@ -114,7 +114,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     # which can then be mapped. This function produces validation statistics for the training/validation, test and all data together
     # using both weighted and unweighted statistics.
     plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov)
-    add_validation_unc(model_save_loc,prov)
+    add_validation_unc(model_save_loc,data_file=data_file,prov=prov)
     # This then produces the total uncertainty (combine parameter, network and validation uncertainties in quadrature)
     add_total_unc(model_save_loc)
     # Plot the mean of the last year of the timeseries for a sanity check.
@@ -697,7 +697,7 @@ def neural_val_run(data,model_save_loc,var,provs,ens=10,unc=True,name='fco2'):
 
 
 def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=False,fco2_cutoff_low = 50,fco2_cutoff_high = 750,ice = None,per_prov=True,prov = None,daily = False,var = [],
-    c = np.array([0,800]),name='fco2',unit = '$\mu$atm',parameter = 'fCO$_{2 (sw)}$'):
+    c_plot = np.array([0,800]),name='fco2',unit = '$\mu$atm',parameter = 'fCO$_{2 (sw)}$'):
     """
     Function to produce validation statistics with respect to the train/validation/test datasets. This step is extremely sensitive to the indexes used, see note below as to
     a change needed in the code to stop issues.
@@ -788,8 +788,8 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
             tot_n = np.concatenate((tot_n,np.stack((fco2[ind_trval],fco2_unc[ind_trval]),axis=1)))
     ax[0].scatter(tot_s[:,0],tot_n[:,0],s=2) # Scatter the data onto the plot
     # Produce the scatter validation text and put onto the plot (both weighted and unweighted versions)
-    h2 = unweight(tot_s[:,0],tot_n[:,0],ax[0],c,unit=unit)
-    h1 = weighted(tot_s[:,0],tot_n[:,0],1/np.sqrt(tot_s[:,1]**2 + tot_n[:,1]**2),ax[0],c,unit=unit)
+    h2 = unweight(tot_s[:,0],tot_n[:,0],ax[0],c_plot,unit=unit)
+    h1 = weighted(tot_s[:,0],tot_n[:,0],1/np.sqrt(tot_s[:,1]**2 + tot_n[:,1]**2),ax[0],c_plot,unit=unit)
 
     # Start independent test plotting
     # Here we have an additional step to do per province test dataset plots so we have the validation uncertainty for the mapping.
@@ -814,10 +814,10 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         if per_prov: # Plot the scatter plot for each province with the in plot statistics
 
             axs[tp].scatter(soc[ind_test],fco2[ind_test])
-            unweight(soc[ind_test],fco2[ind_test],axs[tp],c,unit=unit)
-            weighted(soc[ind_test],fco2[ind_test],1/np.sqrt(soc_s[ind_test]**2 + fco2_unc[ind_test]**2),axs[tp],c,unit=unit)
+            unweight(soc[ind_test],fco2[ind_test],axs[tp],c_plot,unit=unit)
+            weighted(soc[ind_test],fco2[ind_test],1/np.sqrt(soc_s[ind_test]**2 + fco2_unc[ind_test]**2),axs[tp],c_plot,unit=unit)
             axs[tp].set_title(f'Province {v}')
-            axs[tp].set_xlim(c); axs[tp].set_ylim(c); axs[tp].plot(c,c,'k-');
+            axs[tp].set_xlim(c_plot); axs[tp].set_ylim(c_plot); axs[tp].plot(c_plot,c_plot,'k-');
             axs[tp].set_xlabel('in situ '+parameter+' ('+ unit+')')
             axs[tp].set_ylabel('Neural Network '+parameter+' ('+unit+')')
             tp = tp+1
@@ -839,15 +839,15 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     np.savetxt(os.path.join(model_save_loc,'validation','independent_test_rmsd.csv'), rmsd, delimiter=",") # Save this rmsd data to a csv file to load later...
     # Produce the scatter plot for the test dataset
     ax[1].scatter(tot_ts[:,0],tot_tn[:,0],s=2)
-    h2 = unweight(tot_ts[:,0],tot_tn[:,0],ax[1],c,unit=unit)
-    h1 = weighted(tot_ts[:,0],tot_tn[:,0],1/np.sqrt(tot_ts[:,1]**2 + tot_tn[:,1]**2),ax[1],c,unit=unit)
+    h2 = unweight(tot_ts[:,0],tot_tn[:,0],ax[1],c_plot,unit=unit)
+    h1 = weighted(tot_ts[:,0],tot_tn[:,0],1/np.sqrt(tot_ts[:,1]**2 + tot_tn[:,1]**2),ax[1],c_plot,unit=unit)
 
     # Merged all the data together and produce a final validation plot
     ts = np.concatenate((tot_ts,tot_s))
     tn = np.concatenate((tot_tn,tot_n))
     ax[2].scatter(ts[:,0],tn[:,0],s=2)
     h2 = unweight(ts[:,0],tn[:,0],ax[2],c,unit=unit)
-    h1 = weighted(ts[:,0],tn[:,0],1/np.sqrt(ts[:,1]**2 + tn[:,1]**2),ax[2],c,unit=unit)
+    h1 = weighted(ts[:,0],tn[:,0],1/np.sqrt(ts[:,1]**2 + tn[:,1]**2),ax[2],c_plot,unit=unit)
 
     # Produce a scatter plot with the errorbars as well...
     ax[3].scatter(ts[:,0],tn[:,0],s=2,c='r',zorder = 3)
@@ -856,7 +856,7 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     # Plot tidying up and adding axis labels and plot titles
     let = ['a','b','c','d','e','f','g','h']
     for i in [0,1,2,3]:
-        ax[i].set_xlim(c); ax[i].set_ylim(c); ax[i].plot(c,c,'k-');
+        ax[i].set_xlim(c_plot); ax[i].set_ylim(c_plot); ax[i].plot(c_plot,c_plot,'k-');
         ax[i].set_xlabel('in situ '+parameter+' ('+ unit+')')
         ax[i].set_ylabel('Neural Network '+parameter+' ('+unit+')')
         ax[i].text(0.03,1.07,f'({let[i]})',transform=ax[i].transAxes,va='top',fontweight='bold',fontsize = 26)

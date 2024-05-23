@@ -26,16 +26,22 @@ Further updates to the framework to allow spatial resolution variations was fund
 Further updates to the framework for the generation of Total Alkalinity data, and the extension to full surface ocean carbonate system funded by the ESA Scope project ()
 
 # References
-Implementation of the NOAA COARE for cool skin estimation
+**Implementation of the NOAA COARE for cool skin estimation**
 
 Bariteau Ludovic, Blomquist Byron, Fairall Christopher, Thompson Elizabeth, Edson Jim, & Pincus Robert. (2021). Python implementation of the COARE 3.5 Bulk Air-Sea Flux algorithm (v1.1). Zenodo. https://doi.org/10.5281/zenodo.5110991
 
-Implementation of semi-variogram analysis in Python
+**Implementation of semi-variogram analysis in Python**
 
 Mälicke, M. (2022). SciKit-GStat 1.0: a SciPy-flavored geostatistical variogram estimation toolbox written in Python. Geoscientific Model Development, 15(6), 2505–2532. https://doi.org/10.5194/gmd-15-2505-2022
 
-FluxEngine: air-sea gas exchange calculation Python toolbox
+**FluxEngine: air-sea gas exchange calculation Python toolbox**
 
 Shutler, J. D., Land, P. E., Piolle, J. F., Woolf, D. K., Goddijn-Murphy, L., Paul, F., et al. (2016). FluxEngine: A flexible processing system for calculating atmosphere-ocean carbon dioxide gas fluxes and climatologies. Journal of Atmospheric and Oceanic Technology, 33(4), 741–756. https://doi.org/10.1175/JTECH-D-14-00204.1
 
 Holding, T., Ashton, I. G., Shutler, J. D., Land, P. E., Nightingale, P. D., Rees, A. P., et al. (2019). The FluxEngine air–sea gas flux toolbox: simplified interface and extensions for in situ analyses and multiple sparingly soluble gases. Ocean Science, 15(6), 1707–1728. https://doi.org/10.5194/os-15-1707-2019
+
+**PyCO2sys implementation for calculating the full ocean carbonate system**
+
+Humphreys, M. P., Lewis, E. R., Sharp, J. D., and Pierrot, D. (2022). PyCO2SYS v1.8: marine carbonate system calculations in Python. Geoscientific Model Development 15, 15-43. doi:10.5194/gmd-15-15-2022.
+
+Humphreys, M. P., Schiller, A. J., Sandborn, D. E., Gregor, L., Pierrot, D., van Heuven, S. M. A. C., Lewis, E. R., and Wallace, D. W. R. (2024). PyCO2SYS: marine carbonate system calculations in Python. Zenodo. doi:10.5281/zenodo.3744275.

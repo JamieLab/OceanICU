@@ -45,7 +45,7 @@ def reanalyse(socat_dir=None,socat_files=None,sst_dir=None,sst_tail=None,out_dir
         fco2_sst = fco2_sst+273.15
     append_to_file(outfile,fco2,fco2_std,fco2_sst,name,socat_files[0])
 
-def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name='',kelvin=True):
+def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name='',kelvin=True,socat_notreanalysed=False):
     """
     Function loads the reanlysed fCO2 data produced by JamieLab, instead of running the reanalysis process.
 
@@ -64,17 +64,21 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
         time.append((datetime.datetime(1970,1,1) + datetime.timedelta(days=int(t))).year)
     time = np.array(time)
     #print(time)
-
-    #Extracting the reanalysed fCO2 data
-    fco2 = np.array(c.variables['fco2_reanalysed_ave_weighted'])
-    fco2_std = np.array(c.variables['fco2_reanalysed_std_weighted'])
+    if socat_notreanalysed:
+        #Extracting the non-reanalysed SOCAT data...
+        fco2 = np.array(c.variables['fco2_ave_weighted'])
+        fco2_std = np.array(c.variables['fco2_std_weighted'])
+        sst = np.array(c.variables['sst_ave_weighted'])
+    else:
+        #Extracting the reanalysed fCO2 data
+        fco2 = np.array(c.variables['fco2_reanalysed_ave_weighted'])
+        fco2_std = np.array(c.variables['fco2_reanalysed_std_weighted'])
+        sst = np.array(c.variables['sst_reynolds'])
     #Toggle to allow the function to output the SST paired to the observations as degC or K
     if kelvin:
         #Kelvin output (as prereanalysed files are in degC)
-        sst = np.array(c.variables['sst_reynolds']) +273.15 #T_reynolds is in degC prefer in K
-    else:
-        #degC output
-        sst = np.array(c.variables['sst_reynolds'])
+        sst =  sst +273.15 #sst comes in in degC prefer in K
+
     c.close()
     # Find where the data within the reanalysed file match the specified time period
     f = np.where((time <= end_yr) & (time >= start_yr))
@@ -96,9 +100,9 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
         sst[sst<-2.5] = np.nan
     #print(fco2.shape)
     # Append to data to the output file.
-    append_to_file(output_file,fco2,fco2_std,sst,name,input_file)
+    append_to_file(output_file,fco2,fco2_std,sst,name,input_file,not_reanalysed=socat_notreanalysed)
 
-def append_to_file(output_file,fco2,fco2_std,sst,name,socat_files):
+def append_to_file(output_file,fco2,fco2_std,sst,name,socat_files,not_reanalysed = False):
     """
     Function to append the reanalysed fCO2 to the neural network input file
 
@@ -116,6 +120,8 @@ def append_to_file(output_file,fco2,fco2_std,sst,name,socat_files):
     var_o.sst = name
     #var_o.units = 'uatm'
     var_o.created_from = socat_files
+    if not_reanalysed:
+        var_o.not_reanalysed = 'These data are not reanalysed and are the orginial SOCAT data. NetCDF variable name is just for compatiability with the nerual network setup'
 
     var_o = c.createVariable(name+'_reanalysed_fCO2_sw_std','f4',('longitude','latitude','time'))
     var_o[:] = fco2_std
@@ -123,13 +129,19 @@ def append_to_file(output_file,fco2,fco2_std,sst,name,socat_files):
     var_o.sst = name
     #var_o.units = 'uatm'
     var_o.created_from = socat_files
+    if not_reanalysed:
+        var_o.not_reanalysed = 'These data are not reanalysed and are the orginial SOCAT data. NetCDF variable name is just for compatiability with the nerual network setup'
     var_o = c.createVariable(name+'_reanalysed_sst','f4',('longitude','latitude','time'))
     var_o[:] = sst
     # var_o.standard_name = 'Reanalysed fCO2(sw, subskin) std using ' + name + ' datset'
     var_o.sst = name
     #var_o.units = 'uatm'
     var_o.created_from = socat_files
-    var_o.comment = 'SST data that is coincident to the reanalysed fCO2(sw)'
+    if not_reanalysed:
+        var_o.not_reanalysed = 'These data are not reanalysed and are the orginial SOCAT data. NetCDF variable name is just for compatiability with the nerual network setup'
+        var_o.comment = 'SST data that is coincident to the SOCAT fCO2(sw)'
+    else:
+        var_o.comment = 'SST data that is coincident to the reanalysed fCO2(sw)'
     c.close()
 
 def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GLO-1M-100-SOCAT-CONV.nc',flip=False):

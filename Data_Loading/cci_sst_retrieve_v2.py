@@ -9,9 +9,9 @@ import numpy as np
 import urllib.request
 import requests
 
-def cci_sst_v3_trailblaze(loc,start_yr=1990,end_yr=2023):
+def cci_sst_v3(loc,start_yr=1990,end_yr=2023):
     du.makefolder(loc)
-    htt = 'https://gws-access.jasmin.ac.uk/public/esacci-sst/CDR3.0_release/Analysis/L4/v3.0.1/'
+    htt = 'https://data.ceda.ac.uk/neodc/eocis/data/global_and_regional/sea_surface_temperature/CDR_v3/Analysis/L4/v3.0.1/'
     d = datetime.datetime(start_yr,1,1)
     # t = 1
     while d.year < end_yr:

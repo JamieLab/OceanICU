@@ -436,3 +436,15 @@ def copy_netcdf_vars(file,vars,outfile):
         longname[v] = c[v].long_name
     c.close()
     append_netcdf(outfile,direct,1,1,1,units=units,longname=longname)
+
+def netcdf_var_bias(file,var,bias, nvar=0):
+    c = Dataset(file,'r')
+    direct = {}
+
+    for v in range(len(var)):
+        if nvar != 0:
+            direct[nvar[v]] = np.array(c[var[v]]) + bias
+        else:
+            direct[var[v]] = np.array(c[var[v]]) + bias
+    c.close()
+    append_netcdf(file,direct,1,1,1)

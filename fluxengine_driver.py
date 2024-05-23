@@ -49,12 +49,18 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws
         direct['t_skin'] = direct['t_subskin'] + coolskin_dt
     elif coolskin == 'Donlon98':
         direct['t_skin'] = direct['t_subskin'] - 0.17
+
     elif coolskin == 'COARE3.5':
         import coare_cool_skin as ccs
         dt_coare = ccs.calc_coare(input_file,coare_out,ws = ws,tair = tair, dewair = dewair, sst = tsub, msl = msl,
             rs = rs, rl = rl, zi = zi,start_yr=start_yr,end_yr=end_yr)
         direct['t_skin'] = direct['t_subskin'] - dt_coare
-        direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
+        #direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
+    elif coolskin == 'None':
+        # No coolskin effect applied (so Tskin == Tsubskin)
+        direct['t_skin'] = direct['t_subskin']
+
+    direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
 
     #append_netcdf(input_file,direct,lon,lat,timesteps)
     if not ws2:

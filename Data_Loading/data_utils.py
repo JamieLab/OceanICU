@@ -174,15 +174,20 @@ def numstr3(num):
     else:
         return str(num)
 
-def netcdf_create_basic(file,var,var_name,lat,lon):
+def netcdf_create_basic(file,var,var_name,lat,lon,flip=False,units=''):
     #copts={"zlib":True,"complevel":5} # Compression variables to save space :-)
     outp = Dataset(file,'w',format='NETCDF4_CLASSIC')
     outp.date_created = datetime.datetime.now().strftime(('%d/%m/%Y'))
     outp.created_by = 'Daniel J. Ford (d.ford@exeter.ac.uk)'
     outp.createDimension('lon',lon.shape[0])
     outp.createDimension('lat',lat.shape[0])
-    sst_o = outp.createVariable(var_name,'f4',('lon','lat'),zlib=True)
-    sst_o[:] = var
+    if flip:
+        sst_o = outp.createVariable(var_name,'f4',('lat','lon'),zlib=True)
+        sst_o[:] = np.transpose(var)
+    else:
+        sst_o = outp.createVariable(var_name,'f4',('lon','lat'),zlib=True)
+        sst_o[:] = var
+    sst_o.units = units
 
     lat_o = outp.createVariable('latitude','f4',('lat'))
     lat_o[:] = lat
@@ -194,10 +199,15 @@ def netcdf_create_basic(file,var,var_name,lat,lon):
     lon_o[:] = lon
     outp.close()
 
-def netcdf_append_basic(file,var,var_name):
+def netcdf_append_basic(file,var,var_name,flip=False,units=''):
     outp = Dataset(file,'a',format='NETCDF4_CLASSIC')
-    sst_o = outp.createVariable(var_name,'f4',('lon','lat'),zlib=True)
-    sst_o[:] = var
+    if flip:
+        sst_o = outp.createVariable(var_name,'f4',('lat','lon'),zlib=True)
+        sst_o[:] = np.transpose(var)
+    else:
+        sst_o = outp.createVariable(var_name,'f4',('lon','lat'),zlib=True)
+        sst_o[:] = var
+    sst_o.units = units
     outp.close()
 
 def lon_switch(var):

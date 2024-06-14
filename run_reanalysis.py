@@ -89,6 +89,18 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
     fco2_std = np.transpose(fco2_std[f[0],:,:],(2,1,0))
     sst = np.transpose(sst[f[0],:,:],(2,1,0))
 
+    if time[-1] != end_yr:
+        #If the end_year of the SOCAT data is not the end year we want to extrapolate to then pad the end,
+        #so the data can be included in the netcdf. For example this is used by the UoE to prepare input
+        #datasets for the GCB release, and allows running of an addiitonal year in preparation
+        deltatime = (end_yr - time[-1])*12
+        add_field = np.zeros((fco2.shape[0],fco2.shape[1],deltatime)); add_field[:] = np.nan
+
+        #Add the additional padding fields on the time axis :-)
+        fco2 = np.concatenate((fco2,add_field),axis=2)
+        fco2_std = np.concatenate((fco2_std,add_field),axis=2)
+        sst = np.concatenate((sst,add_field),axis=2)
+
     # Remove data that is either fill or isn't representative (i.e fCO2sw of 0 isn't really possible)
     # in seawater.
     # Need better solution to this...

@@ -7,6 +7,7 @@ import time
 import data_utils as du
 from netCDF4 import Dataset
 import numpy as np
+import calendar
 
 def cci_retrieve(loc="D:/Data/SST-CCI/",start_yr = 1981,end_yr = 2023):
     import cdsapi
@@ -57,14 +58,19 @@ def cci_retrieve(loc="D:/Data/SST-CCI/",start_yr = 1981,end_yr = 2023):
                 zip_ref.extractall(p)
         d = d+datetime.timedelta(days=1)
 
-def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023,time_cor = 5):
+def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023,time_cor = 5,v3 = False):
     du.makefolder(os.path.join(inp,'monthly'))
-    if start_yr <= 1981:
-        ye = 1981
-        mon = 9
-    else:
+    if v3:
         ye = start_yr
         mon = 1
+    else:
+        if start_yr <= 1981:
+            ye = 1981
+            mon = 9
+        else:
+            ye = start_yr
+            mon = 1
+
     i = 0 # Variable for loading lat and lon grid once (set to 1 once loaded for the first time)
     du.makefolder(os.path.join(inp,'monthly',str(ye)))
     while ye <= end_yr:
@@ -73,7 +79,14 @@ def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023,time_cor 
             # Get the year and month folder path in the input directory, and then find all netCDF files, should
             # equal the number of days (maybe add check for this?)
             fold = os.path.join(inp,str(ye),du.numstr(mon))
-            files = glob.glob(fold+'\*.nc')
+            if v3:
+                files = []
+                for f_loop in range(1,calendar.monthrange(int(ye),int(mon))[1]+1):
+                    file_t = glob.glob(os.path.join(fold,du.numstr(f_loop),'*.nc'))
+                    files.append(file_t[0])
+                print(files)
+            else:
+                files = glob.glob(fold+'\*.nc')
             #print(fold)
             #print(files)
             # Load the lat and lon grid for the first time (set i to 1 as we only want to do this once)
@@ -117,17 +130,19 @@ def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023,time_cor 
             mon = 1
             ye = ye+1
 
-def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_yr=2023,out_loc='',log='',lag=''):
+def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_yr=2023,out_loc='',log='',lag='',v3=False,flip=False):
     du.makefolder(out_loc)
     res = np.round(np.abs(log[0]-log[1]),2)
-    if start_yr < 1981:
-        ye = 1981
-        mon= 9
-    else:
+    if v3:
         ye = start_yr
-        mon=1
-    st_ye = 1981
-    st_mon = 9
+        mon = 1
+    else:
+        if start_yr <= 1981:
+            ye = 1981
+            mon = 9
+        else:
+            ye = start_yr
+            mon = 1
 
     t=0
     while ye <= end_yr:
@@ -152,9 +167,9 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
             sst_o = du.grid_average(sst,lo_grid,la_grid)
             ice_o = du.grid_average(ice,lo_grid,la_grid)
             unc_o = du.grid_average(unc,lo_grid,la_grid)
-            du.netcdf_create_basic(file_o,sst_o,'analysed_sst',lag,log)
-            du.netcdf_append_basic(file_o,ice_o,'sea_ice_fraction')
-            du.netcdf_append_basic(file_o,unc_o,'analysed_sst_uncertainty')
+            du.netcdf_create_basic(file_o,sst_o,'analysed_sst',lag,log,flip=flip,units='Kelvin')
+            du.netcdf_append_basic(file_o,ice_o,'sea_ice_fraction',flip=flip)
+            du.netcdf_append_basic(file_o,unc_o,'analysed_sst_uncertainty',flip=flip,units = 'Kelvin')
 
         mon = mon+1
         if mon == 13:

@@ -933,17 +933,23 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
     import scipy.interpolate as interp
     import random
     fluxloc = model_save_loc+'/flux'
+    # We have our default location for the output file (i.e where all the output data from the Nerual network and flux uncertainty computation per pixel)
+    # but we can specify here if this file is different
     if inp_file:
         c = Dataset(inp_file,'r')
     else:
         c = Dataset(model_save_loc+'/output.nc','r')
 
+    # If were not dealing with the seaice component we can load the flux (with the sea ice accounted for) from
+    # the flux variable (this is normally 'flux')
+    # The uncertainties are percentages of the flux, so we convert to g C m-2 d-1 by multipling the uncertainty
+    # by the absolute flux.
     if not seaice:
         c_flux = np.array(c.variables[flux_variable])
         print(c_flux.shape)
         c_flux_unc = np.array(c.variables[flux_var]) * np.abs(c_flux)
 
-
+    #Laoding the latitude/longitude/time grids from the input data file.
     lon = np.array(c.variables['longitude'])
     lat = np.array(c.variables['latitude'])
     time = np.array(c.variables['time'])
@@ -953,11 +959,15 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
     # ax.pcolor(lon,lat,np.transpose(c_flux[:,:,0]))
     # plt.show()
     c.close()
-
+    # Here we convert the times from 'days since' to a datetime array, and then extract the year (as this is the bit we need
+    # to paritition the fluxes into different years)
     time_2 = np.zeros((len(time)))
     for i in range(0,len(time)):
         time_2[i] = ((datetime.datetime(1970,1,15)+datetime.timedelta(days=int(time[i]))).year)
 
+    # If were dealing with the sea ice componenent we load the flux direct from the Fluxengine files (as these don't have the sea ice accounted for
+    # with the flux * (1-ice)). We then load the sea ice used in the Fluxengine calculations, and then load the sea ice uncertainty from the
+    # input data array
     if seaice:
         c_flux = load_flux_var(fluxloc,'OF',start_yr,end_yr,len(lon),len(lat),len(time))
         c_flux = np.transpose(c_flux,(1,0,2))
@@ -966,13 +976,16 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
         c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'r')
         ice_unc = np.array(c.variables[seaice_var][:])
         c.close()
-
+    # Find the resolution of the data we are working with
     res = np.abs(lon[0]-lon[1])
+    # Calcualte the area of each pixel and convert from km-2 to m-2 (this is used in the intergrated flux calculations)
     area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
-
+    # Transpose to get onto the array shape as the other data (not sure why the du.area_grid function doesn't output the right way to start with)
     area = np.transpose(area)
     print(area.shape)
 
+    # Here we load the ocean proportion data from the GEBCO bathymetry file for use in the intergrated flux calculations
+    # We also load the elevation (i.e depth) if the bath_cutoff is specified (so we can trim the data to only the water depth required)
     c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
     land = np.squeeze(np.array(c.variables['ocean_proportion']))
     if bath_cutoff:
@@ -980,11 +993,19 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
     print(land.shape)
     c.close()
 
+    # Here we cycle through the time dimension (third dimension) and set the areas where the water is deeper than the bathymetry cutoff to nan
+    # then save back to the flux array.
+    # Only applied if bath_cutoff is specified
     if bath_cutoff:
         for i in range(c_flux.shape[2]):
             flu = c_flux[:,:,i]  ; flu[elev<=bath_cutoff] = np.nan; c_flux[:,:,i] = flu
     #fco2_tot_unc =  fco2_tot_unc[:,:,:,np.newaxis]
+    # Get a list of the years we are computing the fluxes for
     a = list(range(start_yr,end_yr+1))
+
+    """
+    This all seems like legacy code (leaving here for now....)
+    """
     # data_totals = np.zeros((len(a)))
     # for i in range(len(a)):
     #     f = np.where(time_2 == a[i])
@@ -997,112 +1018,135 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
     # print(data_totals)
 
     # data_totals = decors[:,1]
+
+    #Here we load the decorrelation lengths from the semi-variogram analysis. Where within decor_loaded the first column is year, second
+    # is the median decorelation lenght, thrid is the IQR, fourth is the mean, fifth is the standard deviation
     decors = np.zeros((len(a),2))
+    #If decor is a string (we assume its a file name, or an absolute path to a file)
     if isinstance(decor, str):
         print('Loading Decorrelation')
         try:
-            decor_loaded = np.loadtxt(os.path.join(model_save_loc,'decorrelation',decor),delimiter=',')
+            decor_loaded = np.loadtxt(os.path.join(model_save_loc,'decorrelation',decor),delimiter=',') # Seems ive hardcoded the location (where we'd expect the file)
         except:
             print('Bad file... trying a second attempt')
-            decor_loaded = np.loadtxt(decor,delimiter=',')
-        decors[:,0] = decor_loaded[:,1]
+            decor_loaded = np.loadtxt(decor,delimiter=',') # And then if a actual path is specified the first call will fail and then load it from the absolute path supplied
+        decors[:,0] = decor_loaded[:,1] # Median decorrelation length loaded
 
         decors[:,1] = decor_loaded[:,2]/2 # IQR needs to be divided by two to get a +- range
+
+        # If we have nans then the decorrelation length analysis failed for this year (likely due to no data) so we set the decorrelation length to the maximum of all
+        # avaiable years
         f = np.where(np.isnan(decors[:,0]) == 1)[0]
         if len(f) > 0:
             print('NaN values present!')
             decors[f,0] = np.nanmax(decors[:,0])
             decors[f,1] = np.nanmax(decors[:,1])
         print(decors)
-    else:
+    else: # We assume its a number (decorrealtion and a uncertainty) which is fixed for all years/
         decors[:,0] = decors[:,0] + decor[0]
         decors[:,1] = decor[1]
         print(decors)
 
     #ens = 100
-    out = np.zeros((len(a),ens))
-    out2 = np.zeros((len(a)))
+    """
+    Into the monte carlo propagation of the uncertainties now...
+    """
+    out = np.zeros((len(a),ens)) # Setup an array to save the final fluxes (dimensions are (number of years, number of ensembles))
+    out2 = np.zeros((len(a))) # Setup array to save the ensemble output before saveing to the above final output array
     #pad = 40 # 8 = 400km, 13 = 650km, 14 = 700 km, 28 = 1400km, 40 = 2000km
+    #Printing the latitude/longitude bounds we are dealing with? I think
     print(f'Lat 1: {lat[0]} Lat2: {lat[-1]}')
     print(f'Lon 1: {lon[0]} Lon2: {lon[-1]}')
 
-    lon_ns,lat_ns = np.meshgrid(lon,lat)
-    for j in range(0,ens):
+    lon_ns,lat_ns = np.meshgrid(lon,lat) # Create a 2d array of latitude and longitude values
+    for j in range(0,ens): # Start montecarlo ensembles
         print(j)
         t = 0
         t_c = 1
-        unc = np.zeros((c_flux.shape))
-        for i in range(c_flux.shape[2]):
-            if t_c ==1:
-                pad = -1
+        unc = np.zeros((c_flux.shape)) # Setup the uncertianty perturbation grid that has same dimensions as the flux (lon, lat, time)
+        for i in range(c_flux.shape[2]):# Cycle through the time dimesnsion
+            if t_c ==1: # This works out the decorrelation length for this run (so a random value within the uncertainties of the decorrlation in km)
+                pad = -1 # Set pad to -1 (so if this is less than 1 degree run again)
                 while (pad < 1):# | (pad>70):
-                    ran = np.random.normal(0,0.33,1)
-                    de_len = (decors[t,0] + (decors[t,1]*ran))
-                    pad = (de_len / 110.574)*2
-                lat_s = np.linspace(lat[0],lat[-1],int((lat[-1]-lat[0])/pad))
+                    ran = np.random.normal(0,0.33,1) # Select a single random value that will be between -1, 1 at the 99.9% confidence.
+                    de_len = (decors[t,0] + (decors[t,1]*ran)) # Calculate the randome decorrelation for this run (so median + perturbation)
+                    pad = (de_len / 110.574)*2 # We need the tie point in the next step to be 2 times the decorrelation length apart, so we convert out decorrelation lenght to km (where latitude km -> deg is fixedish)
+                lat_s = np.linspace(lat[0],lat[-1],int((lat[-1]-lat[0])/pad)) # Setup the tie point grid for the latitudes in degrees (so this gives out latitude tie points at spacings 2 times decorrelation length)
                 lat_ss = []
                 lon_ss = []
-                for l in range(len(lat_s)):
-                    lat_km = 111.320*np.cos(np.deg2rad(lat_s[l]))
-                    padl = (de_len/lat_km)*2
+                for l in range(len(lat_s)): # We now need to calculate the longitudes for our tie points on each latitude band in lat_s (i.e how many longitude ties do we need)
+                    lat_km = 111.320*np.cos(np.deg2rad(lat_s[l])) # Longirude convesions from km -> degrees varies with laittude so for our latitude we calculate the distance that each degree is in km
+                    padl = (de_len/lat_km)*2# We then use this value to work out the number of degrees our decorrelation length is for at this particular latitude
 
-                    in_padl = int((lon[-1] - lon[0])/padl)
+                    in_padl = int((lon[-1] - lon[0])/padl) # Then we work out how many our degree decorrealtion length fits into the longitude grid
                     #print(in_padl)
-                    if in_padl == 0:
-                        lon_s = [0]
+                    if in_padl == 0: # If it turns out to be 0, then we have a single tie point on the grid that we set in the middle of the latitude/longitude grid
+                        lon_s = [(lon[-1] - lon[0])/2]
                     else:
-                        lon_s = np.linspace(lon[0],lon[-1],in_padl)
-                    for p in range(len(lon_s)):
+                        lon_s = np.linspace(lon[0],lon[-1],in_padl) # If we can fit more then these are linearly spaces along the longitude grid at that latitude
+                    for p in range(len(lon_s)): # Now we cycle through the lons and latitudes to build our tie point grid so we have the coordinates for each point (latitude in lat_ss and lon in lon_ss)
                         lat_ss.append(lat_s[l])
                         lon_ss.append(lon_s[p])
+                # To do the inteprolation of the uncertainty grid we need to make sure the whole grid is covered. The poles or edges of the grid become an issue so we add a pertirbation value for the 4 corners of our grid.
                 lat_ss.append(lat[0]); lat_ss.append(lat[0]);lat_ss.append(lat[-1]);lat_ss.append(lat[-1]);
                 lon_ss.append(lon[0]); lon_ss.append(lon[-1]); lon_ss.append(lon[0]); lon_ss.append(lon[-1]);
 
-            unc_o = np.random.normal(0,1,(len(lon_ss)))
+            unc_o = np.random.normal(0,1,(len(lon_ss))) # Here we select a random peturbation value for each of our tie points (lat_ss, lon_ss)
+            #So here we set the 4 corners of the grid to the same perturbation value (im not quite sure why, but likely to do with having a single perturbation region at the poles.)
             v = np.random.normal(0,1)
             unc_o[-3:] = v
 
+            #So we stack our tie points together into a list (tie_point_number by 2 columns)
             points = np.stack([np.array(lon_ss).ravel(),np.array(lat_ss).ravel()],-1)
-            u = unc_o.ravel()
-            un_int = interp.griddata(points,u,(np.stack([lon_ns.ravel(),lat_ns.ravel()],-1)),method = 'cubic')
-            un_int = np.transpose(un_int.reshape((len(lat),len(lon))))
-            unc[:,:,i] = un_int
-            t_c = t_c + 1
-            if t_c == 13:
+            u = unc_o.ravel() # And put our perturbation values into a column (I think they are probably already in a column but just to be sure)
+            un_int = interp.griddata(points,u,(np.stack([lon_ns.ravel(),lat_ns.ravel()],-1)),method = 'cubic') # Now we interpolate the values onto our full latitude and longitude grid (using cubic, as fully linear lead to harsh boundaries, where as cubic is smoother)
+            un_int = np.transpose(un_int.reshape((len(lat),len(lon)))) # These come out as a column, so we reshape to the grid, and then transpose as it seems I got the dimensions all wrong, but this outputs them to the right orientation
+            unc[:,:,i] = un_int # Then put these values into the final uncertainty perturbation grid at the time step
+            t_c = t_c + 1 # Add one to our timestep counter so we don't recalculate tje decorrelation lengths and tie point again for this year (the tie points are fixed locations for each year but the perturbation value can now change)
+            if t_c == 13:# When we get to 13 we are starting a new year, so we recalcuate the tie points for a new perturbation of the decorrelation length
                 t=t+1
                 t_c = 1
+            # Here we plot the perturbation grid (first grid in time for checking/debugging)
             if (j ==0) & (i == 0):
                 fig = plt.figure()
                 plt.pcolor(lon,lat,np.transpose(np.squeeze(unc[:,:,i])),vmin=-1,vmax=1)
                 plt.colorbar()
                 fig.savefig(os.path.join(model_save_loc,'plots','example_pco2_perturbation.png'),format='png',dpi=300)
                 #plt.show()
+        # SO we now have our perturbation grid through time we can now apply it to the fluxes
+
+        #If were dealing with seaice, the perturbation vlaues affect the ice and ice_unc.
         if seaice:
-            ice_t = ice+(ice_unc*unc)
-            ice_t[ice_t > 1] = 1; ice_t[ice_t <0] = 0
-            e_flux = c_flux * (1-ice_t)
-        else:
+            ice_t = ice+(ice_unc*unc) # Calcualte our ice with the perturbation
+            ice_t[ice_t > 1] = 1; ice_t[ice_t <0] = 0 # Can't have ice less than 0 or greater than 1 (or 100% ice cover)
+            e_flux = c_flux * (1-ice_t) # Apply to flux
+        else:# Were dealing with a precomputed flux uncertainty, so we multiple by the perturbation vlaue and add to the flux
             e_flux = c_flux + (unc*c_flux_unc)
+        # Setup flux variables for computing the annual values
         flux = np.zeros((c_flux.shape))
         c_flux2 = np.zeros((c_flux.shape))
+        # Cycle through each time step, and mutliple the flux (g C m-2 d-1) by the area (m-2), the ocean proportion (0-1), the mean number of days in a month (d-1) and convert to Pg C (1e15)
+        # So units our Pg C mon-1
         for i in range(0,flux.shape[2]):
-            flux[:,:,i] = (e_flux[:,:,i] * area * land * 30.5) /1e15
-            c_flux2[:,:,i] = (c_flux[:,:,i] * area * land * 30.5) /1e15
+            flux[:,:,i] = (e_flux[:,:,i] * area * land * 30.5) /1e15 #This is our perturbed values
+            c_flux2[:,:,i] = (c_flux[:,:,i] * area * land * 30.5) /1e15 # This is our unperturbed (raw flux)
 
         t = 0
-        for i in range(0,flux.shape[2],12):
-            flu = flux[:,:,i:i+12]
+        for i in range(0,flux.shape[2],12):# Cycle through the flux array, in annual increments and sum the flux thats in Pg C mon-1 into a Pg C yr-1
+            flu = flux[:,:,i:i+12] #Extract the years values
             print(np.nansum(flu))
-            c_flu = c_flux2[:,:,i:i+12]
+            c_flu = c_flux2[:,:,i:i+12] # Extract the unperturbed values - I think this only applies when we are doing a single output... so we have the actual calulated flux and the uncertainty
             out[t,j] = np.nansum(flu)
             out2[t] = np.nansum(c_flu)
 
-            t = t+1
-    if single_output:
-        data = pd.DataFrame(a,columns=['Year'])
-        st = np.std(out,axis=1)
-        data['std'] = st
-        data['Net air-sea CO2 flux (Pg C yr-1)'] = out2
+            t = t+1# Keep a count so we can put the annual values in the right output row
+    if single_output: #If a single value output i.e in its own table (e.g SOCOMv2 geospatial analysis only does one uncertainty component)
+        data = pd.DataFrame(a,columns=['Year']) # So we save the year
+        st = np.std(out,axis=1) # Calcualte the standard devaiiton of the ensembles
+        data['std'] = st# Save these into the table
+        data['Net air-sea CO2 flux (Pg C yr-1)'] = out2 # This is our calcualted ocena carbon sink with no perturbations (so flux as is calculated)
+
+        #Then we plot the results (i.e a ocean sink with errorbars)
         fig = plt.figure(figsize=(7,7))
         gs = GridSpec(1,1, figure=fig, wspace=0.5,hspace=0.2,bottom=0.1,top=0.95,left=0.15,right=0.98)
         ax = fig.add_subplot(gs[0,0])
@@ -1114,33 +1158,36 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
         ax.set_xlabel('Year')
         # ax.plot(a,out)
         # ax.plot(a,out2,'k--',linewidth=3)
-        fig.savefig(single_output+'.png',format='png',dpi=300)
-        data.to_csv(single_output+'.csv',index=False)
+        fig.savefig(single_output+'.png',format='png',dpi=300) #Save the figure
+        data.to_csv(single_output+'.csv',index=False) # Save the year, flux, standard deviation of the ensemble.
     else:
+        # If multiple uncertainty components will be calculated then we do this
+        # So we plot some debug information
         fig = plt.figure(figsize=(14,7))
         gs = GridSpec(1,2, figure=fig, wspace=0.5,hspace=0.2,bottom=0.1,top=0.95,left=0.10,right=0.98)
-        ax = fig.add_subplot(gs[0,0])
+        ax = fig.add_subplot(gs[0,0]) # Plotting the used decorrelation lenghts
         ax.set_xlabel('Year')
         ax.plot(a,decors[:,0],'k-')
         ax.fill_between(a,decors[:,0] - (decors[:,1]/2), decors[:,0]+ (decors[:,1]/2),alpha=0.4,color='k')
         ax.set_ylabel('Decorrelation length (km)')
-
+        # We load the precomputed annual fluxes from the fixed_uncertainty_append function
         ann = np.loadtxt(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',',skiprows=1)
         ax = fig.add_subplot(gs[0,1])
-        ax.plot(a,ann[:,1],'k-',linewidth=3,zorder=6)
-        st = np.std(out,axis=1)
-        ax.plot(a,out,zorder=2)
-        ax.fill_between(a,ann[:,1] - st,ann[:,1] + st,alpha = 0.6,color='k',zorder=5)
+        ax.plot(a,ann[:,1],'k-',linewidth=3,zorder=6)# We plot this flux
+        st = np.std(out,axis=1)#Calculate the standard deviation of the ensemble
+        ax.plot(a,out,zorder=2)# We plot the individual ensembles
+        ax.fill_between(a,ann[:,1] - st,ann[:,1] + st,alpha = 0.6,color='k',zorder=5) # Then plot the unperturbed flux with errorbars
         ax.fill_between(a,ann[:,1] - (2*st),ann[:,1] + (2*st),alpha=0.4,color='k',zorder=4)
         ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
         print(st)
-        fig.savefig(os.path.join(model_save_loc,'plots','pco2_uncertainty_contribution_revised.png'),format='png',dpi=300)
-        data = pd.read_table(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',')
-        if seaice:
+        fig.savefig(os.path.join(model_save_loc,'plots','pco2_uncertainty_contribution_revised.png'),format='png',dpi=300) # Save the debug figure
+        data = pd.read_table(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',')# Read our annual flux table with the already computed flux uncertainties
+        #Then we save the uncertainity on the fluxes into the table before resaving with the appended values
+        if seaice:#For seaice we manual assign the column name and values
             data['flux_unc_seaice (Pg C yr-1)'] = st
-        else:
+        else: # If were using a precomputed value, then we name it as such.
             data[flux_var+' (Pg C yr-1)'] = st
-        data.to_csv(os.path.join(model_save_loc,'annual_flux.csv'),index=False)
+        data.to_csv(os.path.join(model_save_loc,'annual_flux.csv'),index=False) # save the data back on to the file.
         #np.savetxt(os.path.join(model_save_loc,'unc_monte_revised.csv'),np.stack((np.array(a),st)),delimiter=',',fmt='%.5f')
         #plt.show()
 

@@ -32,11 +32,11 @@ def interpolate_noaa(file,lat=1,lon=1,grid_lat=[],grid_lon=[],grid_time=[],out_d
     # plt.show()
     print('Setting up interpolation variable...')
     interp = RegularGridInterpolator((noaa_time,noaa_grid),data)
-    if (grid_lon == []) & (grid_lat == []):
+    if (len(grid_lon) == 0) & (len(grid_lat) == 0):
         print('Generating regular lat/lon grid at '+str(lat)+' deg...')
         grid_lon,grid_lat = reg_grid(lat=lat,lon=lon)
 
-    if (grid_time == []):
+    if len(grid_time) == 0:
         print('Generating regular monthly time grid....')
         date_ti,grid_time = generate_monthly_time(int(start_yr),int(np.floor(noaa_time[-1])))
         print(grid_time)

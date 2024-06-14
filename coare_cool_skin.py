@@ -29,7 +29,7 @@ def calc_coare(data_file,out_loc,ws = None,tair = None,dewair = None, sst = None
         tair_c = np.array(tabl[tair]) -273.15
         dewair_c = np.array(tabl[dewair]) - 273.15
         tabl['rh'] = 100* (np.exp((17.625*dewair_c) / (243.04+dewair_c)) / np.exp((17.625*tair_c) / (243.04+tair_c)))
-
+        
         out = co.coare35vn(u = tabl[ws],t = tabl[tair]-273.15, rh = tabl['rh'],ts = tabl[sst]-273.15,P=tabl[msl]/100, Rs = tabl[rs], Rl = tabl[rl], zu = 10,
             zt = 2, zq = 2, lat = tabl['lat'], zi = tabl[zi],jcool = 1)
         print(out)

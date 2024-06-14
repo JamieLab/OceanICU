@@ -110,12 +110,19 @@ def ccmp_temporal_average(loc,start_yr=1990,end_yr=2023,var='ws',v=3):
                 wind_t = np.array(c.variables[var][:])
                 wind_t[wind_t < 0 ] = np.nan
                 #print(np.transpose(sst[0,:,:]).shape)
-                wind_t = np.transpose(wind_t,[1,0,2])
+                if wind_t.shape[2] == 4:
+                    # If wind speed is in dimensions (lat,lon, time)
+                    wind_t = np.transpose(wind_t,[1,0,2])
+
+                else:
+                    # SOme files come as dimensions (time,lat,lon) so do this tranposition
+                    wind_t = np.transpose(wind_t,[2,1,0])
                 print(wind_t.shape)
                 c.close()
 
 
                 wind[:,:,cou:cou+4] = wind_t
+
 
                 # plt.figure()
                 # plt.pcolor(wind_t[:,:,0])

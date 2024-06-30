@@ -156,6 +156,47 @@ def append_to_file(output_file,fco2,fco2_std,sst,name,socat_files,not_reanalysed
         var_o.comment = 'SST data that is coincident to the reanalysed fCO2(sw)'
     c.close()
 
+def model_fco2_append(input_file,output_file,start_yr=1990, end_yr = 2020,name='',ref_yr = 1970):
+    """
+    Function to append GCB model fCO2 into the neural network framework input file
+    """
+
+    c = Dataset(input_file,'r')
+    data = np.array(c['sfco2'])
+    c.close()
+    #Setup a time array so we know the year that the data is from.
+    time = []
+    yr = ref_yr
+    mon = 1
+    for ti in range(data.shape[0]):
+        time.append(yr)
+        mon = mon+1
+        if mon == 13:
+            mon = 1
+            yr=yr+1
+    time = np.array(time)
+    print(time)
+
+    f = np.where((time <= end_yr) & (time >= start_yr))[0]
+    data = data[f,:,:]
+    data = du.lon_switch(data)
+    data = np.transpose(data,[2,1,0])
+    fco2_std = np.zeros((data.shape))
+    data[data>10000] = np.nan
+
+    c = Dataset(output_file,'a')
+    var_o = c.createVariable('model_reanalysed_fCO2_sw','f4',('longitude','latitude','time'))
+    var_o[:] = data
+    var_o.model_data = 'Data from ' + input_file
+    var_o.model_subsampled_data = 'These data are model subsampled data - NetCDF variable name is just for compatiability with the nerual network setup'
+    var_o = c.createVariable('model_reanalysed_fCO2_sw_std','f4',('longitude','latitude','time'))
+    var_o[:] = fco2_std
+    var_o.model_data = 'Data from ' + input_file
+    var_o.model_subsampled_data = 'These data are model subsampled data - NetCDF variable name is just for compatiability with the nerual network setup'
+    var_o.padded_zeros = 'This data array is just padded with zeros...'
+    c.close()
+
+
 def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GLO-1M-100-SOCAT-CONV.nc',flip=False):
     """
     Function to iteratively load the fCO2sw from the reanalysis folder (i.e one netcdf per month_year combo)

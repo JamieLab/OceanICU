@@ -7,21 +7,18 @@ Script to plot flux output for GCB submission
 
 """
 import matplotlib.pyplot as plt
-import pandas as pd
 from netCDF4 import Dataset
 import numpy as np
-import datetime
-import Data_Loading.data_utils as du
 import os
-import glob
 from matplotlib.gridspec import GridSpec
 import matplotlib.transforms
+
 font = {'weight' : 'normal',
         'size'   : 19}
 matplotlib.rc('font', **font)
 matplotlib.rcParams['text.usetex'] = True
 
-model_save_loc = 'D:/ESA_CONTRACT/NN/GCB_2023_Prelim_Ens3'
+model_save_loc = 'D:/OceanCarbon4Climate/NN/GCB2024_full_version'
 gcb_file = model_save_loc+'/GCB_output.nc'
 
 c = Dataset(gcb_file,'r')
@@ -44,4 +41,4 @@ for i in range(4):
         ax[i].set_xlabel('Time (year)')
     ax[i].set_title(tit[i])
 
-fig.savefig('plots/gcb_submission.png',dpi=300)
+fig.savefig(os.path.join(model_save_loc,'plots/gcb_submission.png'),dpi=300)

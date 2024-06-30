@@ -49,7 +49,7 @@ def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,org
     yr = start_yr
     mon = 1
     t = 0
-    while yr < end_yr:
+    while yr <= end_yr:
         if mon == 1:
             du.makefolder(os.path.join(outloc,str(yr)))
         file = os.path.join(loc,str(yr),str(yr)+'_'+du.numstr(mon)+'_ERA5.nc')

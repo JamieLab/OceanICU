@@ -144,11 +144,14 @@ def OSISAF_spatial_average(data='D:/Data/OSISAF/monthly',start_yr = 1981, end_yr
                 unc_o = du.grid_average_nonreg(unc,grid)
                 sst_o = np.transpose(np.reshape(sst_o,(len(lag),len(log))))
                 print(sst_o.shape)
-                unc_o = np.transpose(np.reshape(unc_o,(len(lag),len(log))))
+                unc_o = np.transpose(np.reshape(unc_o,(len(lag),len(log)))) * 2 #We want 2 sigma uncertainties
                 du.netcdf_create_basic(file_o,sst_o,'ice_conc',lag,log)
                 #du.netcdf_append_basic(file_o,ice_o,'sea_ice_fraction')
                 du.netcdf_append_basic(file_o,unc_o,'total_standard_uncertainty')
                 du.netcdf_append_basic(file_o,np.transpose(grid_t),'grid_t')
+                c = Dataset(file_o,'a')
+                c.variables['total_standard_uncertainty'].uncertainty = 'These uncertainties are 2 sigma (95% confidence) equivalents!'
+                c.close()
 
         mon = mon+1
         if mon == 13:
@@ -206,6 +209,9 @@ def OSISAF_merge_hemisphere(loc,bath,start_yr = 1981, end_yr=2023,log='',lag='')
             du.netcdf_create_basic(file,ice_o/100,'ice_conc',lag,log)
             #du.netcdf_append_basic(file_o,ice_o,'sea_ice_fraction')
             du.netcdf_append_basic(file,unc_o/100,'total_standard_uncertainty')
+            c = Dataset(file,'a')
+            c.variables['total_standard_uncertainty'].uncertainty = 'These uncertainties are 2 sigma (95% confidence) equivalents!'
+            c.close()
         mon = mon+1
         if mon == 13:
             ye = ye+1

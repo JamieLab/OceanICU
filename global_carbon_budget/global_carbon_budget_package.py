@@ -11,29 +11,16 @@ import pandas as pd
 from netCDF4 import Dataset
 import numpy as np
 import datetime
-import Data_Loading.data_utils as du
+import sys
 import os
 import glob
-def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel):
-    out = np.zeros((latl,lonl,timel))
-    out[:] = np.nan
-    yr = start_yr
-    mon = 1
-    t=0
-    while yr <= end_yr:
-        fil = os.path.join(loc,str(yr),du.numstr(mon),'*.nc')
-        print(fil)
-        g = glob.glob(fil)
-        #print(g)
-        c = Dataset(g[0])
-        op = np.squeeze(np.array(c[var]))
-        out[:,:,t] = op
-        mon = mon+1
-        t = t+1
-        if mon == 13:
-            yr = yr+1
-            mon = 1
-    return out
+
+#Location of OceanICU neural network framework
+oceanicu = 'C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/OceanICU'
+sys.path.append(os.path.join(oceanicu,'Data_Loading'))
+sys.path.append(oceanicu)
+import Data_Loading.data_utils as du
+import fluxengine_driver as fl
 
 def lon_switch(var):
     temp = np.zeros((var.shape))
@@ -47,7 +34,7 @@ def lon_switch_2d(var):
     temp[:,180:] = var[:,0:180]
     return temp
 
-model_save_loc = 'D:/ESA_CONTRACT/NN/GCB_2023_Prelim_Ens3'
+model_save_loc = 'D:/OceanCarbon4Climate/NN/GCB2024_full_version'
 fluxloc = model_save_loc+'/flux'
 gcb_file = model_save_loc+'/GCB_output.nc'
 lon,lat = du.reg_grid()
@@ -58,6 +45,7 @@ lon,lat = du.reg_grid()
 # Secondary function to get time variable length
 c = Dataset(model_save_loc+'/output.nc','r')
 fco2_sw = np.array(c['fco2'])
+flux = np.array(c['flux'])
 c.close()
 
 
@@ -68,18 +56,19 @@ outs.created_from = 'Data created from ' + model_save_loc
 outs.packed_with = 'Data packed with global_carbon_budget_package.py'
 outs.flux_calculations = 'Flux calculations completed with FluxEngine v4. See details in Shutler et al. (2016; https://doi.org/10.1175/JTECH-D-14-00204.1) and Holding et al. (2019; https://doi.org/10.5194/os-15-1707-2019)'
 outs.method_citation = 'Watson, A.J., Schuster, U., Shutler, J.D. et al. Revised estimates of ocean-atmosphere CO2 flux are consistent with ocean carbon inventory. Nat Commun 11, 4422 (2020). https://doi.org/10.1038/s41467-020-18203-3'
-outs.sst_citation = 'Merchant, C.J., Embury, O., Bulgin, C.E. et al. Satellite-based time-series of sea-surface temperature since 1981 for climate applications. Sci Data 6, 223 (2019). https://doi.org/10.1038/s41597-019-0236-x'
-outs.sst_data_location = 'https://doi.org/10.24381/cds.cf608234'
+outs.method_citation_updates = 'Preprint: Daniel J Ford, Josh Blannin, Jennifer Watts, et al. A comprehensive analysis of air-sea CO2 flux uncertainties constructed from surface ocean data products. ESS Open Archive . April 01, 2024. https://doi.org/10.22541/essoar.171199280.05732707/v1'
+outs.sst_citation = 'Embury, O., Merchant, C.J., Good, S.A. et al. Satellite-based time-series of sea-surface temperature since 1980 for climate applications. Sci Data 11, 326 (2024). https://doi.org/10.1038/s41597-024-03147-w'
+outs.sst_data_location = 'https://dx.doi.org/10.5285/4a9654136a7148e39b7feb56f8bb02d2'
 outs.sss_citation = 'Jean-Michel, L., Eric, G., Romain, B.-B., Gilles, G., Angélique, M., Marie, D., et al. (2021). The Copernicus Global 1/12° Oceanic and Sea Ice GLORYS12 Reanalysis. Frontiers in Earth Science 9, 585. doi:10.3389/feart.2021.698876. '
 outs.sss_data_location = 'https://doi.org/10.48670/moi-00021'
 outs.wind_citation = 'Mears, C.; Lee, T.; Ricciardulli, L.; Wang, X.; Wentz, F. Improving the Accuracy of the Cross-Calibrated Multi-Platform (CCMP) Ocean Vector Winds. Remote Sens. 2022, 14, 4230. https://doi.org/10.3390/rs14174230'
-outs.wind_data_location = 'https://data.remss.com/ccmp/v03.0/'
+outs.wind_data_location = 'https://data.remss.com/ccmp/v03.1/'
 outs.mld_citation = 'Jean-Michel, L., Eric, G., Romain, B.-B., Gilles, G., Angélique, M., Marie, D., et al. (2021). The Copernicus Global 1/12° Oceanic and Sea Ice GLORYS12 Reanalysis. Frontiers in Earth Science 9, 585. doi:10.3389/feart.2021.698876. '
 outs.mld_data_location = 'https://doi.org/10.48670/moi-00021'
-outs.version = 'v23'
+outs.version = 'v24'
 outs.interpolation_method = 'SOM-FNN uses CCI-SST, CMEMS SSS, CMEMS MLD and Takahashi Climatology - FNN uses CCI-SST, CMEMS SSS, CMEMS MLD, ERSL xCO2atm and anomalies of all 4 products (8 inputs total)'
 outs.interpolation_method_ref = 'Landschützer, P., Gruber, N., E. Bakker, D. C., and Schuster, U. (2014), Recent variability of the global ocean carbon sink, Global Biogeochem. Cycles, 28, 927– 949, doi:10.1002/2014GB004853.'
-outs.socat_version = 'v2023; https://doi.org/10.25921/r7xa-bt92'
+outs.socat_version = 'v2024; https://doi.org/10.25921/r7xa-bt92'
 outs.reanalysis_data = 'Ford et al. (in prep); Pending DOI'
 outs.coolskin = 'Cool Skin calculated using NOAA COARE 3.5, with ERA5 monthly inputs - to get cool skin deviation, compute tos_skin - tos'
 outs.era5_data_location = 'https://doi.org/10.24381/cds.f17050d7'
@@ -112,62 +101,62 @@ var = outs.createVariable('sfco2','f4',('time','lat','lon'))
 var[:] = lon_switch(np.transpose(fco2_sw,(2,1,0)))
 var.Long_name = 'Surface ocean fCO2'
 var.description = 'Surface ocean fCO2 at the subskin temperature; fCO2(sw,subskin)'
-var.subskin_temp_dataset = 'Subskin temperature dataset used = SST-CCI v2.1 (https://doi.org/10.24381/cds.cf608234)'
+var.subskin_temp_dataset = 'Subskin temperature dataset used = SST-CCI v3.0 (https://dx.doi.org/10.5285/4a9654136a7148e39b7feb56f8bb02d2)'
 var.Units = 'uatm; micro atmospheres'
 
-ou = load_flux_var(fluxloc,'pgas_air',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
+ou = fl.load_flux_var(fluxloc,'pgas_air',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
 ou[ou == -999] = np.nan
 print(ou.shape)
 var = outs.createVariable('fco2atm','f4',('time','lat','lon'))
-var[:] = lon_switch(np.flip(np.transpose(ou,(2,0,1)),axis=1))
+var[:] = lon_switch(np.transpose(ou,(2,0,1)))
 var.Long_name = 'Atmospheric fCO2'
 var.Units = 'uatm; microatmospheres'
 var.description = 'Atmospheric fCO2 evaluated at the skin temperature; tos_skin'
 
-ou = load_flux_var(fluxloc,'OK3',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
+ou = fl.load_flux_var(fluxloc,'OK3',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
 ou[ou == -999] = np.nan
 var = outs.createVariable('kw','f4',('time','lat','lon'))
-var[:] = lon_switch(np.flip(np.transpose(ou,(2,0,1)),axis=1))
+var[:] = lon_switch(np.transpose(ou,(2,0,1)))
 var.Long_name = 'Gas Transfer Velocity'
 var.Units = 'cm hr-1'
-var.description = 'Gas transfer velocity estimated from CCMPv3.0 wind speed and Nightingale et al. 2000 gas transfer parameterisation'
+var.description = 'Gas transfer velocity estimated from CCMPv3.1 wind speed and Nightingale et al. 2000 gas transfer parameterisation'
 
-ou = load_flux_var(fluxloc,'FT1_Kelvin_mean',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
+ou = fl.load_flux_var(fluxloc,'FT1_Kelvin_mean',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
 ou[ou == -999] = np.nan
 var = outs.createVariable('tos','f4',('time','lat','lon'))
-var[:] = lon_switch(np.flip(np.transpose(ou,(2,0,1)),axis=1) - 273.15) #Kelvin to degC
+var[:] = lon_switch(np.transpose(ou,(2,0,1)) - 273.15) #Kelvin to degC
 var.Long_name = 'Surface ocean temperature'
 var.Units = 'degC'
 var.description = 'Surface ocean subskin temperature'
 
-ou = load_flux_var(fluxloc,'ST1_Kelvin_mean',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
+ou = fl.load_flux_var(fluxloc,'ST1_Kelvin_mean',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
 ou[ou == -999] = np.nan
 var = outs.createVariable('tos_skin','f4',('time','lat','lon'))
-var[:] = lon_switch(np.flip(np.transpose(ou,(2,0,1)),axis=1) - 273.15) #Kelvin to degC
+var[:] = lon_switch(np.transpose(ou,(2,0,1)) - 273.15) #Kelvin to degC
 var.Long_name = 'Surface ocean skin temperature'
 var.Units = 'degC'
 var.description = 'Surface ocean skin temperature'
 
-ou = load_flux_var(fluxloc,'fnd_solubility',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
+ou = fl.load_flux_var(fluxloc,'fnd_solubility',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
 ou[ou == -999] = np.nan
 var = outs.createVariable('alpha','f4',('time','lat','lon'))
-var[:] = lon_switch(np.flip(np.transpose(ou,(2,0,1)),axis=1)/1000) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
+var[:] = lon_switch(np.transpose(ou,(2,0,1))/1000) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
 var.Long_name = 'Solubilty of CO2 in seawater'
 var.Units = 'mol m-3 uatm-1'
 var.description = 'Solubility of CO2 in seawater evaluated at the subskin; tos temperature'
 
-ou = load_flux_var(fluxloc,'skin_solubility',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
+ou = fl.load_flux_var(fluxloc,'skin_solubility',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
 ou[ou == -999] = np.nan
 var = outs.createVariable('alpha_skin','f4',('time','lat','lon'))
-var[:] = lon_switch(np.flip(np.transpose(ou,(2,0,1)),axis=1)/1000) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
+var[:] = lon_switch(np.transpose(ou,(2,0,1))/1000) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
 var.Long_name = 'Skin solubilty of CO2 in seawater'
 var.Units = 'mol m-3 uatm-1'
 var.description = 'Solubility of CO2 in seawater evaluated at the skin temperature (tos_skin) and a salty skin (+0.1 psu to subskin salinity)'
 
-ou = load_flux_var(fluxloc,'P1',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
+ou = fl.load_flux_var(fluxloc,'P1',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
 ou[ou == -999] = np.nan
 var = outs.createVariable('fice','f4',('time','lat','lon'))
-var[:] = lon_switch(np.flip(np.transpose(ou,(2,0,1)),axis=1)) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
+var[:] = lon_switch(np.transpose(ou,(2,0,1))) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
 var.Long_name = 'Fraction of sea ice cover'
 var.Units = ''
 var.description = 'Percentage of sea ice cover corresponding to the tos dataset'
@@ -175,27 +164,27 @@ var.description = 'Percentage of sea ice cover corresponding to the tos dataset'
 #############
 #############
 #############
-ou = load_flux_var(fluxloc,'OF',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
-ou[ou == -999] = np.nan
+# ou = load_flux_var(fluxloc,'OF',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
+# ou[ou == -999] = np.nan
 var = outs.createVariable('fgco2','f4',('time','lat','lon'))
-flux = lon_switch(np.flip(np.transpose(ou,(2,0,1)),axis=1) / (12.011) / (24*3600) * -1) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
+flux = lon_switch(np.transpose(flux,(2,1,0)) / (12.011) / (24*3600) * -1) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
 var[:] = flux
 var.Long_name = 'Air-sea CO2 flux'
 var.Units = 'mol m-2 s-1; +ve into ocean'
 var.description = 'Air-sea CO2 flux evaluated with respect to vertical temperature gradients using Nightingale et al. 2000 gas transfer parameterisation'
 var.Note = 'Positive flux indicates flux into the ocean!'
 
-c = Dataset('C:/Users/df391/OneDrive - University of Exeter/Post_Doc_ESA_Contract/Python/custom_flux_av/data/onedeg_land.nc')
-land = np.array(c['land_proportion'])
+c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'))
+land = np.array(c['ocean_proportion'])
 c.close()
 var = outs.createVariable('mask_sfc','f4',('lat','lon'))
-land_mask = lon_switch_2d(np.flipud(np.transpose(np.abs(np.squeeze(land)-1),(0,1))))
+land_mask = lon_switch_2d(np.transpose(land,(1,0)))
 var[:] = land_mask
 var.Long_name = 'Fractional coverage of ocean in each grid tile'
 var.Units = ''
-var.description = 'This is the land proportion mask supplied with FluxEngine v4. Converted from land proportion to ocean proportion as: abs(land - 1)'
+var.description = 'This is the ocean proportion mask calculated from GEBCO2023 data. '
 
-area = du.area_grid(lat=1,lon=1) * 1e6
+area = du.area_grid(lat=lat,lon=lon,res=1) * 1e6
 var = outs.createVariable('area','f4',('lat','lon'))
 var[:] = lon_switch_2d(area)
 var.Long_name = 'Total surface area of each grid cell'

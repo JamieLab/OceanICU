@@ -125,6 +125,7 @@ def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023,time_cor 
             du.netcdf_create_basic(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc'),sst_o,'analysed_sst',lat,lon)
             du.netcdf_append_basic(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc'),ice_o,'sea_ice_fraction')
             du.netcdf_append_basic(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc'),unc_o,'analysed_sst_uncertainty')
+
         mon = mon+1
         if mon == 13:
             mon = 1
@@ -161,7 +162,7 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
             c = Dataset(file,'r')
             sst = np.array(c.variables['analysed_sst'][:]); sst[sst<0] = np.nan
             ice = np.array(c.variables['sea_ice_fraction'][:])
-            unc = np.array(c.variables['analysed_sst_uncertainty'][:])
+            unc = np.array(c.variables['analysed_sst_uncertainty'][:])*2 # We want 2 sigma/95% confidence uncertainties
             c.close()
             #print(sst.shape)
             sst_o = du.grid_average(sst,lo_grid,la_grid)
@@ -170,7 +171,9 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
             du.netcdf_create_basic(file_o,sst_o,'analysed_sst',lag,log,flip=flip,units='Kelvin')
             du.netcdf_append_basic(file_o,ice_o,'sea_ice_fraction',flip=flip)
             du.netcdf_append_basic(file_o,unc_o,'analysed_sst_uncertainty',flip=flip,units = 'Kelvin')
-
+            c = Dataset(file_o,'a')
+            c.variables['analysed_sst_uncertainty'].uncertainty = 'These uncertainties are 2 sigma (95% confidence) equivalents!'
+            c.close()
         mon = mon+1
         if mon == 13:
             ye = ye+1

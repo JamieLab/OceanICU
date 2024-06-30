@@ -38,8 +38,11 @@ def interpolate_noaa(file,lat=1,lon=1,grid_lat=[],grid_lon=[],grid_time=[],out_d
 
     if len(grid_time) == 0:
         print('Generating regular monthly time grid....')
-        date_ti,grid_time = generate_monthly_time(int(start_yr),int(np.floor(noaa_time[-1])))
-        print(grid_time)
+        if start_yr <=int(np.floor(noaa_time[0])):
+            date_ti,grid_time = generate_monthly_time(int(np.floor(noaa_time[0])),int(np.floor(noaa_time[-1])))
+        else:
+            date_ti,grid_time = generate_monthly_time(int(start_yr),int(np.floor(noaa_time[-1])))
+        #print(grid_time)
 
     grid_lat_vec = grid_lat
     print('Interpolating values...')
@@ -54,13 +57,34 @@ def interpolate_noaa(file,lat=1,lon=1,grid_lat=[],grid_lon=[],grid_time=[],out_d
         if du.checkfileexist(file_o) == 0:
             du.netcdf_create_basic(file_o,out,'xCO2',grid_lat_vec,grid_lon)
     if (end_yr != []):
-        print('Extending data beyond NOAA ERSL end year! End year = ' + date_ti[-1].strftime('%Y'))
-        yr = int(date_ti[-1].strftime('%Y')) + 1
+        # print(date_ti[-1].year)
+        # print(end_yr)
+        if (end_yr > date_ti[-1].year):
+            print('Extending data beyond NOAA ERSL end year! End year = ' + date_ti[-1].strftime('%Y'))
+            yr = int(date_ti[-1].strftime('%Y')) + 1
+            mon = 1
+            while yr <= end_yr:
+                temp_date = datetime.datetime(yr-1,mon,1)
+                c = Dataset(os.path.join(out_dir,temp_date.strftime('%Y'), temp_date.strftime('%Y_%m_NOAA_ERSL_xCO2.nc')))
+                xdata = np.array(c.variables['xCO2']) + 2.4 # Growth rate of atmospheric CO2 for recent years from https://gml.noaa.gov/ccgg/trends/gr.html
+                c.close()
+                temp_date = datetime.datetime(yr,mon,1)
+                du.makefolder(os.path.join(out_dir,temp_date.strftime('%Y')))
+                file_o = os.path.join(out_dir,temp_date.strftime('%Y'),temp_date.strftime('%Y_%m_NOAA_ERSL_xCO2.nc'))
+                du.netcdf_create_basic(file_o,xdata,'xCO2',grid_lat_vec,grid_lon)
+                mon = mon+1
+                if mon == 13:
+                    yr = yr+1
+                    mon=1
+
+    if (start_yr<int(np.floor(noaa_time[0]))):
+        print('Extending data back from NOAA ERSL start year! Start year = ' + date_ti[0].strftime('%Y'))
+        yr = int(date_ti[0].strftime('%Y')) - 1
         mon = 1
-        while yr <= end_yr:
-            temp_date = datetime.datetime(yr-1,mon,1)
+        while yr >= start_yr:
+            temp_date = datetime.datetime(yr+1,mon,1)
             c = Dataset(os.path.join(out_dir,temp_date.strftime('%Y'), temp_date.strftime('%Y_%m_NOAA_ERSL_xCO2.nc')))
-            xdata = np.array(c.variables['xCO2']) + 2.4 # Growth rate of atmospheric CO2 for recent years from https://gml.noaa.gov/ccgg/trends/gr.html
+            xdata = np.array(c.variables['xCO2']) - 0.9 # Growth rate of atmospheric CO2 for early years from https://gml.noaa.gov/ccgg/trends/gr.html
             c.close()
             temp_date = datetime.datetime(yr,mon,1)
             du.makefolder(os.path.join(out_dir,temp_date.strftime('%Y')))
@@ -68,7 +92,7 @@ def interpolate_noaa(file,lat=1,lon=1,grid_lat=[],grid_lon=[],grid_time=[],out_d
             du.netcdf_create_basic(file_o,xdata,'xCO2',grid_lat_vec,grid_lon)
             mon = mon+1
             if mon == 13:
-                yr = yr+1
+                yr = yr-1
                 mon=1
 
 

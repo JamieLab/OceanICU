@@ -110,7 +110,7 @@ def solubility_wannink2014(sst,sal):
     sol = np.exp(sol)
     return sol
 
-def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1,sst_unc = 0.27,wind_unc=0.901,sal_unc =0.1,ens=100,unc_input_file=None,single_run = False):
+def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1,sst_unc = 0.3,wind_unc=1.8,sal_unc =0.2,ens=100,unc_input_file=None,single_run = False):
     """
     Function to calculate the time and space varying air-sea CO2 flux uncertainties
     """
@@ -598,26 +598,30 @@ def flux_split(flux,flux_unc,f,g):
 
     return np.array(out),np.array(out_unc)
 
-def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False):
+def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,bath_file=False,flux_file=False,save_file=False):
     """
     OceanICU version of the fluxengine budgets tool that allows for the uncertainities to be propagated...
     """
-    flux_unc_components = ['fco2sw','k','wind','schmidt','ph2o','xco2atm','solsubskin_unc','solskin_unc','fco2atm','fco2sw_net','fco2sw_para','fco2sw_val']
+    #flux_unc_components = ['fco2sw','k','wind','schmidt','ph2o','xco2atm','solsubskin_unc','solskin_unc','fco2atm','fco2sw_net','fco2sw_para','fco2sw_val']
     import matplotlib.transforms
     font = {'weight' : 'normal',
             'size'   : 19}
     matplotlib.rc('font', **font)
     res = np.abs(lon[0]-lon[1])
-    #lon,lat = du.reg_grid()
-    area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
 
-    c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
+    area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
+    if bath_file:
+        c = Dataset(bath_file,'r')
+    else:
+        c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
     land = np.transpose(np.squeeze(np.array(c.variables['ocean_proportion'])))
     if bath_cutoff:
         elev=  np.transpose(np.squeeze(np.array(c.variables['elevation'])))
     c.close()
-
-    c = Dataset(model_save_loc+'/output.nc','r')
+    if flux_file:
+        c = Dataset(flux_file,'r')
+    else:
+        c = Dataset(model_save_loc+'/output.nc','r')
     flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
     print(flux.shape)
     # flux_unc = np.transpose(np.array(c.variables['flux_unc']),(1,0,2))
@@ -674,10 +678,14 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False)
     # for i in range(0,1):
     #     ax[i].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
 
-    mol_c = (np.array(out) * 10**15) / np.array(are) / 12
+    mol_c = (np.array(out) * 10**15) / np.array(are) / 12.011
     head = 'Year, Net air-sea CO2 flux (Pg C yr-1),Upward air-sea CO2 flux (Pg C yr-1),Downward air-sea CO2 flux (Pg C yr-1),Area of net air-sea CO2 flux (m-2),Mean air-sea CO2 flux rate (mol C m-2 yr-1)'
     out_f = np.transpose(np.stack((np.array(year),np.array(out),np.array(up),np.array(down),np.array(are),np.array(mol_c))))
-    np.savetxt(os.path.join(model_save_loc,'annual_flux.csv'),out_f,delimiter=',',fmt='%.5f',header=head)
+    if save_file:
+        file = save_file
+    else:
+        file = os.path.join(model_save_loc,'annual_flux.csv')
+    np.savetxt(file,out_f,delimiter=',',fmt='%.5f',header=head)
     # fig.savefig(os.path.join(model_save_loc,'plots','global_flux_unc.png'))
     #return flux,flux_u
 
@@ -1032,7 +1040,7 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
             decor_loaded = np.loadtxt(decor,delimiter=',') # And then if a actual path is specified the first call will fail and then load it from the absolute path supplied
         decors[:,0] = decor_loaded[:,1] # Median decorrelation length loaded
 
-        decors[:,1] = decor_loaded[:,2]/2 # IQR needs to be divided by two to get a +- range
+        decors[:,1] = decor_loaded[:,2] # IQR is left as is - we want 2 sigma equivalent, so I'd divide by 2 to get the IQR as a +-, then times by 2 to get 2 sigma equivalent.
 
         # If we have nans then the decorrelation length analysis failed for this year (likely due to no data) so we set the decorrelation length to the maximum of all
         # avaiable years
@@ -1068,7 +1076,7 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
             if t_c ==1: # This works out the decorrelation length for this run (so a random value within the uncertainties of the decorrlation in km)
                 pad = -1 # Set pad to -1 (so if this is less than 1 degree run again)
                 while (pad < 1):# | (pad>70):
-                    ran = np.random.normal(0,0.33,1) # Select a single random value that will be between -1, 1 at the 99.9% confidence.
+                    ran = np.random.normal(0,0.5,1) # Select a single random value that will be between -1, 1.
                     de_len = (decors[t,0] + (decors[t,1]*ran)) # Calculate the randome decorrelation for this run (so median + perturbation)
                     pad = (de_len / 110.574)*2 # We need the tie point in the next step to be 2 times the decorrelation length apart, so we convert out decorrelation lenght to km (where latitude km -> deg is fixedish)
                 lat_s = np.linspace(lat[0],lat[-1],int((lat[-1]-lat[0])/pad)) # Setup the tie point grid for the latitudes in degrees (so this gives out latitude tie points at spacings 2 times decorrelation length)
@@ -1091,9 +1099,9 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
                 lat_ss.append(lat[0]); lat_ss.append(lat[0]);lat_ss.append(lat[-1]);lat_ss.append(lat[-1]);
                 lon_ss.append(lon[0]); lon_ss.append(lon[-1]); lon_ss.append(lon[0]); lon_ss.append(lon[-1]);
 
-            unc_o = np.random.normal(0,1,(len(lon_ss))) # Here we select a random peturbation value for each of our tie points (lat_ss, lon_ss)
+            unc_o = np.random.normal(0,0.5,(len(lon_ss))) # Here we select a random peturbation value for each of our tie points (lat_ss, lon_ss)
             #So here we set the 4 corners of the grid to the same perturbation value (im not quite sure why, but likely to do with having a single perturbation region at the poles.)
-            v = np.random.normal(0,1)
+            v = np.random.normal(0,0.5)
             unc_o[-3:] = v
 
             #So we stack our tie points together into a list (tie_point_number by 2 columns)
@@ -1267,19 +1275,19 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
 
         data1 = np.array(c.variables[input_array[0]][:])
         data1[data1<=0.0] = np.nan
-        data1[data1>=10000] = np.nan
+        data1[data1>=100000000] = np.nan
         c.close()
         c = Dataset(input_datafile[1],'r')
         data2 = np.array(c.variables[input_array[1]][:])
         data2[data2<=0.0] = np.nan
-        data2[data2>=10000] = np.nan
+        data2[data2>=100000000] = np.nan
         c.close()
 
     else:
         c = Dataset(input_datafile,'r')
         data = np.array(c.variables[input_array][:])
         data[data<=0.0] = np.nan
-        data[data>=10000] = np.nan
+        data[data>=10000000000] = np.nan
         time = np.array(c.variables['time'])
         lon = np.array(c.variables['longitude'])
         lat = np.array(c.variables['latitude'])

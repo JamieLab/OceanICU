@@ -2,11 +2,11 @@
 """
 """
 import data_utils as du
-start_yr = 1980
+start_yr = 1970
 end_yr = 2024
 
 noaa = False
-era5 = False
+era5 = True
 cmems = False
 cmems_daily=False
 bicep = False
@@ -14,7 +14,7 @@ ccmp = False
 oisst = False
 cci = False
 gebco = False
-osisaf = True
+osisaf = False
 lon,lat = du.reg_grid()
 if gebco:
     import gebco_resample as ge
@@ -29,7 +29,7 @@ if era5:
     import ERA5_data_download as er
     #Download script for downloading monthly ERA5 air pressure and wind speed.
     # from the Copernicus Climate Data Store (CCDS)
-    er.download_era5("D:/Data/ERA5/MONTHLY/DATA",start_yr=2023,end_yr=end_yr)
+    er.download_era5("D:/Data/ERA5/MONTHLY/DATA",start_yr=start_yr,end_yr=end_yr)
     #Averaging from 0.25 to 1 deg
     #mean sea level pressure
     # er.era5_average("D:/Data/ERA5/MONTHLY/DATA","D:/Data/ERA5/MONTHLY/1DEG",start_yr=start_yr,end_yr=end_yr,res=1,var='msl')

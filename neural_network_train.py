@@ -46,7 +46,10 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     print('Creating output directory tree...')
     make_save_tree(model_save_loc)
     print('Neural_Network_Start...')
-    vars = [fco2_sst+'_reanalysed_fCO2_sw',fco2_sst+'_reanalysed_fCO2_sw_std',fco2_sst+'_reanalysed_sst']
+
+    vars = [fco2_sst+'_reanalysed_fCO2_sw',fco2_sst+'_reanalysed_fCO2_sw_std']
+    if socat_sst:
+        vars.append(fco2_sst+'_reanalysed_sst')
     vars.append(prov)
     if not bath_cutoff == None:
         vars.append(bath)
@@ -790,7 +793,9 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     # Produce the scatter validation text and put onto the plot (both weighted and unweighted versions)
     h2 = unweight(tot_s[:,0],tot_n[:,0],ax[0],c_plot,unit=unit)
     h1 = weighted(tot_s[:,0],tot_n[:,0],1/np.sqrt(tot_s[:,1]**2 + tot_n[:,1]**2),ax[0],c_plot,unit=unit)
-
+    stats_temp = ws.weighted_stats(tot_s[:,0],tot_n[:,0],1/np.sqrt(tot_s[:,1]**2 + tot_n[:,1]**2),'b')
+    ax[0].fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6)
+    ax[0].fill_between(c_plot,c_plot-(stats_temp['rmsd']*2),c_plot+(stats_temp['rmsd']*2),color='k',alpha=0.4)
     # Start independent test plotting
     # Here we have an additional step to do per province test dataset plots so we have the validation uncertainty for the mapping.
     t=0 # Counter so we can properly concatenate the arrays from each province (i.e we load each provinces validation index then we can append the values to the array correctly)
@@ -818,6 +823,9 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
             weighted(soc[ind_test],fco2[ind_test],1/np.sqrt(soc_s[ind_test]**2 + fco2_unc[ind_test]**2),axs[tp],c_plot,unit=unit)
             axs[tp].set_title(f'Province {v}')
             axs[tp].set_xlim(c_plot); axs[tp].set_ylim(c_plot); axs[tp].plot(c_plot,c_plot,'k-');
+            stats_temp = ws.weighted_stats(soc[ind_test],fco2[ind_test],1/np.sqrt(soc_s[ind_test]**2 + fco2_unc[ind_test]**2),'b')
+            axs[tp].fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6,zorder=-1)
+            axs[tp].fill_between(c_plot,c_plot-(stats_temp['rmsd']*2),c_plot+(stats_temp['rmsd']*2),color='k',alpha=0.4,zorder=-2)
             axs[tp].set_xlabel('in situ '+parameter+' ('+ unit+')')
             axs[tp].set_ylabel('Neural Network '+parameter+' ('+unit+')')
             tp = tp+1
@@ -841,17 +849,24 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     ax[1].scatter(tot_ts[:,0],tot_tn[:,0],s=2)
     h2 = unweight(tot_ts[:,0],tot_tn[:,0],ax[1],c_plot,unit=unit)
     h1 = weighted(tot_ts[:,0],tot_tn[:,0],1/np.sqrt(tot_ts[:,1]**2 + tot_tn[:,1]**2),ax[1],c_plot,unit=unit)
-
+    stats_temp = ws.weighted_stats(tot_ts[:,0],tot_tn[:,0],1/np.sqrt(tot_ts[:,1]**2 + tot_tn[:,1]**2),'b')
+    ax[1].fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6)
+    ax[1].fill_between(c_plot,c_plot-(stats_temp['rmsd']*2),c_plot+(stats_temp['rmsd']*2),color='k',alpha=0.4)
     # Merged all the data together and produce a final validation plot
     ts = np.concatenate((tot_ts,tot_s))
     tn = np.concatenate((tot_tn,tot_n))
     ax[2].scatter(ts[:,0],tn[:,0],s=2)
     h2 = unweight(ts[:,0],tn[:,0],ax[2],c,unit=unit)
     h1 = weighted(ts[:,0],tn[:,0],1/np.sqrt(ts[:,1]**2 + tn[:,1]**2),ax[2],c_plot,unit=unit)
+    stats_temp = ws.weighted_stats(ts[:,0],tn[:,0],1/np.sqrt(ts[:,1]**2 + tn[:,1]**2),'b')
+    ax[2].fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6)
+    ax[2].fill_between(c_plot,c_plot-(stats_temp['rmsd']*2),c_plot+(stats_temp['rmsd']*2),color='k',alpha=0.4)
 
     # Produce a scatter plot with the errorbars as well...
     ax[3].scatter(ts[:,0],tn[:,0],s=2,c='r',zorder = 3)
     ax[3].errorbar(ts[:,0],tn[:,0],xerr=ts[:,1],yerr=tn[:,1],linestyle='none')
+    ax[3].fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6,zorder=5)
+    ax[3].fill_between(c_plot,c_plot-(stats_temp['rmsd']*2),c_plot+(stats_temp['rmsd']*2),color='k',alpha=0.4,zorder=4)
 
     # Plot tidying up and adding axis labels and plot titles
     let = ['a','b','c','d','e','f','g','h']
@@ -889,9 +904,9 @@ def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugac
     if len(val.shape)>1:# So if we have a single province this should be 1, otherwise it should be 2 (i.e 2 dimensions)
         for v in range(0,val.shape[0]):# Iterate through the provinces and add the validation to the province areas
             print(v)
-            val_unc[prov == val[v,0]] = val[v,1] # For each province we put the validaiton RMSD as the value...
+            val_unc[prov == val[v,0]] = val[v,1]*2 # For each province we put the validaiton RMSD as the value...
     else: #Single province must be handled differently
-        val_unc[prov == val[0]] = val[1] # val[0] is the province number, and val[1] is the RMSD
+        val_unc[prov == val[0]] = val[1]*2 # val[0] is the province number, and val[1] is the RMSD
     val_unc = np.reshape(val_unc,s)
 
     # Need to add a check if the fCO2_val_unc variable has been created already - if it has we just overwrite with the new data...

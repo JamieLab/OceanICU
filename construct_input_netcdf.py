@@ -317,6 +317,14 @@ def manual_prov(model_save_loc,lat_g,lon_g,prov_var,fill=np.nan):
     c.variables[prov_var][:] = prov
     c.close()
 
+def convert_prov(model_save_loc,prov_var,prov_num_replace,prov_num_replaced):
+    c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'a')
+    prov = np.array(c.variables[prov_var][:])
+    f = np.where(prov == prov_num_replace)
+    prov[f] = prov_num_replaced
+    c.variables[prov_var][:] = prov
+    c.close()
+
 def fill_with_var(model_save_loc,var_o,var_f,log,lag,mod = None):
     c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'a')
     var_o_d = np.array(c.variables[var_o][:])

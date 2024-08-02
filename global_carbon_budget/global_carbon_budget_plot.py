@@ -18,7 +18,7 @@ font = {'weight' : 'normal',
 matplotlib.rc('font', **font)
 matplotlib.rcParams['text.usetex'] = True
 
-model_save_loc = 'D:/OceanCarbon4Climate/NN/GCB2024_full_version'
+model_save_loc = 'D:/OceanCarbon4Climate/NN\GCB2024_full_version_biascorrected'
 gcb_file = model_save_loc+'/GCB_output.nc'
 
 c = Dataset(gcb_file,'r')

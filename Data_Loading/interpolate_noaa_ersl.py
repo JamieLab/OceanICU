@@ -24,14 +24,17 @@ def interpolate_noaa(file,lat=1,lon=1,grid_lat=[],grid_lon=[],grid_time=[],out_d
     print('Generating sine latitudes for NOAA/ERSL...')
     noaa_grid = sinelat()
     print('Loading NOAA_file: ' +file)
-    data = load_noaa_file(file)
-    noaa_time = np.ascontiguousarray(data[:,0])
-    data = data[:,1:-1:2]
+    data2 = load_noaa_file(file)
+    noaa_time = np.ascontiguousarray(data2[:,0])
+    data = data2[:,1:-1:2]
+    data_unc = data2[:,2::2]
+    print(data_unc)
 
     # plt.pcolor(noaa_grid,noaa_time,data)
     # plt.show()
     print('Setting up interpolation variable...')
     interp = RegularGridInterpolator((noaa_time,noaa_grid),data)
+    interp_unc = RegularGridInterpolator((noaa_time,noaa_grid),data_unc)
     if (len(grid_lon) == 0) & (len(grid_lat) == 0):
         print('Generating regular lat/lon grid at '+str(lat)+' deg...')
         grid_lon,grid_lat = reg_grid(lat=lat,lon=lon)
@@ -48,14 +51,17 @@ def interpolate_noaa(file,lat=1,lon=1,grid_lat=[],grid_lon=[],grid_time=[],out_d
     print('Interpolating values...')
     grid_time,grid_lat = np.meshgrid(grid_time,grid_lat)
     interp_vals = interp((grid_time,grid_lat))
+    interp_vals_unc = interp_unc((grid_time,grid_lat))
     #print(interp_vals.shape)
     for i in range(0,interp_vals.shape[1]):
         du.makefolder(os.path.join(out_dir,date_ti[i].strftime('%Y')))
         out = np.matlib.repmat(interp_vals[:,i],len(grid_lon),1)
+        out_unc = np.matlib.repmat(interp_vals_unc[:,i],len(grid_lon),1)
         #print(out.shape)
         file_o = os.path.join(out_dir,date_ti[i].strftime('%Y'),date_ti[i].strftime('%Y_%m_NOAA_ERSL_xCO2.nc'))
         if du.checkfileexist(file_o) == 0:
             du.netcdf_create_basic(file_o,out,'xCO2',grid_lat_vec,grid_lon)
+            du.netcdf_append_basic(file_o,out_unc,'xCO2_unc')
     if (end_yr != []):
         # print(date_ti[-1].year)
         # print(end_yr)
@@ -67,11 +73,13 @@ def interpolate_noaa(file,lat=1,lon=1,grid_lat=[],grid_lon=[],grid_time=[],out_d
                 temp_date = datetime.datetime(yr-1,mon,1)
                 c = Dataset(os.path.join(out_dir,temp_date.strftime('%Y'), temp_date.strftime('%Y_%m_NOAA_ERSL_xCO2.nc')))
                 xdata = np.array(c.variables['xCO2']) + 2.4 # Growth rate of atmospheric CO2 for recent years from https://gml.noaa.gov/ccgg/trends/gr.html
+                uncdata = np.array(c.variables['xCO2_unc'])
                 c.close()
                 temp_date = datetime.datetime(yr,mon,1)
                 du.makefolder(os.path.join(out_dir,temp_date.strftime('%Y')))
                 file_o = os.path.join(out_dir,temp_date.strftime('%Y'),temp_date.strftime('%Y_%m_NOAA_ERSL_xCO2.nc'))
                 du.netcdf_create_basic(file_o,xdata,'xCO2',grid_lat_vec,grid_lon)
+                du.netcdf_append_basic(file_o,uncdata,'xCO2_unc')
                 mon = mon+1
                 if mon == 13:
                     yr = yr+1

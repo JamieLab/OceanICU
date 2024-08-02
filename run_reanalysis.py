@@ -68,11 +68,13 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
         #Extracting the non-reanalysed SOCAT data...
         fco2 = np.array(c.variables['fco2_ave_weighted'])
         fco2_std = np.array(c.variables['fco2_std_weighted'])
+        fco2_nobs = np.array(c.variables['count_nobs_reanalysed'])
         sst = np.array(c.variables['sst_ave_weighted'])
     else:
         #Extracting the reanalysed fCO2 data
         fco2 = np.array(c.variables['fco2_reanalysed_ave_weighted'])
         fco2_std = np.array(c.variables['fco2_reanalysed_std_weighted'])
+        fco2_nobs = np.array(c.variables['count_nobs_reanalysed'])
         sst = np.array(c.variables['sst_reynolds'])
     #Toggle to allow the function to output the SST paired to the observations as degC or K
     if kelvin:
@@ -87,6 +89,7 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
     # (lon,lat,time) dimensions
     fco2 = np.transpose(fco2[f[0],:,:],(2,1,0))
     fco2_std = np.transpose(fco2_std[f[0],:,:],(2,1,0))
+    fco2_nobs = np.transpose(fco2_nobs[f[0],:,:],(2,1,0))
     sst = np.transpose(sst[f[0],:,:],(2,1,0))
 
     if time[-1] != end_yr:
@@ -99,6 +102,7 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
         #Add the additional padding fields on the time axis :-)
         fco2 = np.concatenate((fco2,add_field),axis=2)
         fco2_std = np.concatenate((fco2_std,add_field),axis=2)
+        fco2_nobs = np.concatenate((fco2_nobs,add_field),axis=2)
         sst = np.concatenate((sst,add_field),axis=2)
 
     # Remove data that is either fill or isn't representative (i.e fCO2sw of 0 isn't really possible)
@@ -112,9 +116,9 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
         sst[sst<-2.5] = np.nan
     #print(fco2.shape)
     # Append to data to the output file.
-    append_to_file(output_file,fco2,fco2_std,sst,name,input_file,not_reanalysed=socat_notreanalysed)
+    append_to_file(output_file,fco2,fco2_std,sst,fco2_nobs,name,input_file,not_reanalysed=socat_notreanalysed)
 
-def append_to_file(output_file,fco2,fco2_std,sst,name,socat_files,not_reanalysed = False):
+def append_to_file(output_file,fco2,fco2_std,sst,obs,name,socat_files,not_reanalysed = False):
     """
     Function to append the reanalysed fCO2 to the neural network input file
 
@@ -154,6 +158,13 @@ def append_to_file(output_file,fco2,fco2_std,sst,name,socat_files,not_reanalysed
         var_o.comment = 'SST data that is coincident to the SOCAT fCO2(sw)'
     else:
         var_o.comment = 'SST data that is coincident to the reanalysed fCO2(sw)'
+
+    var_o = c.createVariable(name+'_reanalysed_count_obs','f4',('longitude','latitude','time'))
+    var_o[:] = obs
+    # var_o.standard_name = 'Reanalysed fCO2(sw, subskin) std using ' + name + ' datset'
+    var_o.sst = name
+    #var_o.units = 'uatm'
+    var_o.created_from = socat_files
     c.close()
 
 def model_fco2_append(input_file,output_file,start_yr=1990, end_yr = 2020,name='',ref_yr = 1970):

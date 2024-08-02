@@ -224,9 +224,11 @@ def lon_switch_2d(var):
 
 def grid_interp(o_lon,o_lat,o_data,n_lon,n_lat,plot=False):
 
+    o_data = o_data.T
     o_lon,o_lat = np.meshgrid(o_lon,o_lat)
 
     n_lon,n_lat = np.meshgrid(n_lon,n_lat)
+
     s = n_lon.shape
     points = np.stack([o_lon.ravel(),o_lat.ravel()],-1)
     out = interp.griddata(points,o_data.ravel(),(n_lon.ravel(),n_lat.ravel()))
@@ -234,7 +236,17 @@ def grid_interp(o_lon,o_lat,o_data,n_lon,n_lat,plot=False):
     if plot:
         import matplotlib.pyplot as plt
         plt.figure()
-        plt.pcolor(n_lon,n_lat,np.transpose(out))
+        plt.pcolor(o_lon); plt.colorbar()
+        plt.figure()
+        plt.pcolor(o_lat); plt.colorbar()
+        plt.figure()
+        plt.pcolor(n_lon)
+        plt.figure()
+        plt.pcolor(n_lat); plt.colorbar()
+        plt.figure()
+        plt.pcolor(o_data);plt.colorbar()
+        plt.figure()
+        plt.pcolor(n_lon,n_lat,out.T)
         plt.show()
     return out
 

@@ -34,7 +34,7 @@ def lon_switch_2d(var):
     temp[:,180:] = var[:,0:180]
     return temp
 
-model_save_loc = 'D:/OceanCarbon4Climate/NN/GCB2024_full_version'
+model_save_loc = 'D:/OceanCarbon4Climate/NN/GCB2024_full_version_biascorrected'
 fluxloc = model_save_loc+'/flux'
 gcb_file = model_save_loc+'/GCB_output.nc'
 lon,lat = du.reg_grid()
@@ -59,6 +59,7 @@ outs.method_citation = 'Watson, A.J., Schuster, U., Shutler, J.D. et al. Revised
 outs.method_citation_updates = 'Preprint: Daniel J Ford, Josh Blannin, Jennifer Watts, et al. A comprehensive analysis of air-sea CO2 flux uncertainties constructed from surface ocean data products. ESS Open Archive . April 01, 2024. https://doi.org/10.22541/essoar.171199280.05732707/v1'
 outs.sst_citation = 'Embury, O., Merchant, C.J., Good, S.A. et al. Satellite-based time-series of sea-surface temperature since 1980 for climate applications. Sci Data 11, 326 (2024). https://doi.org/10.1038/s41597-024-03147-w'
 outs.sst_data_location = 'https://dx.doi.org/10.5285/4a9654136a7148e39b7feb56f8bb02d2'
+outs.sst_bias_corrected = 'CCI-SST data has been bias corrected to surface drifters with a consistent 0.05K increase (as identified by Embury et al. 2024; which follows the recommendations in Dong et al. 2022)'
 outs.sss_citation = 'Jean-Michel, L., Eric, G., Romain, B.-B., Gilles, G., Angélique, M., Marie, D., et al. (2021). The Copernicus Global 1/12° Oceanic and Sea Ice GLORYS12 Reanalysis. Frontiers in Earth Science 9, 585. doi:10.3389/feart.2021.698876. '
 outs.sss_data_location = 'https://doi.org/10.48670/moi-00021'
 outs.wind_citation = 'Mears, C.; Lee, T.; Ricciardulli, L.; Wang, X.; Wentz, F. Improving the Accuracy of the Cross-Calibrated Multi-Platform (CCMP) Ocean Vector Winds. Remote Sens. 2022, 14, 4230. https://doi.org/10.3390/rs14174230'

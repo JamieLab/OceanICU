@@ -172,7 +172,7 @@ def construct_climatology(data,month_track):
             clim[:,:,i] = np.squeeze(data[:,:,f])
     return clim
 
-def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,ref_year = 1970,units=False,long_name=False):
+def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,ref_year = 1970,units=False,long_name=False,comment=False):
     """
     Function to save the final netcdf output for use in the neural network training.
     For each variable in the direct dictionary a netcdf variable is generated - this
@@ -201,6 +201,8 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,re
             var_o.units = units[var]
         if long_name:
             var_o.long_name = long_name[var]
+        if comment:
+            var_o.comment = comment[var]
         var_o.date_variable = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
 
     lat_o = c.createVariable('latitude','f4',('latitude'))
@@ -219,7 +221,7 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,re
         time_o.standard_name = 'Time of observations'
     c.close()
 
-def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False,longname =False):
+def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False,longname =False,comment=False):
     c = Dataset(save_loc,'a',format='NETCDF4_CLASSIC')
     v = c.variables.keys()
     for var in list(direct.keys()):
@@ -240,6 +242,8 @@ def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False,longn
             var_o.units = units[var]
         if longname:
             var_o.long_name = longname[var]
+        if comment:
+            var_o.comment = comment[var]
         var_o.date_variable = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
     c.close()
 
@@ -438,12 +442,17 @@ def copy_netcdf_vars(file,vars,outfile):
     direct = {}
     units = {}
     longname={}
+    comment = {}
     for v in vars:
         direct[v] = np.array(c[v])
         units[v] = c[v].units
         longname[v] = c[v].long_name
+        try:
+            comment[v] = c[v].comment
+        except:
+            comment[v] = ''
     c.close()
-    append_netcdf(outfile,direct,1,1,1,units=units,longname=longname)
+    append_netcdf(outfile,direct,1,1,1,units=units,longname=longname,comment=comment)
 
 def netcdf_var_bias(file,var,bias, nvar=0):
     c = Dataset(file,'r')

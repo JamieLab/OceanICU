@@ -96,13 +96,19 @@ def fluxengine_individual_netcdf(model_save_loc,direct,lon,lat,start_yr = 1990,e
             yr = yr+1
             mon = 1
 
-def fluxengine_run(model_save_loc,config_file = None,start_yr = 1990, end_yr = 2020):
+def fluxengine_run(model_save_loc,config_file = None,start_yr = 1990, end_yr = 2020,output_ov = False):
     """
     Function to run fluxengine for a particular neural network.
     """
     return_path = os.getcwd()
     os.chdir(model_save_loc)
-    returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True)
+
+    if output_ov:
+        out_dir = os.path.join(model_save_loc,output_ov)
+        du.makefolder(out_dir)
+        returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True,outputDirOverride=out_dir)
+    else:
+        returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True)
     os.chdir(return_path)
 
 def solubility_wannink2014(sst,sal):
@@ -110,12 +116,15 @@ def solubility_wannink2014(sst,sal):
     sol = np.exp(sol)
     return sol
 
-def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1,sst_unc = 0.3,wind_unc=1.8,sal_unc =0.2,ens=100,unc_input_file=None,single_run = False):
+def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1,sst_unc = 0.3,wind_unc=1.8,sal_unc =0.2,ens=100,unc_input_file=None,single_run = False,flux_loc = False,override_output=False):
     """
     Function to calculate the time and space varying air-sea CO2 flux uncertainties
     """
     print('Calculating air-sea CO2 flux uncertainty...')
-    fluxloc = model_save_loc+'/flux'
+    if not flux_loc:
+        fluxloc = os.path.join(model_save_loc,'flux')
+    else:
+        fluxloc = os.path.join(model_save_loc,flux_loc)
     #k_perunc = 0.2 # k percentage uncertainty
     #atm_unc = 1 # Atmospheric fco2 unc (1 uatm)
 
@@ -126,7 +135,10 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     # So I need k, fCO2 fields, [CO2] fields from the fluxengine output + the fCO2 unc from the output file.
 
     #Start with the fCO2 fields as this will give us the time lengths required for load_flux var.
-    c = Dataset(model_save_loc+'/output.nc','r')
+    c = Dataset(os.path.join(model_save_loc,'output.nc'),'r')
+    lat = np.array(c.variables['latitude'])
+    lon = np.array(c.variables['longitude'])
+    time = np.array(c.variables['time'])
     fco2_sw = np.array(c.variables['fco2'])
     if fco2_tot_unc == -1:
         fco2_tot_unc = np.array(c.variables['fco2_tot_unc'])
@@ -328,7 +340,34 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
         + schmidt_fixed**2 + ph20_fixed**2 + sol_skin_fixed**2 + sol_subskin_fixed**2)
     #Save to the output netcdf
     print('Saving data...')
-    c = Dataset(model_save_loc+'/output.nc','a')
+    if override_output:
+        if du.checkfileexist(os.path.join(model_save_loc,override_output)):
+            c = Dataset(os.path.join(model_save_loc,override_output),'a')
+        else:
+            c = Dataset(os.path.join(model_save_loc,override_output),'w')
+            c.date_file_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+            c.code_by = 'Daniel J. Ford (d.ford@exeter.ac.uk)'
+            c.code_location = 'https://github.com/JamieLab/OceanICU'
+
+            c.createDimension('longitude',lon.shape[0])
+            c.createDimension('latitude',lat.shape[0])
+            c.createDimension('time',time.shape[0])
+            lat_o = c.createVariable('latitude','f4',('latitude'))
+            lat_o[:] = lat
+            lat_o.units = 'Degrees'
+            lat_o.standard_name = 'Latitude'
+            lon_o = c.createVariable('longitude','f4',('longitude'))
+            lon_o.units = 'Degrees'
+            lon_o.standard_name = 'Longitude'
+            lon_o[:] = lon
+            #print(time_track)
+            time_o = c.createVariable('time','f4',('time'))
+            time_o[:] = time
+            time_o.units = f'Days since 1970-01-15'
+            time_o.standard_name = 'Time of observations'
+    else:
+        c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
+
     keys = c.variables.keys()
     if 'flux' in keys:
         c.variables['flux'][:] = flux
@@ -351,6 +390,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc'].long_name = 'Air-sea CO2 flux total uncertainty'
     c.variables['flux_unc'].seaice = 'Sea ice uncertainty not included due to asymmetric nature of this flux uncertainty component'
     c.variables['flux_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
     """
     fCO2(sw) components - Fixed algorithm component and variable wind unc driven component
     """
@@ -364,7 +404,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_fco2sw'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_fco2sw'].long_name = 'Air-sea CO2 flux total fCO2sw uncertainty'
     c.variables['flux_unc_fco2sw'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
-
+    c.variables['flux_unc_fco2sw'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
     if 'flux_unc_fco2sw_net' in keys:
         c.variables['flux_unc_fco2sw_net'][:] = subskin_conc_unc_net
     else:
@@ -374,6 +414,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_fco2sw_net'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_fco2sw_net'].long_name = 'Air-sea CO2 flux fCO2sw network uncertainty'
     c.variables['flux_unc_fco2sw_net'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_fco2sw_net'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
 
     if 'flux_unc_fco2sw_para' in keys:
         c.variables['flux_unc_fco2sw_para'][:] = subskin_conc_unc_para
@@ -384,6 +425,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_fco2sw_para'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_fco2sw_para'].long_name = 'Air-sea CO2 flux fCO2sw parameter uncertainty'
     c.variables['flux_unc_fco2sw_para'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_fco2sw_para'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
 
     if 'flux_unc_fco2sw_val' in keys:
         c.variables['flux_unc_fco2sw_val'][:] = subskin_conc_unc_val
@@ -395,6 +437,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_fco2sw_val'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_fco2sw_val'].long_name = 'Air-sea CO2 flux fCO2sw evaluation uncertainty'
     c.variables['flux_unc_fco2sw_val'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_fco2sw_val'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
 
     """
     K parameterisation components - Fixed algorithm component and variable wind unc driven component
@@ -409,6 +452,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_k'].long_name = 'Air-sea CO2 flux gas transfer algorithm uncertainty'
     c.variables['flux_unc_k'].fixed_value = f'Algorithm uncertainty set at {k_perunc*100}%'
     c.variables['flux_unc_k'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_k'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
 
     if 'flux_unc_wind' in keys:
         c.variables['flux_unc_wind'][:] = wind_unc
@@ -419,6 +463,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_wind'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_wind'].long_name = 'Air-sea CO2 flux gas transfer uncertainty due to wind speed uncertainty'
     c.variables['flux_unc_wind'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_wind'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
     """
     Schmidt number components - Fixed algorithm component and variable SST unc driven component
     """
@@ -432,6 +477,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_schmidt'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_schmidt'].long_name = 'Air-sea CO2 flux Schmidt number uncertainty due to SST uncertainty'
     c.variables['flux_unc_schmidt'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_schmidt'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
 
     if 'flux_unc_schmidt_fixed' in keys:
         c.variables['flux_unc_schmidt_fixed'][:] = schmidt_fixed
@@ -442,6 +488,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_schmidt_fixed'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_schmidt_fixed'].long_name = 'Air-sea CO2 flux Schmidt number uncertainty due to algorithm uncertainty'
     c.variables['flux_unc_schmidt_fixed'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_schmidt_fixed'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
     """
     pH20 components - Fixed component and variable SST/SSS driven component
     """
@@ -455,6 +502,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_ph2o'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_ph2o'].long_name = 'Air-sea CO2 flux pH2O correction uncertainty due to SST uncertainty'
     c.variables['flux_unc_ph2o'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_ph2o'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
 
     if 'flux_unc_ph2o_fixed' in keys:
         c.variables['flux_unc_ph2o_fixed'][:] = ph20_fixed
@@ -466,6 +514,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_ph2o_fixed'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_ph2o_fixed'].long_name = 'Air-sea CO2 flux pH2O correction uncertainty due to algorithm uncertainty'
     c.variables['flux_unc_ph2o_fixed'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_ph2o_fixed'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
     """
     xCO2 component - xCO2atm fixed component
     """
@@ -478,6 +527,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_xco2atm'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_xco2atm'].long_name = 'Air-sea CO2 flux xCO2atm uncertainty'
     c.variables['flux_unc_xco2atm'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_xco2atm'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
     """
     Solubility subskin components
     """
@@ -491,6 +541,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_solsubskin_unc'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_solsubskin_unc'].long_name = 'Air-sea CO2 flux subskin solubility uncertainty due to SST and SSS uncertainties'
     c.variables['flux_unc_solsubskin_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_solsubskin_unc'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
 
     if 'flux_unc_solsubskin_unc_fixed' in keys:
         c.variables['flux_unc_solsubskin_unc_fixed'][:] = sol_subskin_fixed
@@ -502,6 +553,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_solsubskin_unc_fixed'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_solsubskin_unc_fixed'].long_name = 'Air-sea CO2 flux subskin solubility uncertainty due to algorithm uncertaintity'
     c.variables['flux_unc_solsubskin_unc_fixed'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_solsubskin_unc_fixed'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
     """
     Solubility skin components
     """
@@ -515,6 +567,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_solskin_unc'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_solskin_unc'].long_name = 'Air-sea CO2 flux skin solubility uncertainty due to SST and SSS uncertainties'
     c.variables['flux_unc_solskin_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_solskin_unc'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
 
     if 'flux_unc_solskin_unc_fixed' in keys:
         c.variables['flux_unc_solskin_unc_fixed'][:] = sol_skin_fixed
@@ -526,12 +579,8 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['flux_unc_solskin_unc_fixed'].comment = 'Multiple by absolute flux to get uncertainty in g C m-2 d-1'
     c.variables['flux_unc_solskin_unc_fixed'].long_name = 'Air-sea CO2 flux skin solubility uncertainty due to algorithm uncertaintity'
     c.variables['flux_unc_solskin_unc_fixed'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables['flux_unc_solskin_unc_fixed'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
 
-    # if 'flux_unc_fco2atm' in keys:
-    #     c.variables['flux_unc_fco2atm'][:] = np.sqrt(ph20**2 + vco2_atm_unc**2)
-    # else:
-    #     var_o = c.createVariable('flux_unc_fco2atm','f4',('longitude','latitude','time'))
-    #     var_o[:] = np.sqrt(ph20**2 + vco2_atm_unc**2)
     """
     Adding ice to output flux file...
     """
@@ -545,6 +594,52 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.variables['ice'].long_name = 'Proportion of ice cover'
     c.variables['ice'].comment = 'See the OceanICU framework config file for the ice dataset used in these calculations'
     c.variables['ice'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+
+    #Adding the temperature and salinty for the skin and subskin.
+
+    if 'subskin_temp' in keys:
+        c.variables['subskin_temp'][:] = sst_subskin
+    else:
+        var_o = c.createVariable('subskin_temp','f4',('longitude','latitude','time'))
+        var_o[:] = sst_subskin
+
+    c.variables['subskin_temp'].units = 'Kelvin'
+    c.variables['subskin_temp'].long_name = 'Subskin temperature'
+    c.variables['subskin_temp'].comment = 'See the OceanICU framework config file for the SST subskin dataset used in these calculations'
+    c.variables['subskin_temp'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+
+    if 'skin_temp' in keys:
+        c.variables['skin_temp'][:] = sst_skin
+    else:
+        var_o = c.createVariable('skin_temp','f4',('longitude','latitude','time'))
+        var_o[:] = sst_skin
+
+    c.variables['skin_temp'].units = 'Kelvin'
+    c.variables['skin_temp'].long_name = 'Skin temperature'
+    c.variables['skin_temp'].comment = 'See the OceanICU framework config file for the SST skin dataset used in these calculations'
+    c.variables['skin_temp'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+
+    if 'skin_salinity' in keys:
+        c.variables['skin_salinity'][:] = sal_skin
+    else:
+        var_o = c.createVariable('skin_salinity','f4',('longitude','latitude','time'))
+        var_o[:] = sal_skin
+
+    c.variables['skin_salinity'].units = 'psu'
+    c.variables['skin_salinity'].long_name = 'Skin salinity'
+    c.variables['skin_salinity'].comment = 'See the OceanICU framework config file for the SSS skin dataset used in these calculations'
+    c.variables['skin_salinity'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+
+    if 'subskin_salinity' in keys:
+        c.variables['subskin_salinity'][:] = sal_subskin
+    else:
+        var_o = c.createVariable('subskin_salinity','f4',('longitude','latitude','time'))
+        var_o[:] = sal_subskin
+
+    c.variables['subskin_salinity'].units = 'psu'
+    c.variables['subskin_salinity'].long_name = 'Subskin salinity'
+    c.variables['subskin_salinity'].comment = 'See the OceanICU framework config file for the SSS subskin dataset used in these calculations'
+    c.variables['subskin_salinity'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
     c.close()
     print('Done uncertainty calculations!')
 
@@ -838,6 +933,8 @@ def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=
     #ax2 = ax.twinx()
     cols = ['#6929c4','#1192e8','#005d5d','#e78ac3','#fa4d56','#570408','#e5c494','#198038','#002d9c']
     cols = ["#fd7f6f", "#7eb0d5",  "#bd7ebe", "#ffb55a", "#ffee65", "#beb9db", "#fdcce5", "#8bd3c7","#b2e061"]
+    cols = ['#CC6677', '#332288', '#DDCC77', '#117733', '#88CCEE', '#44AA99',  '#882255','#999933', '#AA4499']
+    cols = ['#332288','#44AA99','#882255','#DDCC77', '#117733', '#88CCEE','#999933','#CC6677']
     for i in range(combined.shape[0]):
         bottom = 0
         for j in range(combined.shape[1]):
@@ -850,10 +947,12 @@ def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=
     # ax2.plot(year,np.sum(gross,axis=1),'k--', label = 'Net Flux',linewidth=3)
     # ax2.legend(bbox_to_anchor=(1.6, 0.9))
     #
-    ax[0].legend(bbox_to_anchor=(0.49, 0.75))
+
     ax[0].set_ylabel('Relative contribution to uncertainty (%)')
     ax[0].set_xlabel('Year')
     ax[0].set_ylim([0,100])
+    handles, labels = ax[0].get_legend_handles_labels()
+    ax[0].legend(handles[::-1], labels[::-1],bbox_to_anchor=(0.49, 0.75))
     #ax2.set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     #
     label = ['fCO$_{2 (sw)}$ Network','fCO$_{2 (sw)}$ Parameter','fCO$_{2 (sw)}$ Evaluation']
@@ -868,7 +967,9 @@ def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=
             else:
                 p = ax[1].bar(year[i],(data_fco2[i,j]/totals[i])*100,bottom=bottom,color=cols[j])
             bottom = bottom + (data_fco2[i,j]/totals[i])*100
-    ax[1].legend(loc=2)#bbox_to_anchor=(1.14, 0.8))
+    #bbox_to_anchor=(1.14, 0.8))
+    handles, labels = ax[1].get_legend_handles_labels()
+    ax[1].legend(handles[::-1], labels[::-1],loc=2)
     ax[1].set_ylabel('Relative contribution to uncertainty (%)')
     ax[1].set_xlabel('Year')
     ax[1].set_ylim([0,100])
@@ -886,7 +987,8 @@ def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=
             else:
                 p = ax[2].bar(year[i],(data_atm[i,j]/totals[i])*100,bottom=bottom,color=cols[j])
             bottom = bottom + (data_atm[i,j]/totals[i])*100
-    ax[2].legend(loc=2)#bbox_to_anchor=(1, 0.8))
+    handles, labels = ax[2].get_legend_handles_labels()
+    ax[2].legend(handles[::-1], labels[::-1],loc=2)
     ax[2].set_ylabel('Relative contribution to uncertainty (%)')
     ax[2].set_xlabel('Year')
     ax[2].set_ylim([0,100])

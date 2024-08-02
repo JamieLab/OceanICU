@@ -38,7 +38,7 @@ matplotlib.rc('font', **font)
 tf.autograph.set_verbosity(0)
 
 def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_save_loc = None,
-    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,activ = 'sigmoid',socat_sst=False):
+    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,activ = 'sigmoid',socat_sst=False,ens=10):
     """
     This is the driver function to load the data from the input file, trim the data extremes(?) and then call
     the neural network package.
@@ -47,7 +47,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     make_save_tree(model_save_loc)
     print('Neural_Network_Start...')
 
-    vars = [fco2_sst+'_reanalysed_fCO2_sw',fco2_sst+'_reanalysed_fCO2_sw_std']
+    vars = [fco2_sst+'_reanalysed_fCO2_sw',fco2_sst+'_reanalysed_fCO2_sw_std', fco2_sst+'_reanalysed_count_obs']
     if socat_sst:
         vars.append(fco2_sst+'_reanalysed_sst')
     vars.append(prov)
@@ -72,7 +72,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     tabl = tabl[(np.isnan(tabl) == 0).all(axis=1)]
     #print(tabl)
     #Combine the stdev with an assumed measurement unc of 5 uatm (Bakker et al. 2016).
-    tabl[vars[1]] = np.sqrt(tabl[vars[1]]**2 + 5**2)
+    tabl[vars[1]] = np.sqrt((tabl[vars[1]]/np.sqrt(tabl[vars[2]]))**2 + 5**2)
 
     if not fco2_cutoff_low == None:
         print(f'Trimming fCO2(sw) less than {fco2_cutoff_low} uatm...')
@@ -106,11 +106,11 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     else:
         net_train_var = var
     print(net_train_var)
-    run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,activ = activ)
+    #run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,activ = activ,ens=ens)
 
     # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
     # (propagated input parameter uncertainties)
-    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc)
+    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc,ens=ens)
     # Then we save the fCO2 data
     save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,time = time)
     # Once saved the validation can be extracted, and used to determine the validation uncertainty for each province,
@@ -156,7 +156,7 @@ def daily_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_
         print(str(v) + ' : '+str(np.argwhere(np.array(data[prov]) == v).shape))
 
     run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,epochs=epochs,node_in = node_in,learning_rate = learning_rate)
-    plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov,daily=True,var=var,fco2_cutoff_low = cutoff_low,fco2_cutoff_high=cutoff_high,c=np.array(c),unit = plot_unit,parameter = plot_parameter)
+    plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov,daily=True,var=var,fco2_cutoff_low = cutoff_low,fco2_cutoff_high=cutoff_high,c_plot=np.array(c),unit = plot_unit,parameter = plot_parameter)
     print(mapping_var)
     map_vars = mapping_var.copy()
     map_vars.append(mapping_prov)
@@ -856,7 +856,7 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     ts = np.concatenate((tot_ts,tot_s))
     tn = np.concatenate((tot_tn,tot_n))
     ax[2].scatter(ts[:,0],tn[:,0],s=2)
-    h2 = unweight(ts[:,0],tn[:,0],ax[2],c,unit=unit)
+    h2 = unweight(ts[:,0],tn[:,0],ax[2],c_plot,unit=unit)
     h1 = weighted(ts[:,0],tn[:,0],1/np.sqrt(ts[:,1]**2 + tn[:,1]**2),ax[2],c_plot,unit=unit)
     stats_temp = ws.weighted_stats(ts[:,0],tn[:,0],1/np.sqrt(ts[:,1]**2 + tn[:,1]**2),'b')
     ax[2].fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6)
@@ -919,9 +919,10 @@ def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugac
 
         var_o = c.createVariable(name+'_val_unc','f4',('longitude','latitude','time'))
         var_o[:] = val_unc
-        var_o.long_name = longname+' evaluation uncertainty'
-        var_o.date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
-        var_o.units = unit
+    c.variables[name+'_val_unc'].long_name = longname+' evaluation uncertainty'
+    c.variables[name+'_val_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables[name+'_val_unc'].units = unit
+    c.variables[name+'_val_unc'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
     c.close()
 
 def add_total_unc(model_save_loc,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm'):
@@ -943,10 +944,11 @@ def add_total_unc(model_save_loc,name='fco2',longname='Fugacity of CO2 in seawat
     else:
         var_o = c.createVariable(name+'_tot_unc','f4',('longitude','latitude','time'))
         var_o[:] = tot
-        var_o.long_name = longname+' total uncertainty'
-        var_o.date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
-        var_o.comment = 'Combination of'+name+'_val_unc, '+name+'_net_unc and '+name+'_para_unc in quadrature'
-        var_o.units = unit
+    c.variables[name+'_tot_unc'].long_name = longname+' total uncertainty'
+    c.variables[name+'_tot_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables[name+'_tot_unc'].comment = 'Combination of'+name+'_val_unc, '+name+'_net_unc and '+name+'_para_unc in quadrature'
+    c.variables[name+'_tot_unc'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
+    c.variables[name+'_tot_unc'].units = unit
     c.close()
 
 def plot_mapped(model_save_loc,dat=300):
@@ -1064,12 +1066,13 @@ def save_mapped_fco2(data,net_unc,para_unc,data_shape = None, model_save_loc = N
     from construct_input_netcdf import save_netcdf
     direct = {}; direct[name] = data; direct[name+'_net_unc'] = net_unc; direct[name+'_para_unc'] = para_unc
     units = {}; units[name] = unit; units[name+'_net_unc'] = unit; units[name+'_para_unc'] = unit
+    comment = {}; comment[name] = ''; comment[name+'_net_unc'] = 'Uncertainties considered 95% confidence (2 sigma)'; comment[name+'_para_unc'] = 'Uncertainties considered 95% confidence (2 sigma)'
     long_name={};
     long_name[name] = longname
     long_name[name+'_net_unc'] = longname+' network uncertainty'
     long_name[name+'_para_unc'] = longname+' parameter uncertainty'
 
-    save_netcdf(os.path.join(model_save_loc,'output.nc'),direct,lon,lat,data.shape[2],time_track=time,units = units,long_name=long_name)
+    save_netcdf(os.path.join(model_save_loc,'output.nc'),direct,lon,lat,data.shape[2],time_track=time,units = units,long_name=long_name,comment = comment)
 
 def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_lat = False,plot_file = 'mapped_residuals.png',bin = False,log = False,lag = False):
     import geopandas as gpd

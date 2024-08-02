@@ -131,7 +131,7 @@ def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023,time_cor 
             mon = 1
             ye = ye+1
 
-def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_yr=2023,out_loc='',log='',lag='',v3=False,flip=False):
+def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_yr=2023,out_loc='',log='',lag='',v3=False,flip=False,bia=0):
     du.makefolder(out_loc)
     res = np.round(np.abs(log[0]-log[1]),2)
     if v3:
@@ -168,11 +168,12 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
             sst_o = du.grid_average(sst,lo_grid,la_grid)
             ice_o = du.grid_average(ice,lo_grid,la_grid)
             unc_o = du.grid_average(unc,lo_grid,la_grid)
-            du.netcdf_create_basic(file_o,sst_o,'analysed_sst',lag,log,flip=flip,units='Kelvin')
+            du.netcdf_create_basic(file_o,sst_o+bia,'analysed_sst',lag,log,flip=flip,units='Kelvin')
             du.netcdf_append_basic(file_o,ice_o,'sea_ice_fraction',flip=flip)
             du.netcdf_append_basic(file_o,unc_o,'analysed_sst_uncertainty',flip=flip,units = 'Kelvin')
             c = Dataset(file_o,'a')
             c.variables['analysed_sst_uncertainty'].uncertainty = 'These uncertainties are 2 sigma (95% confidence) equivalents!'
+            c.variables['analysed_sst'].bias_correction = 'Bias correction of ' + str(bia) + ' applied!'
             c.close()
         mon = mon+1
         if mon == 13:

@@ -26,22 +26,22 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
     sst_kelvin: Is the sst_var is in kelvin (If True, then we convert to degC)
     sss_var: Variable name in aux_file for SSS
     """
-    var_out = [['dic','dic','umol/kg','Dissolved Inorganic Carbon in seawater'],
-        ['u_dic','dic_tot_unc','umol/kg','Dissolved Inorganic Carbon in seawater total uncertainty'],
-        ['u_dic__par2','dic_ta_unc','umol/kg','Dissolved Inorganic Carbon in seawater alkalinity uncertainty'],
-        ['u_dic__par1','dic_fco2_unc','umol/kg','Dissolved Inorganic Carbon in seawater fCO2(sw) uncertainty'],
-        ['u_dic__temperature','dic_sst_unc','umol/kg','Dissolved Inorganic Carbon in seawater SST uncertainty'],
-        ['u_dic__salinity','dic_sss_unc','umol/kg','Dissolved Inorganic Carbon in seawater SSS uncertainty'],
-        ['u_dic__total_phosphate','dic_phos_unc','umol/kg','Dissolved Inorganic Carbon in seawater phosphate uncertainty'],
-        ['u_dic__total_silicate','dic_sili_unc','umol/kg','Dissolved Inorganic Carbon in seawater silicate uncertainty'],
-        ['pH','pH','-log([H+])','pH on total scale'],
-        ['u_pH','pH_tot_unc','-log([H+])','pH on total scale total uncertainty'],
-        ['u_pH__par2','pH_ta_unc','-log([H+])','pH on total scale alkalinity uncertainty'],
-        ['u_pH__par1','pH_fco2_unc','-log([H+])','pH on total scale fCO2(sw) uncertainty'],
-        ['u_pH__temperature','pH_sst_unc','-log([H+])','pH on total scale SST uncertainty'],
-        ['u_pH__salinity','pH_sss_unc','-log([H+])','pH on total scale SSS uncertainty'],
-        ['u_pH__total_phosphate','pH_phos_unc','-log([H+])','pH on total scale phosphate uncertainty'],
-        ['u_pH__total_silicate','pH_sili_unc','-log([H+])','pH on total scale silicate uncertainty']
+    var_out = [['dic','dic','umol/kg','Dissolved Inorganic Carbon in seawater',''],
+        ['u_dic','dic_tot_unc','umol/kg','Dissolved Inorganic Carbon in seawater total uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_dic__par2','dic_ta_unc','umol/kg','Dissolved Inorganic Carbon in seawater alkalinity uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_dic__par1','dic_fco2_unc','umol/kg','Dissolved Inorganic Carbon in seawater fCO2(sw) uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_dic__temperature','dic_sst_unc','umol/kg','Dissolved Inorganic Carbon in seawater SST uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_dic__salinity','dic_sss_unc','umol/kg','Dissolved Inorganic Carbon in seawater SSS uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_dic__total_phosphate','dic_phos_unc','umol/kg','Dissolved Inorganic Carbon in seawater phosphate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_dic__total_silicate','dic_sili_unc','umol/kg','Dissolved Inorganic Carbon in seawater silicate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['pH','pH','-log([H+])','pH on total scale',''],
+        ['u_pH','pH_tot_unc','-log([H+])','pH on total scale total uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__par2','pH_ta_unc','-log([H+])','pH on total scale alkalinity uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__par1','pH_fco2_unc','-log([H+])','pH on total scale fCO2(sw) uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__temperature','pH_sst_unc','-log([H+])','pH on total scale SST uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__salinity','pH_sss_unc','-log([H+])','pH on total scale SSS uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__total_phosphate','pH_phos_unc','-log([H+])','pH on total scale phosphate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__total_silicate','pH_sili_unc','-log([H+])','pH on total scale silicate uncertainty','Uncertainties considered 95% confidence (2 sigma)']
         ]
     # var_out_list = ['dic',
     #     'u_dic',
@@ -136,10 +136,12 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
     direct = {}
     units = {}
     longname = {}
+    comment = {}
     for a in var_out:
         direct[a[1]] = np.zeros((sss.shape)); direct[a[1]][:] = np.nan
         units[a[1]] = a[2]
         longname[a[1]] = a[3]
+        comment[a[1]] = a[4]
     print('Running CO2sys...')
     for i in range(sst.shape[2]):
         print('Timestep: '+str(i))
@@ -159,7 +161,7 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
             direct[a[1]][:,:,i] = py_out[a[0]]
 
 
-    cinp.append_netcdf(data_file,direct,1,1,1,units=units,longname=longname)
+    cinp.append_netcdf(data_file,direct,1,1,1,units=units,longname=longname,comment=comment)
 
 def plot_pyCO2sys_out(data_file,model_save_loc):
     import geopandas as gpd

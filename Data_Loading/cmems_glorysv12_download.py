@@ -236,8 +236,12 @@ def cmems_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable=''
     while yr <= end_yr:
         if mon == 1:
             du.makefolder(os.path.join(outloc,str(yr)))
-        file = os.path.join(loc,str(yr),str(yr)+'_'+du.numstr(mon)+f'_CMEMS_GLORYSV12_{variable}.nc')
-        outfile = os.path.join(outloc,str(yr),str(yr)+'_'+du.numstr(mon)+f'_CMEMS_GLORYSV12_{variable}_'+str(res)+'_deg.nc')
+        if type(variable) == list:
+            file = os.path.join(loc,str(yr),str(yr)+'_'+du.numstr(mon)+f'_CMEMS_GLORYSV12.nc')
+            outfile = os.path.join(outloc,str(yr),str(yr)+'_'+du.numstr(mon)+f'_CMEMS_GLORYSV12_'+str(res)+'_deg.nc')
+        else:
+            file = os.path.join(loc,str(yr),str(yr)+'_'+du.numstr(mon)+f'_CMEMS_GLORYSV12_{variable}.nc')
+            outfile = os.path.join(outloc,str(yr),str(yr)+'_'+du.numstr(mon)+f'_CMEMS_GLORYSV12_{variable}_'+str(res)+'_deg.nc')
         print(file)
         print(outfile)
         if du.checkfileexist(file) and not du.checkfileexist(outfile):
@@ -245,22 +249,41 @@ def cmems_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable=''
                 lon,lat = du.load_grid(file)
 
             c = Dataset(file,'r')
-            va_da = np.transpose(np.squeeze(np.array(c.variables[variable][:])))
-            va_da[va_da<-100] = np.nan
-            va_da[va_da>5000] = np.nan
-            if log_av:
-                va_da = np.log10(va_da)
-            # va_da[va_da < 0.0] = np.nan
-            # va_da[va_da > 60.0] = np.nan
-            #print(va_da)
-            c.close()
-            #lon,va_da=du.grid_switch(lon,va_da)
+            if type(variable) == list:
+                tp2 = 0
+                for v in variable:
+                    va_da = np.transpose(np.squeeze(np.array(c.variables[v][:])))
+                    va_da[va_da<-100] = np.nan
+                    va_da[va_da>5000] = np.nan
+                    if log_av:
+                        va_da = np.log10(va_da)
+                    if t == 0:
+                        lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
+                        t = 1
+                    va_da_out = du.grid_average(va_da,lo_grid,la_grid)
+                    if tp2 == 0:
+                        du.netcdf_create_basic(outfile,va_da_out,v,lag,log)
+                        tp2=1
+                    else:
+                        du.netcdf_append_basic(outfile,va_da_out,v)
+                c.close()
+            else:
+                va_da = np.transpose(np.squeeze(np.array(c.variables[variable][:])))
+                va_da[va_da<-100] = np.nan
+                va_da[va_da>5000] = np.nan
+                if log_av:
+                    va_da = np.log10(va_da)
+                # va_da[va_da < 0.0] = np.nan
+                # va_da[va_da > 60.0] = np.nan
+                #print(va_da)
+                c.close()
+                #lon,va_da=du.grid_switch(lon,va_da)
 
-            if t == 0:
-                lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
-                t = 1
-            va_da_out = du.grid_average(va_da,lo_grid,la_grid)
-            du.netcdf_create_basic(outfile,va_da_out,variable,lag,log)
+                if t == 0:
+                    lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
+                    t = 1
+                va_da_out = du.grid_average(va_da,lo_grid,la_grid)
+                du.netcdf_create_basic(outfile,va_da_out,variable,lag,log)
         mon = mon+1
         if mon == 13:
             yr = yr+1

@@ -180,12 +180,13 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
             ye = ye+1
             mon = 1
 
-def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1981):
+def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1980,v3=False,plot=False):
     import pandas as pd
     import calendar
     import glob
     import matplotlib.pyplot as plt
     import pickle
+    from scipy.ndimage import generic_filter
     data = pd.read_table(file,sep='\t')
     cci_sst = np.zeros((len(data)))
     cci_sst[:] = np.nan
@@ -204,6 +205,7 @@ def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1981):
         print(start_yr)
 
     for yrs in range(start_yr,yr[1]+1):
+        print('Dumping file')
         dbfile = open(s[0]+'.pkl', 'wb')
         pickle.dump([yrs,cci_sst,cci_sst_unc],dbfile)
         dbfile.close()
@@ -215,9 +217,14 @@ def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1981):
                 print(f'Year: {yrs} Month: {mon} Day: {day}')
                 #print(f)
                 if len(f)>0:
-                    sst_file = os.path.join(data_loc,str(yrs),du.numstr(mon),str(yrs)+du.numstr(mon)+du.numstr(day)+'*.nc')
+                    if v3:
+                        sst_file = os.path.join(data_loc,str(yrs),du.numstr(mon),du.numstr(day),str(yrs)+du.numstr(mon)+du.numstr(day)+'*.nc')
+                    else:
+                        sst_file = os.path.join(data_loc,str(yrs),du.numstr(mon),str(yrs)+du.numstr(mon)+du.numstr(day)+'*.nc')
                     sst_file = glob.glob(sst_file)
-                    if sst_file:
+                    print(sst_file)
+                    if len(sst_file)>0:
+                        print('Loading file')
                         if t == 0:
                             [lon,lat] = du.load_grid(sst_file[0],latv = 'lat',lonv='lon')
                             res = np.abs(lon[0] - lon[1]) * 2
@@ -235,17 +242,52 @@ def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1981):
                             c = Dataset(sst_file[0],'r')
                             sst_data = np.squeeze(c['analysed_sst'][0,lat_b,lon_b])
                             sst_unc = np.squeeze(c['analysed_sst_uncertainty'][0,lat_b,lon_b])
+
+                            if (0 in list(lon_b)) or (len(lon)-1 in list(lon_b)):
+                                #plot = True
+                                print('Full lon grid loaded')
+                                sst_data = np.column_stack((np.squeeze(c['analysed_sst'][0,lat_b,len(lon)-1])[:,None],np.squeeze(c['analysed_sst'][0,lat_b,:]),np.squeeze(c['analysed_sst'][0,lat_b,0])[:,None]))
+                                sst_unc = np.column_stack((np.squeeze(c['analysed_sst_uncertainty'][0,lat_b,len(lon)-1]),np.squeeze(c['analysed_sst_uncertainty'][0,lat_b,:]),np.squeeze(c['analysed_sst_uncertainty'][0,lat_b,0])))
+
+                            if (len(lat)-1 in list(lat_b)):
+                                #plot=True
+                                sst_data = np.vstack((sst_data,sst_data[-1,:]))
+                                sst_unc = np.vstack((sst_unc,sst_unc[-1,:]))
+
                             sst_data[sst_data<-250] = np.nan
                             sst_unc[sst_unc<-250] = np.nan
                             #sst_data = sst_data
                             c.close()
                             #print(data['longitude [dec.deg.E]'][f[g]])
                             #print(data['latitude [dec.deg.N]'][f[g]])
-                            a = du.point_interp(lon[lon_b],lat[lat_b],sst_data,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=False)
+                            if (0 in list(lon_b)) or (len(lon)-1 in list(lon_b)):
+                                lon_g = np.hstack((lon[-1]-360,lon,lon[0]+360))
+                            else:
+                                lon_g = lon[lon_b]
+
+                            if (len(lat)-1 in list(lat_b)):
+                                lat_g = np.hstack((lat[lat_b],lat[-1]+(res/2)))
+                            else:
+                                lat_g = lat[lat_b]
+                            a = du.point_interp(lon_g,lat_g,sst_data,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=plot)
                             #print(a)
+                            if np.sum(np.isnan(a)==1) > 0:
+                                print('NaNs present in output - attempting second approach')
+                                data_filt = generic_filter(sst_data,np.nanmean,[3,3])
+
+                                ap = du.point_interp(lon_g,lat_g,data_filt,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=plot)
+                                a[np.isnan(a) == 1] = ap[np.isnan(a) == 1]
+                                print('NaN left: '+str(np.sum(np.isnan(a)==1)))
                             cci_sst[f[g]] = a
-                            a = du.point_interp(lon[lon_b],lat[lat_b],sst_unc,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=False)
+                            a = du.point_interp(lon_g,lat_g,sst_unc,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=plot)
+                            if np.sum(np.isnan(a)) > 0:
+                                print('NaNs present in output - attempting second approach')
+                                data_filt = generic_filter(sst_unc,np.nanmean,[3,3])
+                                ap = du.point_interp(lon_g,lat_g,data_filt,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=plot)
+                                a[np.isnan(a) == 1] = ap[np.isnan(a) == 1]
+                                print('NaN left: '+str(np.sum(np.isnan(a)==1)))
                             cci_sst_unc[f[g]] = a
+                            plot = False
 
     data['cci_sst [C]'] = cci_sst - 273.15
     data['cci_sst_unc [C]'] = cci_sst_unc

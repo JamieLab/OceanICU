@@ -172,7 +172,7 @@ def construct_climatology(data,month_track):
             clim[:,:,i] = np.squeeze(data[:,:,f])
     return clim
 
-def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,ref_year = 1970,units=False,long_name=False,comment=False):
+def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=[],ref_year = 1970,units=False,long_name=False,comment=False):
     """
     Function to save the final netcdf output for use in the neural network training.
     For each variable in the direct dictionary a netcdf variable is generated - this
@@ -214,7 +214,7 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=False,re
     lon_o.standard_name = 'Longitude'
     lon_o[:] = lon
     #print(time_track)
-    if time_track:
+    if len(time_track)>0:
         time_o = c.createVariable('time','f4',('time'))
         time_o[:] = time_track
         time_o.units = f'Days since {ref_year}-01-15'

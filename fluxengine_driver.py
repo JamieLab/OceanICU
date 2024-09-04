@@ -693,7 +693,7 @@ def flux_split(flux,flux_unc,f,g):
 
     return np.array(out),np.array(out_unc)
 
-def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,bath_file=False,flux_file=False,save_file=False):
+def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,bath_file=False,flux_file=False,save_file=False,mask_file=False):
     """
     OceanICU version of the fluxengine budgets tool that allows for the uncertainities to be propagated...
     """
@@ -713,22 +713,34 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
     if bath_cutoff:
         elev=  np.transpose(np.squeeze(np.array(c.variables['elevation'])))
     c.close()
+
     if flux_file:
         c = Dataset(flux_file,'r')
     else:
         c = Dataset(model_save_loc+'/output.nc','r')
     flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
+    ice = np.transpose(np.array(c.variables['ice']),(1,0,2))
+    time = np.array(c.variables['time'])
+    ref_time=datetime.datetime(1970,1,15)
+    for t in range(len(time)):
+        time[t] = (ref_time + datetime.timedelta(days = int(time[t]))).year
     print(flux.shape)
-    # flux_unc = np.transpose(np.array(c.variables['flux_unc']),(1,0,2))
-    # flux_unc[flux_unc > 2000] = np.nan
-    # flux_unc = flux_unc * np.abs(flux)
-    # flux_components = {}
-    # for i in flux_unc_components:
-    #     flux_components[i] = np.transpose(np.array(c.variables['flux_unc_'+i]),(1,0,2)) * np.abs(flux)
-    #     flux_components[i][flux_components[i]>2000] = np.nan
+    # Corrects area for land (the flux calculation was already correctly done but the area calc wasnt...)
+    area = area * land
+
     c.close()
+
+    if mask_file:
+        c = Dataset(mask_file,'r')
+        mask = np.transpose(np.array(c.variables['mask']),(1,0,2))
+        print(mask.shape)
+        time_mask = np.array(c.variables['time'])
+        for t in range(len(time_mask)):
+            time_mask[t] = (ref_time + datetime.timedelta(days = int(time_mask[t]))).year
+        c.close()
+
     for i in range(0,flux.shape[2]):
-        flux[:,:,i] = (flux[:,:,i] * area * land * 30.5) /1e15
+        flux[:,:,i] = (flux[:,:,i] * area * 30.5) /1e15 # Modified as area is now calculated correctly with land.
         # flux_unc[:,:,i] = (flux_unc[:,:,i] * area * land * 30.5) / 1e15
         # for j in flux_unc_components:
         #     flux_components[j][:,:,i] = (flux_components[j][:,:,i] * area * land * 30.5) /1e15
@@ -742,12 +754,21 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
     down = []
     # out_unc = []
     are = []
+    ice_are = []
     comp = {}
     # for j in flux_unc_components:
     #     comp[j] = []
     area_rep = np.repeat(area[:, :, np.newaxis], 12, axis=2).reshape((-1,1))
-    for i in range(0,flux.shape[2],12):
-        flu = flux[:,:,i:i+12]
+    for i in range(len(year)):
+        g = np.where(time == year[i])
+        flu = flux[:,:,g]
+        ice_r = ice[:,:,g]
+        if mask_file:
+            p = np.where(time_mask == year[i])
+            mas = mask[:,:,p]
+            l = np.where(mas == 0)
+            flu[l[0],l[1],l[2]] = np.nan
+            ice_r[l[0],l[1],l[2]] = np.nan
         out.append(np.nansum(flu))
         f = np.where(np.sign(flu) == 1)
         up.append(np.nansum(flu[f]))
@@ -755,34 +776,21 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
         down.append(np.nansum(flu[f]))
 
         flu = flu.reshape((-1,1))
+        ice_r = ice_r.reshape((-1,1))
         f = np.where(np.isnan(flu) == 0)[0]
         are.append(np.sum(area_rep[f])/12)
+        ice_are.append(np.sum(area_rep[f]*(1-ice_r[f]))/12)
 
-        # out_unc.append(np.nansum(flux_unc[:,:,i:i+12])/2)
-        # for j in flux_unc_components:
-        #     comp[j].append(np.nansum(flux_components[j][:,:,i:i+12])/2)
-
-    # fig = plt.figure(figsize=(10,10))
-    # gs = GridSpec(1,1, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.15,right=0.98)
-    # ax = [fig.add_subplot(gs[0,0])]#,fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,0]),fig.add_subplot(gs[1,1]),fig.add_subplot(gs[2,0]),fig.add_subplot(gs[2,1])]
-    # ax[0].plot(year,out,'k-',linewidth=2)
-    # ax[0].fill_between(year,np.array(out)-np.array(out_unc),np.array(out)+ np.array(out_unc),alpha=0.4,label='Total uncertainty')
-    # ax[0].fill_between(year,np.array(out)-np.array(comp['k']),np.array(out)+ np.array(comp['k']),alpha=0.4,label='Gas Transfer')
-    # ax[0].legend()
-
-    # for i in range(0,1):
-    #     ax[i].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
 
     mol_c = (np.array(out) * 10**15) / np.array(are) / 12.011
-    head = 'Year, Net air-sea CO2 flux (Pg C yr-1),Upward air-sea CO2 flux (Pg C yr-1),Downward air-sea CO2 flux (Pg C yr-1),Area of net air-sea CO2 flux (m-2),Mean air-sea CO2 flux rate (mol C m-2 yr-1)'
-    out_f = np.transpose(np.stack((np.array(year),np.array(out),np.array(up),np.array(down),np.array(are),np.array(mol_c))))
+    head = 'Year, Net air-sea CO2 flux (Pg C yr-1),Upward air-sea CO2 flux (Pg C yr-1),Downward air-sea CO2 flux (Pg C yr-1),Mean area of net air-sea CO2 flux (m-2),Mean ice-free area of net air-sea CO2 flux (m-2),Mean air-sea CO2 flux rate (mol C m-2 yr-1)'
+    out_f = np.transpose(np.stack((np.array(year),np.array(out),np.array(up),np.array(down),np.array(are),np.array(ice_are),np.array(mol_c))))
+    out_f[out_f[:,5]==0,1:] = np.nan
     if save_file:
         file = save_file
     else:
         file = os.path.join(model_save_loc,'annual_flux.csv')
     np.savetxt(file,out_f,delimiter=',',fmt='%.5f',header=head)
-    # fig.savefig(os.path.join(model_save_loc,'plots','global_flux_unc.png'))
-    #return flux,flux_u
 
 def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False):
     fix = ['k','ph2o_fixed','schmidt_fixed','solskin_unc_fixed','solsubskin_unc_fixed']
@@ -931,9 +939,9 @@ def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=
     gs = GridSpec(2,2, figure=fig, wspace=0.25,hspace=0.15,bottom=0.07,top=0.95,left=0.075,right=0.95)
     ax = [fig.add_subplot(gs[0,0]),fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,0]),fig.add_subplot(gs[1,1])]
     #ax2 = ax.twinx()
-    cols = ['#6929c4','#1192e8','#005d5d','#e78ac3','#fa4d56','#570408','#e5c494','#198038','#002d9c']
-    cols = ["#fd7f6f", "#7eb0d5",  "#bd7ebe", "#ffb55a", "#ffee65", "#beb9db", "#fdcce5", "#8bd3c7","#b2e061"]
-    cols = ['#CC6677', '#332288', '#DDCC77', '#117733', '#88CCEE', '#44AA99',  '#882255','#999933', '#AA4499']
+    # cols = ['#6929c4','#1192e8','#005d5d','#e78ac3','#fa4d56','#570408','#e5c494','#198038','#002d9c']
+    # cols = ["#fd7f6f", "#7eb0d5",  "#bd7ebe", "#ffb55a", "#ffee65", "#beb9db", "#fdcce5", "#8bd3c7","#b2e061"]
+    # cols = ['#CC6677', '#332288', '#DDCC77', '#117733', '#88CCEE', '#44AA99',  '#882255','#999933', '#AA4499']
     cols = ['#332288','#44AA99','#882255','#DDCC77', '#117733', '#88CCEE','#999933','#CC6677']
     for i in range(combined.shape[0]):
         bottom = 0

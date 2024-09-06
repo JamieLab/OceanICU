@@ -106,7 +106,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     else:
         net_train_var = var
     print(net_train_var)
-    #run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,activ = activ,ens=ens)
+    run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,activ = activ,ens=ens)
 
     # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
     # (propagated input parameter uncertainties)

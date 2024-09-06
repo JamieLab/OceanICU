@@ -191,6 +191,7 @@ def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1980,v3=False,pl
     cci_sst = np.zeros((len(data)))
     cci_sst[:] = np.nan
     cci_sst_unc = np.copy(cci_sst)
+    ice = np.copy(cci_sst)
     s = file.split('.')
     yr = [np.min(data['yr']),np.max(data['yr'])]
     t = 0
@@ -202,12 +203,13 @@ def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1980,v3=False,pl
         start_yr = temp[0]
         cci_sst = temp[1]
         cci_sst_unc = temp[2]
+        ice = temp[3]
         print(start_yr)
 
     for yrs in range(start_yr,yr[1]+1):
         print('Dumping file')
         dbfile = open(s[0]+'.pkl', 'wb')
-        pickle.dump([yrs,cci_sst,cci_sst_unc],dbfile)
+        pickle.dump([yrs,cci_sst,cci_sst_unc,ice],dbfile)
         dbfile.close()
         for mon in range(1,13):
 
@@ -242,20 +244,24 @@ def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1980,v3=False,pl
                             c = Dataset(sst_file[0],'r')
                             sst_data = np.squeeze(c['analysed_sst'][0,lat_b,lon_b])
                             sst_unc = np.squeeze(c['analysed_sst_uncertainty'][0,lat_b,lon_b])
+                            ice_data = np.squeeze(c['sea_ice_fraction'][0,lat_b,lon_b])
 
                             if (0 in list(lon_b)) or (len(lon)-1 in list(lon_b)):
                                 #plot = True
                                 print('Full lon grid loaded')
                                 sst_data = np.column_stack((np.squeeze(c['analysed_sst'][0,lat_b,len(lon)-1])[:,None],np.squeeze(c['analysed_sst'][0,lat_b,:]),np.squeeze(c['analysed_sst'][0,lat_b,0])[:,None]))
                                 sst_unc = np.column_stack((np.squeeze(c['analysed_sst_uncertainty'][0,lat_b,len(lon)-1]),np.squeeze(c['analysed_sst_uncertainty'][0,lat_b,:]),np.squeeze(c['analysed_sst_uncertainty'][0,lat_b,0])))
+                                ice_data = np.column_stack((np.squeeze(c['sea_ice_fraction'][0,lat_b,len(lon)-1]),np.squeeze(c['sea_ice_fraction'][0,lat_b,:]),np.squeeze(c['sea_ice_fraction'][0,lat_b,0])))
 
                             if (len(lat)-1 in list(lat_b)):
                                 #plot=True
                                 sst_data = np.vstack((sst_data,sst_data[-1,:]))
                                 sst_unc = np.vstack((sst_unc,sst_unc[-1,:]))
+                                ice_data =np.vstack((ice_data,ice_data[-1,:]))
 
                             sst_data[sst_data<-250] = np.nan
                             sst_unc[sst_unc<-250] = np.nan
+                            ice_data[ice_data<-250] = np.nan
                             #sst_data = sst_data
                             c.close()
                             #print(data['longitude [dec.deg.E]'][f[g]])
@@ -279,6 +285,7 @@ def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1980,v3=False,pl
                                 a[np.isnan(a) == 1] = ap[np.isnan(a) == 1]
                                 print('NaN left: '+str(np.sum(np.isnan(a)==1)))
                             cci_sst[f[g]] = a
+
                             a = du.point_interp(lon_g,lat_g,sst_unc,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=plot)
                             if np.sum(np.isnan(a)) > 0:
                                 print('NaNs present in output - attempting second approach')
@@ -287,9 +294,19 @@ def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1980,v3=False,pl
                                 a[np.isnan(a) == 1] = ap[np.isnan(a) == 1]
                                 print('NaN left: '+str(np.sum(np.isnan(a)==1)))
                             cci_sst_unc[f[g]] = a
+
+                            a = du.point_interp(lon_g,lat_g,ice_data,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=plot)
+                            if np.sum(np.isnan(a)) > 0:
+                                print('NaNs present in output - attempting second approach')
+                                data_filt = generic_filter(ice_data,np.nanmean,[3,3])
+                                ap = du.point_interp(lon_g,lat_g,data_filt,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=plot)
+                                a[np.isnan(a) == 1] = ap[np.isnan(a) == 1]
+                                print('NaN left: '+str(np.sum(np.isnan(a)==1)))
+                            ice[f[g]] = a
                             plot = False
 
     data['cci_sst [C]'] = cci_sst - 273.15
     data['cci_sst_unc [C]'] = cci_sst_unc
+    data['cci_ice_fraction'] = ice
     st = file.split('.')
     data.to_csv(file,sep='\t',index=False)

@@ -693,7 +693,8 @@ def flux_split(flux,flux_unc,f,g):
 
     return np.array(out),np.array(out_unc)
 
-def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,bath_file=False,flux_file=False,save_file=False,mask_file=False):
+def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,bath_file=False,flux_file=False,save_file=False,mask_file=False,flux_var = 'flux',ice_var = 'ice',bath_var = 'ocean_proportion',mask_var='mask',
+    area_file = False,area_var = 'area',gcbformat=False):
     """
     OceanICU version of the fluxengine budgets tool that allows for the uncertainities to be propagated...
     """
@@ -703,13 +704,18 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
             'size'   : 19}
     matplotlib.rc('font', **font)
     res = np.abs(lon[0]-lon[1])
-
-    area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
+    if area_file:
+        print('Loading area')
+        c = Dataset(area_file,'r')
+        area= np.transpose(np.squeeze(np.array(c.variables[area_var])))
+        c.close()
+    else:
+        area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
     if bath_file:
         c = Dataset(bath_file,'r')
     else:
         c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
-    land = np.transpose(np.squeeze(np.array(c.variables['ocean_proportion'])))
+    land = np.transpose(np.squeeze(np.array(c.variables[bath_var])))
     if bath_cutoff:
         elev=  np.transpose(np.squeeze(np.array(c.variables['elevation'])))
     c.close()
@@ -718,8 +724,8 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
         c = Dataset(flux_file,'r')
     else:
         c = Dataset(model_save_loc+'/output.nc','r')
-    flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
-    ice = np.transpose(np.array(c.variables['ice']),(1,0,2))
+    flux = np.transpose(np.array(c.variables[flux_var]),(1,0,2))
+    ice = np.transpose(np.array(c.variables[ice_var]),(1,0,2))
     time = np.array(c.variables['time'])
     ref_time=datetime.datetime(1970,1,15)
     for t in range(len(time)):
@@ -732,13 +738,19 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
 
     if mask_file:
         c = Dataset(mask_file,'r')
-        mask = np.transpose(np.array(c.variables['mask']),(1,0,2))
+        mask = np.transpose(np.array(c.variables[mask_var]),(1,0,2))
         print(mask.shape)
         time_mask = np.array(c.variables['time'])
         for t in range(len(time_mask)):
             time_mask[t] = (ref_time + datetime.timedelta(days = int(time_mask[t]))).year
         c.close()
 
+    if gcbformat:
+        flux = np.transpose(flux,(2,0,1))
+        ice = np.transpose(ice,(2,0,1))
+        #area = np.transpose(area)
+        if mask_file:
+            mask = np.transpose(mask,(2,0,1))
     for i in range(0,flux.shape[2]):
         flux[:,:,i] = (flux[:,:,i] * area * 30.5) /1e15 # Modified as area is now calculated correctly with land.
         # flux_unc[:,:,i] = (flux_unc[:,:,i] * area * land * 30.5) / 1e15

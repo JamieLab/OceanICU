@@ -20,7 +20,7 @@ import os
 # different versions.
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-def som_feed_forward(model_save_loc,data_file,inp_vars,ref_year = 1970,o_var = 'prov',box=[7,5,3],m=4, plot=True,normalise = False):
+def som_feed_forward(model_save_loc,data_file,inp_vars,ref_year = 1970,o_var = 'prov',box=[7,5,3],m=4, plot=False,normalise = False):
     """
     This function takes variables out of the data file generated with
     construct_input_netcdf.py, and uses them to train and implement a SOM approach. Here

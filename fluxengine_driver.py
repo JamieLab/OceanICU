@@ -125,6 +125,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
         fluxloc = os.path.join(model_save_loc,'flux')
     else:
         fluxloc = os.path.join(model_save_loc,flux_loc)
+    print(fluxloc)
     #k_perunc = 0.2 # k percentage uncertainty
     #atm_unc = 1 # Atmospheric fco2 unc (1 uatm)
 
@@ -643,7 +644,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     c.close()
     print('Done uncertainty calculations!')
 
-def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel,single_run=False):
+def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel,flip=False,single_run=False):
     """
     Load variables out of the fluxengine monthly output files into a single variable.
     """
@@ -656,17 +657,17 @@ def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel,single_run=False):
     t=0
     while yr <= end_yr:
         fil = os.path.join(loc,str(yr),du.numstr(mon),'*.nc')
-        #print(fil)
+        print(fil)
         g = glob.glob(fil)
         #print(g)
         c = Dataset(g[0])
         op = np.squeeze(np.array(c[var]))
-        if t == 0:
-            lat = np.array(c['latitude'])
-            if np.sign(lat[1] - lat[0]) == -1:
-                flip = True
-            else:
-                flip = False
+        # if t == 0:
+        #     lat = np.array(c['latitude'])
+        #     if np.sign(lat[1] - lat[0]) == -1:
+        #         flip = True
+        #     else:
+        #         flip = False
         if flip:
             op = np.flipud(op)
         out[:,:,t] = op
@@ -703,6 +704,7 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
     font = {'weight' : 'normal',
             'size'   : 19}
     matplotlib.rc('font', **font)
+    from calendar import monthrange
     res = np.abs(lon[0]-lon[1])
     if area_file:
         print('Loading area')
@@ -728,8 +730,11 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
     ice = np.transpose(np.array(c.variables[ice_var]),(1,0,2))
     time = np.array(c.variables['time'])
     ref_time=datetime.datetime(1970,1,15)
+    time_f = np.zeros((len(time),2))
     for t in range(len(time)):
-        time[t] = (ref_time + datetime.timedelta(days = int(time[t]))).year
+        temp = (ref_time + datetime.timedelta(days = int(time[t])))
+        time_f[t,0] = temp.year
+        time_f[t,1] = temp.month
     print(flux.shape)
     # Corrects area for land (the flux calculation was already correctly done but the area calc wasnt...)
     area = area * land
@@ -741,8 +746,12 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
         mask = np.transpose(np.array(c.variables[mask_var]),(1,0,2))
         print(mask.shape)
         time_mask = np.array(c.variables['time'])
+        time_mask_f = np.zeros((len(time_mask),2))
+
         for t in range(len(time_mask)):
-            time_mask[t] = (ref_time + datetime.timedelta(days = int(time_mask[t]))).year
+            temp = (ref_time + datetime.timedelta(days = int(time_mask[t])))
+            time_mask_f[t,0] = temp.year
+            time_mask_f[t,1] = temp.month
         c.close()
 
     if gcbformat:
@@ -751,58 +760,141 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
         #area = np.transpose(area)
         if mask_file:
             mask = np.transpose(mask,(2,0,1))
+
     for i in range(0,flux.shape[2]):
-        flux[:,:,i] = (flux[:,:,i] * area * 30.5) /1e15 # Modified as area is now calculated correctly with land.
-        # flux_unc[:,:,i] = (flux_unc[:,:,i] * area * land * 30.5) / 1e15
-        # for j in flux_unc_components:
-        #     flux_components[j][:,:,i] = (flux_components[j][:,:,i] * area * land * 30.5) /1e15
+        mon = monthrange(int(time_f[i,0]),int(time_f[i,1]))
+        flux[:,:,i] = (flux[:,:,i] * area *mon[1]) /1e15 # Modified as area is now calculated correctly with land.
+
         if bath_cutoff:
             flu = flux[:,:,i] ; flu[elev<=bath_cutoff] = np.nan; flux[:,:,i] = flu
-            # flu_u = flux_unc[:,:,i]; flu_u[elev<=bath_cutoff] = np.nan; flux_unc[:,:,i] = flu_u
 
+    """
+    Calculating the monthly air-sea CO2 fluxes for the globe/region
+    """
     year = list(range(start_yr,end_yr+1,1))
-    out = []
-    up = []
-    down = []
-    # out_unc = []
-    are = []
-    ice_are = []
-    comp = {}
-    # for j in flux_unc_components:
-    #     comp[j] = []
-    area_rep = np.repeat(area[:, :, np.newaxis], 12, axis=2).reshape((-1,1))
-    for i in range(len(year)):
-        g = np.where(time == year[i])
-        flu = flux[:,:,g]
-        ice_r = ice[:,:,g]
+    out_month = np.zeros((len(year)*12,6))
+
+    count = 0
+    ye = start_yr
+    mon = 1
+    while ye <=end_yr:
+        g = np.where((time_f[:,0] == ye) & (time_f[:,1] == mon))
+        flu = np.squeeze(flux[:,:,g])
+        ice_r = np.squeeze(ice[:,:,g])
+        are_temp = np.copy(area)
         if mask_file:
-            p = np.where(time_mask == year[i])
-            mas = mask[:,:,p]
-            l = np.where(mas == 0)
-            flu[l[0],l[1],l[2]] = np.nan
-            ice_r[l[0],l[1],l[2]] = np.nan
-        out.append(np.nansum(flu))
+            p = np.where((time_mask_f[:,0] == ye) & (time_mask_f[:,1] == mon))
+            mask_t = np.squeeze(mask[:,:,p])
+
+            f = np.where(mask_t == 0)
+            flu[f] = np.nan
+            ice_r[f] = np.nan
+        out_month[count,0] = ye + ((mon-1)/12)
+        if len(np.where(np.isnan(flu) == 0)[0]) == 0:
+            out_month[count,1] = np.nan
+        else:
+            out_month[count,1] = np.nansum(flu)
         f = np.where(np.sign(flu) == 1)
-        up.append(np.nansum(flu[f]))
+        if len(f[0]) == 0:
+            out_month[count,2] = np.nan
+        else:
+            out_month[count,2] = np.nansum(flu[f])
+
         f = np.where(np.sign(flu) == -1)
-        down.append(np.nansum(flu[f]))
+        if len(f[0]) == 0:
+            out_month[count,3] = np.nan
+        else:
+            out_month[count,3] = np.nansum(flu[f])
 
-        flu = flu.reshape((-1,1))
-        ice_r = ice_r.reshape((-1,1))
-        f = np.where(np.isnan(flu) == 0)[0]
-        are.append(np.sum(area_rep[f])/12)
-        ice_are.append(np.sum(area_rep[f]*(1-ice_r[f]))/12)
+        f = np.where(np.isnan(flu) == 1)
+        #print(f)
+        ice_r[f] = np.nan
+        are_temp[f] = np.nan
+        if len(np.where(np.isnan(are_temp) == 0)[0]) == 0:
+            out_month[count,4] = np.nan
+        else:
+            out_month[count,4] = np.nansum(are_temp)
+        if len(np.where(np.isnan(are_temp) == 0)[0]) == 0:
+            out_month[count,5] = np.nan
+        else:
+            out_month[count,5] =  np.nansum(are_temp*(1-ice_r))
 
+        count = count+1
+        mon = mon+1
+        if mon == 13:
+            ye = ye+1
+            mon = 1
 
-    mol_c = (np.array(out) * 10**15) / np.array(are) / 12.011
-    head = 'Year, Net air-sea CO2 flux (Pg C yr-1),Upward air-sea CO2 flux (Pg C yr-1),Downward air-sea CO2 flux (Pg C yr-1),Mean area of net air-sea CO2 flux (m-2),Mean ice-free area of net air-sea CO2 flux (m-2),Mean air-sea CO2 flux rate (mol C m-2 yr-1)'
-    out_f = np.transpose(np.stack((np.array(year),np.array(out),np.array(up),np.array(down),np.array(are),np.array(ice_are),np.array(mol_c))))
-    out_f[out_f[:,5]==0,1:] = np.nan
+    if save_file:
+        fil = save_file.split('.')
+        file = fil[0] + '_monthly.csv'
+    else:
+        file = os.path.join(model_save_loc,'monthly_flux.csv')
+
+    np.savetxt(file,out_month,delimiter=',',fmt='%.8f',header='Year,Net air-sea CO2 flux (Pg C mon-1),Upward air-sea CO2 flux (Pg C mon-1),Downward air-sea CO2 flux (Pg C mon-1),Area (m-2),Ice-Free area (m-2)')
+    """
+    Turning monthly fluxes into yearly fluxes
+    """
+    month_year = np.floor(out_month[:,0])
+    out_year = np.zeros((len(year),6))
+    count = 0
+    for i in year:
+        f = np.where(month_year == i)[0]
+        out_year[count,0] = i
+        out_year[count,1] = np.sum(out_month[f,1])
+        out_year[count,2] = np.sum(out_month[f,2])
+        out_year[count,3] = np.sum(out_month[f,3])
+        out_year[count,4] = np.mean(out_month[f,4])
+        out_year[count,5] = np.mean(out_month[f,5])
+        count=count+1
     if save_file:
         file = save_file
     else:
         file = os.path.join(model_save_loc,'annual_flux.csv')
-    np.savetxt(file,out_f,delimiter=',',fmt='%.5f',header=head)
+    np.savetxt(file,out_year,delimiter=',',fmt='%.8f',header='Year,Net air-sea CO2 flux (Pg C yr-1),Upward air-sea CO2 flux (Pg C yr-1),Downward air-sea CO2 flux (Pg C yr-1),Area (m-2),Ice-Free area (m-2)')
+
+    # out = []
+    # up = []
+    # down = []
+    # # out_unc = []
+    # are = []
+    # ice_are = []
+    # comp = {}
+    # # for j in flux_unc_components:
+    # #     comp[j] = []
+    # area_rep = np.repeat(area[:, :, np.newaxis], 12, axis=2).reshape((-1,1))
+    # for i in range(len(year)):
+    #     g = np.where(time == year[i])
+    #     flu = flux[:,:,g]
+    #     ice_r = ice[:,:,g]
+    #     if mask_file:
+    #         p = np.where(time_mask == year[i])
+    #         mas = mask[:,:,p]
+    #         l = np.where(mas == 0)
+    #         flu[l[0],l[1],l[2]] = np.nan
+    #         ice_r[l[0],l[1],l[2]] = np.nan
+    #     out.append(np.nansum(flu))
+    #     f = np.where(np.sign(flu) == 1)
+    #     up.append(np.nansum(flu[f]))
+    #     f = np.where(np.sign(flu) == -1)
+    #     down.append(np.nansum(flu[f]))
+    #
+    #     flu = flu.reshape((-1,1))
+    #     ice_r = ice_r.reshape((-1,1))
+    #     f = np.where(np.isnan(flu) == 0)[0]
+    #     are.append(np.sum(area_rep[f])/12)
+    #     ice_are.append(np.sum(area_rep[f]*(1-ice_r[f]))/12)
+
+
+    # mol_c = (np.array(out) * 10**15) / np.array(are) / 12.011
+    # head = 'Year, Net air-sea CO2 flux (Pg C yr-1),Upward air-sea CO2 flux (Pg C yr-1),Downward air-sea CO2 flux (Pg C yr-1),Mean area of net air-sea CO2 flux (m-2),Mean ice-free area of net air-sea CO2 flux (m-2),Mean air-sea CO2 flux rate (mol C m-2 yr-1)'
+    # out_f = np.transpose(np.stack((np.array(year),np.array(out),np.array(up),np.array(down),np.array(are),np.array(ice_are),np.array(mol_c))))
+    # #out_f[out_f[:,5]==0,1:] = np.nan
+    # if save_file:
+    #     file = save_file
+    # else:
+    #     file = os.path.join(model_save_loc,'annual_flux.csv')
+    # np.savetxt(file,out_f,delimiter=',',fmt='%.5f',header=head)
 
 def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False):
     fix = ['k','ph2o_fixed','schmidt_fixed','solskin_unc_fixed','solsubskin_unc_fixed']
@@ -1036,6 +1128,137 @@ def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=
         #worldmap.plot(color="lightgrey", ax=ax[i])
         ax[i].text(0.92,1.06,f'({let[i]})',transform=ax[i].transAxes,va='top',fontweight='bold',fontsize = 24)
     fig.savefig(os.path.join(model_save_loc,'plots','relative_uncertainty_contribution.png'),format='png',dpi=300)
+
+    # fig = plt.figure(figsize=(10,10))
+    # gs = GridSpec(1,2, figure=fig, wspace=0.9,hspace=0.2,bottom=0.07,top=0.95,left=0.075,right=0.9)
+    # ax = fig.add_subplot(gs[0,0])
+    # ax2.plot(year,np.sum(gross,axis=1),'k-',linewidth=3)
+
+def plot_absolute_contribution(model_save_loc,model_plot=False,model_plot_label=False):
+    font = {'weight' : 'normal',
+            'size'   : 15}
+    matplotlib.rc('font', **font)
+    ye = '# Year'
+    gro = ['Upward air-sea CO2 flux (Pg C yr-1)','Downward air-sea CO2 flux (Pg C yr-1)']
+    uncs = ['k','wind','xco2atm','seaice','fco2sw_net','fco2sw_para','fco2sw_val']
+    uncs_comp= ['ph2o','schmidt','solskin_unc','solsubskin_unc']
+    uncs_fco2 = ['fco2sw_val','fco2sw_para','fco2sw_net']
+    label=['Gas Transfer','Wind','Sea Ice','Schmidt','Solubility skin','Solubility subskin','fCO$_{2 (atm)}$','fCO$_{2 (sw)}$']
+    label2 = ['pH$_{2}$O','xCO$_{2 (atm)}$']
+
+    data = pd.read_table(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',')
+
+    """
+    Start by getting all the data out of the annual_flux.csv file. These could be run in any order so we put into a consitent format
+    We then combine the fixed and non-fixed components of uncs_comp to produce a single estimate.
+    """
+    combined = np.zeros((len(data[ye]),len(uncs_comp)+len(uncs)+1))
+    for i in range(len(uncs)):
+        try:
+            combined[:,i] = data['flux_unc_'+uncs[i]+' (Pg C yr-1)']
+        except:
+            combined[:,i] = 0
+    for i in range(len(uncs_comp)):
+        combined[:,i+len(uncs)] = np.sqrt(data['flux_unc_'+uncs_comp[i]+' (Pg C yr-1)']**2 + data['flux_unc_'+uncs_comp[i]+'_fixed (Pg C yr-1)']**2)
+    combine_head = uncs+uncs_comp
+    #print(combined)
+    #print(combine_head)
+
+    # #data = data[:,7:-3]
+    data_atm = combined[:,[2,7]]
+    data_fco2 = combined[:,[4,5,6]]
+    combined = combined[:,[0,1,3,8,9,10]]
+    print(combined.shape)
+    atm = np.sqrt(np.sum(data_atm**2,axis=1))
+    atm = atm[:,np.newaxis]
+    combined = np.append(combined,atm,axis=1)
+    sw = np.sqrt(np.sum(data_fco2**2,axis=1))
+    sw = sw[:,np.newaxis]
+    combined = np.append(combined,sw,axis=1)
+    totals = []
+    gross = []
+    for i in range(len(data[ye])):
+        totals.append(np.sum(combined[i,:]))
+    print(totals)
+    gross = np.array(data[gro])
+    year = data[ye]
+    #label = np.array(combine_head)[[0,1,3,4,6,7,8]]; label = np.append(label,'fCO2_atm')#
+    #print(label)
+    # data = data[:,[7,8,9,10,13,14,15]]
+    #
+    # print(data.shape)
+    fig = plt.figure(figsize=(15,18))
+    gs = GridSpec(2,2, figure=fig, wspace=0.25,hspace=0.15,bottom=0.07,top=0.95,left=0.075,right=0.95)
+    ax = [fig.add_subplot(gs[0,0]),fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,0]),fig.add_subplot(gs[1,1])]
+    #ax2 = ax.twinx()
+    # cols = ['#6929c4','#1192e8','#005d5d','#e78ac3','#fa4d56','#570408','#e5c494','#198038','#002d9c']
+    # cols = ["#fd7f6f", "#7eb0d5",  "#bd7ebe", "#ffb55a", "#ffee65", "#beb9db", "#fdcce5", "#8bd3c7","#b2e061"]
+    # cols = ['#CC6677', '#332288', '#DDCC77', '#117733', '#88CCEE', '#44AA99',  '#882255','#999933', '#AA4499']
+    cols = ['#332288','#44AA99','#882255','#DDCC77', '#117733', '#88CCEE','#999933','#CC6677']
+    line_style = ['-','--','-.','-','--','-.','-','--']
+    for i in range(combined.shape[1]):
+        bottom = 0
+        ax[0].plot(year,combined[:,i],color=cols[i],label=label[i],linestyle=line_style[i])
+
+
+    ax[0].set_ylabel('Absolute contribution to uncertainty (Pg C yr$^{-1}$)')
+    ax[0].set_xlabel('Year')
+    ax[0].set_ylim([0,1])
+    ax[0].grid()
+    handles, labels = ax[0].get_legend_handles_labels()
+    ax[0].legend(handles[::-1], labels[::-1],loc=2)
+    #ax2.set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
+    #
+    label = ['fCO$_{2 (sw)}$ Network','fCO$_{2 (sw)}$ Parameter','fCO$_{2 (sw)}$ Evaluation']
+    totals = []
+
+    for i in range(data_fco2.shape[1]):
+        ax[1].plot(year,data_fco2[:,i],color=cols[i],label=label[i],linestyle=line_style[i])
+
+    handles, labels = ax[1].get_legend_handles_labels()
+    ax[1].legend(handles[::-1], labels[::-1],loc=2)
+    ax[1].set_ylabel('Absolute contribution to uncertainty (Pg C yr$^{-1}$)')
+    ax[1].set_xlabel('Year')
+    ax[1].set_ylim([0,0.7])
+    ax[1].grid()
+    #ax.set_title('fCO$_{2 (sw)}$ total uncertainty contributions')
+    #
+    label = ['xCO$_{2 (atm)}$','pH$_{2}$O']
+    totals = []
+
+    for i in range(data_atm.shape[1]):
+        ax[2].plot(year,data_atm[:,i],color=cols[i],label=label[i],linestyle=line_style[i])
+
+    handles, labels = ax[2].get_legend_handles_labels()
+    ax[2].legend(handles[::-1], labels[::-1],loc=2)
+    ax[2].set_ylabel('Absolute contribution to uncertainty (Pg C yr$^{-1}$)')
+    ax[2].set_xlabel('Year')
+    ax[2].set_ylim([0,0.01])
+    ax[2].grid()
+    #ax.set_title('fCO$_{2 (atm)}$ uncertainty contributions')
+
+    ann = np.loadtxt(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',',skiprows=1)
+    #sta = np.loadtxt(os.path.join(model_save_loc,'unc_monte.csv'),delimiter=',')
+    st = np.sqrt(np.sum(ann[:,6:]**2,axis=1))
+    a = ann[:,0]
+    ax[3].plot(a,ann[:,1],'k-',linewidth=3,zorder=6,label='Net Flux')
+
+    #ax.plot(a,out,zorder=2)
+    ax[3].fill_between(a,ann[:,1] - st,ann[:,1] + st,alpha = 0.6,color='k',zorder=5)
+    ax[3].fill_between(a,ann[:,1] - (2*st),ann[:,1] + (2*st),alpha=0.4,color='k',zorder=4)
+    ax[3].plot(year,-np.sum(np.abs(gross),axis=1),'b--',label = 'Absolute Flux',linewidth=3)
+
+    if model_plot:
+        a = np.loadtxt(model_plot,delimiter=',',skiprows=1)
+        ax[3].plot(a[:,0],a[:,1],'b-',label = model_plot_label,linewidth=3,zorder=6)
+
+    ax[3].set_ylabel('Air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
+    ax[3].set_xlabel('Year')
+    ax[3].legend(loc = 3)
+    for i in range(len(ax)):
+        #worldmap.plot(color="lightgrey", ax=ax[i])
+        ax[i].text(0.92,1.06,f'({let[i]})',transform=ax[i].transAxes,va='top',fontweight='bold',fontsize = 24)
+    fig.savefig(os.path.join(model_save_loc,'plots','absolute_uncertainty_contribution.jpg'),format='jpg',dpi=300)
 
     # fig = plt.figure(figsize=(10,10))
     # gs = GridSpec(1,2, figure=fig, wspace=0.9,hspace=0.2,bottom=0.07,top=0.95,left=0.075,right=0.9)

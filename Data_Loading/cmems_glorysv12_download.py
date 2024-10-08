@@ -6,7 +6,6 @@ Date: 04/2023
 """
 
 import getpass
-# import motuclient
 import datetime
 import data_utils as du
 import os
@@ -14,135 +13,11 @@ from netCDF4 import Dataset
 import numpy as np
 import copernicusmarine as cmmarine
 
-# class MotuOptions:
-#     def __init__(self, attrs: dict):
-#         super(MotuOptions, self).__setattr__("attrs", attrs)
-#
-#     def __setattr__(self, k, v):
-#         self.attrs[k] = v
-#
-#     def __getattr__(self, k):
-#         try:
-#             return self.attrs[k]
-#         except KeyError:
-#             return None
-#
-# def motu_option_parser(script_template, usr, pwd, output_filename,output_directory,date_min,date_max,vari,product):
-#     dictionary = dict(
-#         [e.strip().partition(" ")[::2] for e in script_template.split('--')])
-#     #dictionary['variable'] = [value for (var, value) in [e.strip().partition(" ")[::2] for e in script_template.split('--')] if var == 'variable']  # pylint: disable=line-too-long
-#     dictionary['variable'] = [vari]
-#     #print(list(dictionary.items()))
-#     for k, v in list(dictionary.items()):
-#         if v == '<OUTPUT_FILENAME>':
-#             dictionary[k] = output_filename
-#         if v == '<USERNAME>':
-#             dictionary[k] = usr
-#         if v == '<PASSWORD>':
-#             dictionary[k] = pwd
-#         if v == '<OUTPUT_DIRECTORY>':
-#             dictionary[k] = output_directory
-#         if v == '<DATEMIN>':
-#             dictionary[k] = date_min
-#         if v == '<DATEMAX>':
-#             dictionary[k] = date_max
-#         if v == '<PRODUCTID>':
-#             dictionary[k] = product
-#         if k in ['longitude-min', 'longitude-max', 'latitude-min',
-#                  'latitude-max', 'depth-min', 'depth-max']:
-#             dictionary[k] = float(v)
-#         # if k in ['date-min', 'date-max']:
-#         #     dictionary[k] = v[1:-1]
-#         dictionary[k.replace('-','_')] = dictionary.pop(k)
-#     dictionary.pop('python')
-#     dictionary['auth_mode'] = 'cas'
-#     return dictionary
-#
-# def script_fore_daily():
-#     script_template_fore = 'python -m motuclient \
-#     --motu https://my.cmems-du.eu/motu-web/Motu \
-#     --service-id GLOBAL_MULTIYEAR_PHY_001_030-TDS \
-#     --product-id <PRODUCTID> \
-#     --longitude-min -180 --longitude-max 180 \
-#     --latitude-min -90 --latitude-max 90 \
-#     --date-min <DATEMIN> --date-max <DATEMAX> \
-#     --depth-min 0.49402499198913574 --depth-max 0.49402499198913574 \
-#     --variable <VAR> \
-#     --out-dir <OUTPUT_DIRECTORY> --out-name <OUTPUT_FILENAME> \
-#     --user <USERNAME> --pwd <PASSWORD>'
-#     product = 'cmems_mod_glo_phy_my_0.083_P1D-m'
-#     return script_template_fore, product
-#
-# def script_fore():
-#     script_template_fore = 'python -m motuclient \
-#     --motu https://my.cmems-du.eu/motu-web/Motu \
-#     --service-id GLOBAL_MULTIYEAR_PHY_001_030-TDS \
-#     --product-id <PRODUCTID> \
-#     --longitude-min -180 --longitude-max 180 \
-#     --latitude-min -90 --latitude-max 90 \
-#     --date-min <DATEMIN> --date-max <DATEMAX> \
-#     --depth-min 0.49402499198913574 --depth-max 0.49402499198913574 \
-#     --variable <VAR> \
-#     --out-dir <OUTPUT_DIRECTORY> --out-name <OUTPUT_FILENAME> \
-#     --user <USERNAME> --pwd <PASSWORD>'
-#     product = 'cmems_mod_glo_phy_myint_0.083_P1M-m'
-#     return script_template_fore, product
-#
-# def script_aft_daily(variable):
-#     script_template_nrt = 'python -m motuclient \
-#     --motu https://nrt.cmems-du.eu/motu-web/Motu \
-#     --service-id GLOBAL_ANALYSISFORECAST_PHY_001_024-TDS \
-#     --product-id <PRODUCTID> \
-#     --longitude-min -180 --longitude-max 180 \
-#     --latitude-min -90 --latitude-max 90 \
-#     --date-min <DATEMIN> --date-max <DATEMAX> \
-#     --depth-min 0.49402499198913574 --depth-max 0.49402499198913574 \
-#     --variable <VAR> \
-#     --out-dir <OUTPUT_DIRECTORY> --out-name <OUTPUT_FILENAME> \
-#     --user <USERNAME> --pwd <PASSWORD>'
-#     if variable == 'thetao':
-#         product = 'cmems_mod_glo_phy-thetao_anfc_0.083deg_P1D-m'
-#     elif variable == 'so':
-#         product = 'cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m'
-#     elif variable == 'uo':
-#         product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m'
-#     elif variable == 'vo':
-#         product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m'
-#     else:
-#         product = 'cmems_mod_glo_phy_anfc_0.083deg_P1D-m'
-#     return script_template_nrt,product
-#
-# def script_aft(variable):
-#     script_template_nrt = 'python -m motuclient \
-#     --motu https://nrt.cmems-du.eu/motu-web/Motu \
-#     --service-id GLOBAL_ANALYSISFORECAST_PHY_001_024-TDS \
-#     --product-id <PRODUCTID> \
-#     --longitude-min -180 --longitude-max 180 \
-#     --latitude-min -90 --latitude-max 90 \
-#     --date-min <DATEMIN> --date-max <DATEMAX> \
-#     --depth-min 0.49402499198913574 --depth-max 0.49402499198913574 \
-#     --variable <VAR> \
-#     --out-dir <OUTPUT_DIRECTORY> --out-name <OUTPUT_FILENAME> \
-#     --user <USERNAME> --pwd <PASSWORD>'
-#     if variable == 'thetao':
-#         product = 'cmems_mod_glo_phy-thetao_anfc_0.083deg_P1D-m'
-#     elif variable == 'so':
-#         product = 'cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m'
-#     elif variable == 'uo':
-#         product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m'
-#     elif variable == 'vo':
-#         product = 'cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m'
-#     else:
-#         product = 'cmems_mod_glo_phy_anfc_0.083deg_P1M-m'
-#     return script_template_nrt,product
-
 def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
     """
     Reanalysis Dataset DOI: https://doi.org/10.48670/moi-00021
     Renalaysis/Forecast Dataset DOI: https://doi.org/10.48670/moi-00016
     """
-    # USERNAME = 'dford1'
-    # PASSWORD = 'Jokers!99.88\\'
     OUTPUT_DIRECTORY = loc
     # Year reanalysis ends - check https://doi.org/10.48670/moi-00021 for year
     # After this year we use the forecast dataset from: https://doi.org/10.48670/moi-00016
@@ -197,8 +72,6 @@ def load_glorysv12_daily(loc,start_yr = 1993,end_yr = 2020,variable=None):
     Renalaysis/Forecast Dataset DOI: https://doi.org/10.48670/moi-00016
     """
     import calendar
-    USERNAME = 'dford1'
-    PASSWORD = 'Jokers!99.88\\'
     OUTPUT_DIRECTORY = loc
     # Year reanalysis ends - check https://doi.org/10.48670/moi-00021 for year
     # After this year we use the forecast dataset from: https://doi.org/10.48670/moi-00016

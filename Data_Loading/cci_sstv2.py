@@ -9,7 +9,7 @@ from netCDF4 import Dataset
 import numpy as np
 import calendar
 
-def cci_retrieve(loc="D:/Data/SST-CCI/",start_yr = 1981,end_yr = 2023):
+def cci_retrieve_v2(loc="D:/Data/SST-CCI/",start_yr = 1981,end_yr = 2023):
     import cdsapi
     import zipfile
     if start_yr < 1981:
@@ -57,6 +57,29 @@ def cci_retrieve(loc="D:/Data/SST-CCI/",start_yr = 1981,end_yr = 2023):
             with zipfile.ZipFile(loc+'download.zip', 'r') as zip_ref:
                 zip_ref.extractall(p)
         d = d+datetime.timedelta(days=1)
+
+def cci_sst_v3(loc,start_yr=1990,end_yr=2023):
+    du.makefolder(loc)
+    htt = 'https://data.ceda.ac.uk/neodc/eocis/data/global_and_regional/sea_surface_temperature/CDR_v3/Analysis/L4/v3.0.1/'
+    d = datetime.datetime(start_yr,1,1)
+    # t = 1
+    while d.year < end_yr:
+        if d.day == 1:
+            du.makefolder(os.path.join(loc,str(d.year)))
+            du.makefolder(os.path.join(loc,str(d.year),du.numstr(d.month)))
+
+        file = os.path.join(loc,str(d.year),du.numstr(d.month),d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR3.0-v02.0-fv01.0.nc'))
+        htt_file = htt+'/'+d.strftime('%Y/%m/%d')+'/'+d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR3.0-v02.0-fv01.0.nc')
+        print(file)
+        #print(htt_file)
+        if not du.checkfileexist(file):
+            print('Downloading... ' + file)
+            urllib.request.urlretrieve(htt_file,file)
+        #open(file).write(requests.get(htt_file))
+        d = d + datetime.timedelta(days=1)
+        # t = t+1
+        # if t == 30:
+        #     break
 
 def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023,time_cor = 5,v3 = False):
     du.makefolder(os.path.join(inp,'monthly'))
@@ -131,34 +154,100 @@ def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023,time_cor 
             mon = 1
             ye = ye+1
 
-def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_yr=2023,out_loc='',log='',lag='',v3=False,flip=False,bia=0):
+def cci_sst_8day(loc,out_folder,start_yr = 1993,end_yr=2022,time_cor = 5):
+
+        du.makefolder(os.path.join(out_folder,str(start_yr)))
+        d = datetime.datetime(start_yr,1,1)
+        t = 0
+        while d.year <= end_yr:
+            ye = d.year
+            du.makefolder(os.path.join(out_folder,str(d.year)))
+            print(d)
+            file_out = os.path.join(out_folder,str(d.year),'ESA_CCI_8DAY_SST_' + d.strftime("%Y%m%d")+'.nc')
+            if (du.checkfileexist(file_out) == 0):
+                files = []
+                for i in range(0,8):
+                    d2 = d + datetime.timedelta(days=int(i))
+                    if d2.year == d.year: # A catch for the very last 8 day period of the year to match the OC-CCI as the last period doesn't always cover 8 days
+                        g = glob.glob(os.path.join(loc,d2.strftime("%Y"),d2.strftime("%m"),d2.strftime("%d"),'*.nc'))
+                        if len(g) > 0:
+                            files.append(g[0])
+                if len(files)>0:
+                    if t == 0:
+                        lon,lat = du.load_grid(files[0],latv='lat',lonv='lon')
+                        t = 1
+                    sst = np.empty((lon.shape[0],lat.shape[0],len(files)))
+                    sst[:] = np.nan
+                    ice = np.empty((lon.shape[0],lat.shape[0],len(files)))
+                    ice[:] = np.nan
+                    unc = np.empty((lon.shape[0],lat.shape[0],len(files)))
+                    unc[:] = np.nan
+                    for j in range(len(files)):
+                        print(files[j])
+                        c = Dataset(os.path.join(files[j]),'r')
+                        sst_t = np.array(c.variables['analysed_sst'][:]); sst_t[sst_t < 0 ] = np.nan
+                        #print(np.transpose(sst[0,:,:]).shape)
+                        sst_t = np.transpose(sst_t[0,:,:])
+
+                        ice_t = np.array(c.variables['sea_ice_fraction'][:]); ice_t[ice_t < 0] = np.nan
+                        ice_t = np.transpose(ice_t[0,:,:])
+
+                        unc_t = np.array(c.variables['analysed_sst_uncertainty'][:]); unc_t[unc_t < 0] = np.nan
+                        unc_t = np.transpose(unc_t[0,:,:])
+                        c.close()
+
+                        sst[:,:,j] = sst_t
+                        ice[:,:,j] = ice_t
+                        unc[:,:,j] = unc_t
+                    sst_o = np.nanmean(sst,axis=2)
+                    ice_o = np.nanmean(ice,axis=2)
+                    unc_o = np.nanmean(unc,axis=2)/np.sqrt(len(files)/time_cor)
+
+                    du.netcdf_create_basic(file_out,sst_o,'analysed_sst',lat,lon)
+                    du.netcdf_append_basic(file_out,ice_o,'sea_ice_fraction')
+                    du.netcdf_append_basic(file_out,unc_o,'analysed_sst_uncertainty')
+
+
+            d = d + datetime.timedelta(days=8)
+            if ye != d.year:
+                d = datetime.datetime(d.year,1,1)
+
+def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_yr=2023,out_loc='',log='',lag='',v3=False,flip=False,bia=0,monthly = True):
     du.makefolder(out_loc)
     res = np.round(np.abs(log[0]-log[1]),2)
-    if v3:
-        ye = start_yr
-        mon = 1
-    else:
-        if start_yr <= 1981:
-            ye = 1981
-            mon = 9
-        else:
+    if monthly:
+        if v3:
             ye = start_yr
             mon = 1
-
+        else:
+            if start_yr <= 1981:
+                ye = 1981
+                mon = 9
+            else:
+                ye = start_yr
+                mon = 1
+    else:
+        d = datetime.datetime(start_yr,1,1)
+    ye = d.year
     t=0
     while ye <= end_yr:
-        du.makefolder(os.path.join(out_loc,str(ye)))
 
-        file = os.path.join(data,str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc')
-        file_o = os.path.join(out_loc,str(ye),str(ye)+du.numstr(mon)+f'_ESA_CCI_MONTHLY_SST_{res}_deg.nc')
+        du.makefolder(os.path.join(out_loc,str(ye)))
+        if monthly:
+            file = os.path.join(data,str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc')
+            file_o = os.path.join(out_loc,str(ye),str(ye)+du.numstr(mon)+f'_ESA_CCI_MONTHLY_SST_{res}_deg.nc')
+        else:
+            file = os.path.join(data,str(d.year),'ESA_CCI_8DAY_SST_'+d.strftime('%Y%m%d')+'.nc')
+            file_o = os.path.join(out_loc,str(d.year),'ESA_CCI_8DAY_SST_'+d.strftime('%Y%m%d')+f'_{res}_deg.nc')
         print(file)
-        if t == 0:
-            [lon,lat] = du.load_grid(file)
-            [lo_grid,la_grid] = du.determine_grid_average(lon,lat,log,lag)
-            #print(lo_grid)
-            #print(la_grid)
-            t = 1
-        if du.checkfileexist(file_o) == 0:
+
+        if (du.checkfileexist(file_o) == 0) & (du.checkfileexist(file) == 1):
+            if t == 0:
+                [lon,lat] = du.load_grid(file)
+                [lo_grid,la_grid] = du.determine_grid_average(lon,lat,log,lag)
+                #print(lo_grid)
+                #print(la_grid)
+                t = 1
             c = Dataset(file,'r')
             sst = np.array(c.variables['analysed_sst'][:]); sst[sst<0] = np.nan
             ice = np.array(c.variables['sea_ice_fraction'][:])
@@ -175,10 +264,16 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
             c.variables['analysed_sst_uncertainty'].uncertainty = 'These uncertainties are 2 sigma (95% confidence) equivalents!'
             c.variables['analysed_sst'].bias_correction = 'Bias correction of ' + str(bia) + ' applied!'
             c.close()
-        mon = mon+1
-        if mon == 13:
-            ye = ye+1
-            mon = 1
+        if monthly:
+            mon = mon+1
+            if mon == 13:
+                ye = ye+1
+                mon = 1
+        else:
+            d = d + datetime.timedelta(days=8)
+            if ye != d.year:
+                d = datetime.datetime(d.year,1,1)
+            ye = d.year
 
 def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1980,v3=False,plot=False):
     import pandas as pd

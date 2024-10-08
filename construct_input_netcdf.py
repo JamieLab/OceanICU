@@ -17,11 +17,12 @@ import Data_Loading.data_utils as du
 def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year = 1970,fill_clim=True,append = False):
     #lon,lat = du.reg_grid(lat=resolution,lon=resolution)
     direct = {}
+    clim = {}
     for a in vars:
         timesteps,direct[a[0]+'_'+a[1]],month_track,time_track_temp = build_timeseries(a[2],a[1],start_yr,end_yr,lon,lat,a[0],fill_clim=fill_clim)
         if a[3] == 1:
             print('Producing anomaly...')
-            direct[a[0] + '_' + a[1] + '_anom'] = produce_anomaly(direct[a[0]+'_'+a[1]],month_track)
+            direct[a[0] + '_' + a[1] + '_anom'],clim[a[0] + '_' + a[1]+'_clim'] = produce_anomaly(direct[a[0]+'_'+a[1]],month_track)
     time_track = []
     for i in range(len(time_track_temp)):
         time_track.append((time_track_temp[i] - datetime.datetime(time_ref_year,1,15)).days)
@@ -29,7 +30,37 @@ def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year =
     if append:
         append_netcdf(out_file,direct,lon,lat,timesteps)
     else:
-        save_netcdf(out_file,direct,lon,lat,timesteps,time_track=time_track,ref_year = time_ref_year)
+        #save_netcdf(out_file,direct,lon,lat,timesteps,time_track=time_track,ref_year = time_ref_year)
+        save_climatology(out_file,clim)
+
+def driver8day(out_file,vars,start_yr=1990,end_yr =2022,lon=[],lat=[],time_ref_year = 1970,fill_clim=False,append=False):
+    print('Testing')
+    d = datetime.datetime(start_yr,1,1)
+    time_track = []
+    while d.year <=end_yr:
+        ye = d.year
+        time_track.append(d)
+        d = d + datetime.timedelta(days=8)
+        if ye != d.year:
+            d = datetime.datetime(d.year,1,1)
+    time_track_int = []
+    for i in range(len(time_track)):
+        time_track_int.append((time_track[i] - datetime.datetime(time_ref_year,1,15)).days)
+    time_track_int = np.array(time_track_int)
+    print(time_track)
+    print(len(time_track))
+    direct = {}
+    for a in vars:
+        out_data = np.empty((len(lon),len(lat),len(time_track)))
+        out_data[:] = np.nan
+        for i in range(len(time_track)):
+            file = a[2].replace('%Y',time_track[i].strftime('%Y')).replace('%m',time_track[i].strftime('%m')).replace('%d',time_track[i].strftime('%d'))
+            print(file)
+            if du.checkfileexist(file):
+                out_data[:,:,i] = du.load_netcdf_var(file,a[1])
+        direct[a[0]+'_'+a[1]] = out_data
+
+    save_netcdf(out_file,direct,lon,lat,len(time_track),time_track=time_track_int,ref_year=time_ref_year)
 
 def build_timeseries(load_loc,variable,start_yr,end_yr,lon,lat,name,fill_clim=True):
     """
@@ -90,7 +121,7 @@ def produce_anomaly(data,month_track):
         #print(clim[:,:,i].shape)
         for j in range(0,len(f)):
             anom[:,:,f[j]] = data[:,:,f[j]] - clim[:,:,i]
-    return anom
+    return anom,clim
 
 def fill_with_clim(data,avai,month_track):
     """
@@ -220,6 +251,21 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=[],ref_y
         time_o.units = f'Days since {ref_year}-01-15'
         time_o.standard_name = 'Time of observations'
     c.close()
+
+def save_climatology(save_loc,direct,flip=False):
+    c = Dataset(save_loc,'a')
+    try:
+        c.createDimension('clim_time',12)
+    except:
+        print('Dimension exists?')
+    for var in list(direct.keys()):
+        if flip:
+            var_o = c.createVariable(var,'f4',('latitude','longitude','clim_time'))#,**copts)
+            var_o[:] = direct[var].transpose(1,0,2)
+        else:
+            var_o = c.createVariable(var,'f4',('longitude','latitude','clim_time'))#,**copts)
+            var_o[:] = direct[var]
+        var_o.date_variable = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
 
 def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False,longname =False,comment=False):
     c = Dataset(save_loc,'a',format='NETCDF4_CLASSIC')
@@ -360,7 +406,7 @@ def land_clear(model_save_loc):
 
     c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'a')
     time = c.variables['time'][:]
-    ocean = np.repeat(ocean[:, :, np.newaxis], len(time), axis=2)
+
     v = list(c.variables.keys())
     v.remove('time')
     v.remove('latitude')
@@ -369,7 +415,8 @@ def land_clear(model_save_loc):
     for var in v:
         print(var)
         data = c.variables[var][:]
-        data[ocean == 0.0] = np.nan
+        ocean_t = np.repeat(ocean[:, :, np.newaxis], data.shape[2], axis=2)
+        data[ocean_t == 0.0] = np.nan
         c.variables[var][:] = data
     c.close()
 

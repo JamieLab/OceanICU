@@ -30,7 +30,7 @@ def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year =
     if append:
         append_netcdf(out_file,direct,lon,lat,timesteps)
     else:
-        #save_netcdf(out_file,direct,lon,lat,timesteps,time_track=time_track,ref_year = time_ref_year)
+        save_netcdf(out_file,direct,lon,lat,timesteps,time_track=time_track,ref_year = time_ref_year)
         save_climatology(out_file,clim)
 
 def driver8day(out_file,vars,start_yr=1990,end_yr =2022,lon=[],lat=[],time_ref_year = 1970,fill_clim=False,append=False):
@@ -266,6 +266,7 @@ def save_climatology(save_loc,direct,flip=False):
             var_o = c.createVariable(var,'f4',('longitude','latitude','clim_time'))#,**copts)
             var_o[:] = direct[var]
         var_o.date_variable = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.close()
 
 def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False,longname =False,comment=False):
     c = Dataset(save_loc,'a',format='NETCDF4_CLASSIC')

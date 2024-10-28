@@ -48,7 +48,7 @@ def era5_daily(loc,start_yr,end_yr):
 
     d = datetime.datetime(start_yr,1,1)
 
-    while d.year < end_yr:
+    while d.year <= end_yr:
         print(d.year)
         print(d.month)
         p = os.path.join(loc,str(d.year))
@@ -76,6 +76,38 @@ def era5_daily(loc,start_yr,end_yr):
             client.retrieve(dataset, request, target)
         d = d + datetime.timedelta(days=int(day[-1]))
 
+def era5_wind_time_average(loc,outloc,start_yr,end_yr):
+    du.makefolder(outloc)
+    yr = start_yr
+    mon = 1
+    t = 0
+    while yr <= end_yr:
+        if mon == 1:
+            du.makefolder(os.path.join(outloc,str(yr)))
+        file = os.path.join(loc,str(yr),du.numstr(mon),str(yr)+'_'+du.numstr(mon)+'_hourly_ERA5.nc')
+        print(file)
+        outfile = os.path.join(outloc,str(yr),str(yr)+'_'+du.numstr(mon)+'_ERA5.nc')
+        if du.checkfileexist(file) and not du.checkfileexist(outfile):
+            lon,lat = du.load_grid(file)
+            c = Dataset(file,'r')
+            u = np.array(c['u10'])
+            v = np.array(c['v10'])
+            c.close()
+            ws = np.sqrt(u**2 + v**2)
+            print(ws.shape)
+            ws2 = ws**2
+            ws = np.transpose(np.mean(ws,axis=0))
+            ws2 = np.transpose(np.mean(ws2,axis=0))
+            print(ws.shape)
+            lon,ws = du.grid_switch(lon,ws)
+            l,ws2 = du.grid_switch(np.array(180),ws2)
+            du.netcdf_create_basic(outfile,ws,'ws',lat,lon)
+            du.netcdf_append_basic(outfile,ws2,'ws2')
+        mon = mon+1
+        if mon == 13:
+            yr = yr+1
+            mon=1
+
 def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,orgi_res = 0.25):
     du.makefolder(outloc)
     res = np.round(np.abs(log[0]-log[1]),2)
@@ -93,9 +125,12 @@ def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,org
             lon,lat = du.load_grid(file)
 
             c = Dataset(file,'r')
-            va_da = np.transpose(np.squeeze(np.array(c.variables[var][:])))
+            va_da = np.squeeze(np.array(c.variables[var][:]))
+            if va_da.shape[0] < va_da.shape[1]:
+                va_da = np.transpose(va_da)
             c.close()
-            lon,va_da=du.grid_switch(lon,va_da)
+            if lon[0] >= 0:
+                lon,va_da=du.grid_switch(lon,va_da)
 
             if res > orgi_res:
                 # If we are averaging to a 1 deg grid for example then we use the grid averaging.

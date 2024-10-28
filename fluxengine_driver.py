@@ -146,7 +146,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
         fco2_tot_unc[fco2_tot_unc>1000] = np.nan
     else:
         fco2_tot_unc = np.ones((fco2_sw.shape)) * fco2_tot_unc
-    #print(fco2_tot_unc)
+    #print(fco2_tot_unc.shape)
     fco2_net_unc = np.array(c.variables['fco2_net_unc'])
     fco2_net_unc[fco2_net_unc>1000] = np.nan
     fco2_para_unc = np.array(c.variables['fco2_para_unc'])
@@ -155,6 +155,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     fco2_val_unc[fco2_val_unc>1000] = np.nan
 
     fco2sw_perunc = fco2_tot_unc / fco2_sw
+    #print(fco2sw_perunc.shape)
     fco2sw_val_unc = fco2_val_unc / fco2_sw
     fco2sw_para_unc = fco2_para_unc / fco2_sw
     fco2sw_net_unc = fco2_net_unc / fco2_sw
@@ -178,7 +179,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
         norm_sst = np.random.normal(0,sst_unc,ens)
     norm_sss = np.random.normal(0,sal_unc,ens)
     norm_wind = np.random.normal(0,wind_unc,ens)
-
+    #print(sst_unc_d)
 
     # Here we load the concentrations
     subskin_conc = load_flux_var(fluxloc,'OSFC',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
@@ -331,6 +332,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     subskin_conc_unc_net = (fco2sw_net_unc * subskin_conc) / np.abs(dconc)
     subskin_conc_unc_para = (fco2sw_para_unc * subskin_conc) / np.abs(dconc)
     subskin_conc_unc_val = (fco2sw_val_unc * subskin_conc) / np.abs(dconc)
+    #print(subskin_conc_unc)
     # Add the concentration unc in quadrature and then convert to a percentage.
     #conc_unc = np.sqrt(skin_conc_unc**2 + subskin_conc_unc**2) / np.abs(dconc)
     # Flux uncertainity is the percentage unc added and then converted to absolute units (not percentage)
@@ -662,12 +664,13 @@ def load_flux_var(loc,var,start_yr,end_yr,lonl,latl,timel,flip=False,single_run=
         #print(g)
         c = Dataset(g[0])
         op = np.squeeze(np.array(c[var]))
-        # if t == 0:
-        #     lat = np.array(c['latitude'])
-        #     if np.sign(lat[1] - lat[0]) == -1:
-        #         flip = True
-        #     else:
-        #         flip = False
+        if t == 0:
+            lat = np.array(c['latitude'])
+            if np.sign(lat[1] - lat[0]) == -1:
+                flip = True
+            else:
+                flip = False
+
         if flip:
             op = np.flipud(op)
         out[:,:,t] = op

@@ -275,7 +275,7 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
                 d = datetime.datetime(d.year,1,1)
             ye = d.year
 
-def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1980,v3=False,plot=False):
+def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1980,v3=False,plot=False,sst_bias=0):
     import pandas as pd
     import calendar
     import glob
@@ -400,7 +400,7 @@ def cci_socat_append(file,data_loc='D:/Data/SST-CCI',start_yr = 1980,v3=False,pl
                             ice[f[g]] = a
                             plot = False
 
-    data['cci_sst [C]'] = cci_sst - 273.15
+    data['cci_sst [C]'] = cci_sst - 273.15 + sst_bias
     data['cci_sst_unc [C]'] = cci_sst_unc
     data['cci_ice_fraction'] = ice
     st = file.split('.')

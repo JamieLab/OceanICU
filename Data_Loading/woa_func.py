@@ -33,7 +33,7 @@ def append_woa(file,delimiter,col_year,col_mon,col_lat,col_lon,woa_location,woa_
     print(out.shape)
     for i in uni:
         print(i)
-        print(os.path.join(woa_location,'*'+du.numstr(i)+'.nc'))
+        print(os.path.join(woa_location,'*'+du.numstr(int(i))+'_01.nc'))
         woa_file = glob.glob(os.path.join(woa_location,'*'+du.numstr(int(i))+'_01.nc'))[0]
 
         c = Dataset(woa_file,'r')

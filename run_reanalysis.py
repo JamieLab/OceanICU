@@ -374,43 +374,44 @@ def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = [],grid
         result['expocode'] = data['Expocode']
 
         for yrs in set(result['yr']):
-            year_data = result[np.where(result['yr'] == yrs)]
-            for mon in set(year_data['mon']):
-                print(f'Year: {yrs} - Month: {mon}')
-                month_data = year_data[np.where(year_data['mon'] == mon)]
-                data_loc = os.path.join(save_fold,'reanalysed_global',"%02d"%mon)
+            if yrs >= start_yr:
+                year_data = result[np.where(result['yr'] == yrs)]
+                for mon in set(year_data['mon']):
+                    print(f'Year: {yrs} - Month: {mon}')
+                    month_data = year_data[np.where(year_data['mon'] == mon)]
+                    data_loc = os.path.join(save_fold,'reanalysed_global',"%02d"%mon)
 
-                data_loc_per = os.path.join(data_loc,'per_cruise')
-                du.makefolder(data_loc)
-                du.makefolder(data_loc_per)
-                outputfile='GL_from_%s_to_%s_%02d.nc'%(yrs,yrs,mon)
+                    data_loc_per = os.path.join(data_loc,'per_cruise')
+                    du.makefolder(data_loc)
+                    du.makefolder(data_loc_per)
+                    outputfile='GL_from_%s_to_%s_%02d.nc'%(yrs,yrs,mon)
 
-                final_output_path = os.path.join(data_loc,outputfile)
-                for expo in set(month_data['expocode']):
-                    print(expo)
-                    output_cruise_file=os.path.join(data_loc_per,outputfile.replace('.nc','-%s.nc'%expo))
-                    expo_indices=np.where(month_data['expocode']==expo)
-                    expo_data=month_data[expo_indices]
-                    variabledictionary=CreateBinnedData(expo_data,latg,long)
-                    #print(variabledictionary)
-                    half_days_in_month=15.5
-                    datadate=datetime.datetime(yrs,mon,int(half_days_in_month),0,0,0)
-                    myprocess=multiprocessing.Process(target=WriteOutToNCAsGrid,args=(variabledictionary,output_cruise_file,None,long,latg,datadate))
-                    myprocess.start()
-                    myprocess.join()
-                common_prefix=outputfile.replace('.nc','')
-                cruise_files=glob.glob("%s/%s*"%(data_loc_per,common_prefix))
-                if len(cruise_files) !=0:
-                   print()
-                   print("Combining cruises from region, year and month: ",cruise_files)
-                   print()
-                   combine_nc_files.FromFilelist(filelist=cruise_files,output=final_output_path,
-                                                 weighting="cruise-weighted",outputtime=datadate)
+                    final_output_path = os.path.join(data_loc,outputfile)
+                    for expo in set(month_data['expocode']):
+                        print(expo)
+                        output_cruise_file=os.path.join(data_loc_per,outputfile.replace('.nc','-%s.nc'%expo))
+                        expo_indices=np.where(month_data['expocode']==expo)
+                        expo_data=month_data[expo_indices]
+                        variabledictionary=CreateBinnedData(expo_data,latg,long)
+                        #print(variabledictionary)
+                        half_days_in_month=15.5
+                        datadate=datetime.datetime(yrs,mon,int(half_days_in_month),0,0,0)
+                        myprocess=multiprocessing.Process(target=WriteOutToNCAsGrid,args=(variabledictionary,output_cruise_file,None,long,latg,datadate))
+                        myprocess.start()
+                        myprocess.join()
+                    common_prefix=outputfile.replace('.nc','')
+                    cruise_files=glob.glob("%s/%s*"%(data_loc_per,common_prefix))
+                    if len(cruise_files) !=0:
+                       print()
+                       print("Combining cruises from region, year and month: ",cruise_files)
+                       print()
+                       combine_nc_files.FromFilelist(filelist=cruise_files,output=final_output_path,
+                                                     weighting="cruise-weighted",outputtime=datadate)
 
-                   #get the binned data for the whole month to add to the nc file as other variables
-                   allnewvars=CreateBinnedData(month_data,latg,long)
-                   newvars={v : allnewvars[v] for v in statvariables+['stds']}
-                   combine_nc_files.AddNewVariables(filename=final_output_path,newvars=newvars)
+                       #get the binned data for the whole month to add to the nc file as other variables
+                       allnewvars=CreateBinnedData(month_data,latg,long)
+                       newvars={v : allnewvars[v] for v in statvariables+['stds']}
+                       combine_nc_files.AddNewVariables(filename=final_output_path,newvars=newvars)
 
 def geo_idx(dd, dd_array):
     """
@@ -777,7 +778,7 @@ def WriteOutToNCAsGrid(vardict,outputfile,extrapolatetoyear,long,latg,outputtime
                 stdf_data.standard_name = "stdev_"+var+varext
                 stdf_data.long_name = "Standard deviation of "+var+varext+" occupying binned cell"
 
-def correct_fco2_daily(socat_file,month_fco2,month_sst,daily_sst,co2 = '_fco2'):
+def correct_fco2_daily(socat_file,month_fco2,month_sst,daily_sst,co2 = '_fco2',sst_bias=0):
     """
     Function to correct the monthly reanalysed fCO2sw data (at a monthly SST) to a respective daily SST data
 

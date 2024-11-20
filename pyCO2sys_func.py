@@ -10,9 +10,14 @@ import os
 from netCDF4 import Dataset
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+import matplotlib.transforms
 import Data_Loading.data_utils as du
 import PyCO2SYS as pyco2
 import construct_input_netcdf as cinp
+import geopandas as gpd
+import cmocean
+import weight_stats as ws
 
 def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI_SST_analysed_sst',sst_kelvin = True,sss_var = 'CMEMS_so',sst_var_unc = 'CCI_SST_analysed_sst_uncertainty',
     sss_var_unc = 0.1,phosphate_var=False,phosphate_var_unc=False,phosphate_unc_perc=False,silicate_var=False,silicate_var_unc=False,
@@ -164,15 +169,13 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
     cinp.append_netcdf(data_file,direct,1,1,1,units=units,longname=longname,comment=comment)
 
 def plot_pyCO2sys_out(data_file,model_save_loc):
-    import geopandas as gpd
-    from matplotlib.gridspec import GridSpec
-    import cmocean
-    import matplotlib.transforms
+
+
     font = {'weight' : 'normal',
             'size'   :26}
     matplotlib.rc('font', **font)
     label_size = 34
-    worldmap = gpd.read_file(gpd.datasets.get_path("ne_50m_land"))
+    worldmap = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
     fig = plt.figure(figsize=(40,35))
     row = 4; col=2;
     gs = GridSpec(row,col, figure=fig, wspace=0.10,hspace=0.15,bottom=0.025,top=0.975,left=0.05,right=0.975)
@@ -280,3 +283,43 @@ def load_DIVA_glodap(file,delimiter,out_file,log,lag,var_name='ta'):
     print(lon.shape)
     out = griddata((lon.ravel(),lat.ravel()), var.ravel(), (log_o.ravel(), lag_o.ravel()), method='linear').reshape(log_o.shape)
     netcdf_create_basic(out_file,out,var_name,lag,log)
+
+def plot_carbonate_validation(model_save_loc,insitu_file,insitu_var,nn_file,nn_var,lims = [1200,2400],var_name = 'DIC',unit='umol kg$^{-1}$',vma = [-40,40]):
+    from neural_network_train import unweight
+    font = {'weight' : 'normal',
+            'size'   :14}
+    matplotlib.rc('font', **font)
+    c = Dataset(insitu_file,'r')
+    insitu = np.array(c[insitu_var])
+    lat = np.array(c['latitude'])
+    lon = np.array(c['longitude'])
+    c.close()
+
+    c = Dataset(nn_file,'r')
+    nn = np.array(c[nn_var])
+    c.close()
+
+    fig = plt.figure(figsize=(21,7))
+    gs = GridSpec(1,3, figure=fig, wspace=0.25,hspace=0.25,bottom=0.1,top=0.95,left=0.05,right=0.95)
+    ax = fig.add_subplot(gs[0,0])
+    ax2 = fig.add_subplot(gs[0,1:])
+
+    ax.scatter(insitu,nn,s=2)
+    unweight(insitu.ravel(),nn.ravel(),ax,np.array(lims),unit = unit,plot=True,loc = [0.52,0.26])
+    stats_temp = ws.unweighted_stats(insitu.ravel(),nn.ravel(),'b')
+    lims = np.array(lims)
+    ax.set_xlim(lims)
+    ax.set_ylim(lims)
+    ax.fill_between(lims,lims-stats_temp['rmsd'],lims+stats_temp['rmsd'],color='k',alpha=0.6,linestyle='')
+    ax.fill_between(lims,lims-(stats_temp['rmsd']*2),lims+(stats_temp['rmsd']*2),color='k',alpha=0.4,linestyle='')
+    ax.set_ylabel('UExP-FNN-U ' + var_name +' (' + unit +')')
+    ax.set_xlabel('in situ ' + var_name +' (' + unit +')')
+    ax.plot(lims,lims,'k-')
+
+    worldmap = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+    worldmap.plot(color="lightgrey", ax=ax2)
+    dif = np.nanmean(insitu - nn,axis=2)
+
+    a = ax2.pcolor(lon,lat,np.transpose(dif),cmap = cmocean.tools.crop_by_percent(cmocean.cm.balance, 20, which='both', N=None),vmin = vma[0],vmax=vma[1])
+    cbar = fig.colorbar(a); cbar.set_label(var_name + ' Bias (' + unit+')')
+    fig.savefig(os.path.join(model_save_loc,'plots',var_name+'_validation_bias.png'),dpi=300)

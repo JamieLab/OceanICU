@@ -633,18 +633,19 @@ The neural network approach here is all about defined uncertainties, so this is 
 #     else:
 #         fig.savefig(os.path.join(model_save_loc,'plots','total_validation.png'),format='png',dpi=300)
 
-def unweight(x,y,ax,c,unit = '$\mu$atm'):
+def unweight(x,y,ax,c,unit = '$\mu$atm',plot=False,loc = [0.52,0.35]):
     """
     Function to calculate the unweighted statistics and add them to a scatter plot (well any plot really, in the bottom right corner)
     """
     stats_un = ws.unweighted_stats(x,y,'val')
-    #h2 = ax.plot(c,c*stats_un['slope']+stats_un['intercept'],'k-.',zorder=5, label = 'Unweighted')
+    if plot:
+        h2 = ax.plot(c,c*stats_un['slope']+stats_un['intercept'],'k--',zorder=5, label = 'Unweighted')
     rmsd = '%.2f' %np.round(stats_un['rmsd'],2)
     bias = '%.2f' %np.round(stats_un['rel_bias'],2)
     sl = '%.2f' %np.round(stats_un['slope'],2)
     ip = '%.2f' %np.round(stats_un['intercept'],2)
     n = stats_un['n']
-    ax.text(0.52,0.35,f'Unweighted Stats\nRMSD = {rmsd} {unit}\nBias = {bias} {unit}\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
+    ax.text(loc[0],loc[1],f'Unweighted Stats\nRMSD = {rmsd} {unit}\nBias = {bias} {unit}\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
     #return h2
 
 def weighted(x,y,weights,ax,c,unit = '$\mu$atm'):

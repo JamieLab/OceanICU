@@ -140,6 +140,68 @@ def grid_switch(lon,var):
     # lon_temp[0:var_sh] = lon[var_sh:]
     return lon,var_temp
 
+def insitu_grid(file,lon,lat,start_yr,end_yr,out_file,format='.csv',sep=',',
+    year_col = '# Year',month_col = 'Month',day_col = 'Day',lat_col = 'Latitude (deg N)',lon_col = 'Longitude (deg W)',chla_col = 'chlorphyll-a (mgm-3)'
+        ,skiprows=0,dateti=False,datecol='',unit = '',out_var_name='',out_var_long_name = '',min_val = -9999):
+    """
+    """
+    import pandas as pd
+    from construct_input_netcdf import append_netcdf
+    res_h = np.abs(lon[0]-lon[1])/2
+    t_len = (end_yr-start_yr+1)*12
+
+    # data = np.genfromtxt('csv/'+file+'.csv', delimiter=',')
+    data = pd.read_table(file+format,sep = sep,skiprows=skiprows)
+    if dateti:
+        time = data[datecol]
+        temp = np.zeros((np.array(time).size,3)); temp[:] = np.nan
+        for i in range(time.size):
+            tt = datetime.datetime.strptime(time[i],dateformat)
+            temp[i,0] = tt.year
+            temp[i,1] = tt.month
+            temp[i,2] = tt.day
+        data[year_col] = temp[:,0]
+        data[month_col] = temp[:,1]
+        data[day_col] = temp[:,2]
+    data = np.transpose(np.vstack((np.array(data[year_col]),np.array(data[month_col]),np.array(data[lat_col]),np.array(data[lon_col]),np.array(data[chla_col]))))
+    data[:,-1][data[:,-1] <= min_val] = np.nan
+    chl = np.zeros((len(lon),len(lat),t_len))
+    chl[:] = np.nan
+    print(chl.shape)
+    print(data)
+    print(data.shape)
+
+    yr = start_yr
+    mon=1
+    i=0
+    time = []
+    while yr<=end_yr:
+        print(str(yr) + ' - ' + str(mon))
+        f = np.where((data[:,0] == yr) & (data[:,1] == mon))[0]
+        if f.size!=0:
+            print('Not Zeros')
+            for j in range(0,len(lat)):
+                for k in range(0,len(lon)):
+                    g = np.where((data[f,2] > lat[j]-res_h) & (data[f,2] < lat[j]+res_h) & (data[f,3] > lon[k]-res_h) & (data[f,3] < lon[k]+res_h))
+                    chl[k,j,i] = np.nanmean(data[f[g],4])
+
+        time.append(datetime.datetime(yr,mon,15))
+        i = i+1
+        mon = mon+1
+        if mon == 13:
+            yr = yr+1
+            mon=1
+    direct ={}
+    direct[out_var_name] = chl
+    longname = {}
+    longname[out_var_name] = out_var_long_name
+    units = {}
+    units[out_var_name] = unit
+    append_netcdf(out_file,direct,lon,lat,0,units = units,longname=longname)
+    c = Dataset(out_file,'a')
+    c[out_var_name].file_input = file
+    c.close()
+
 def load_grid(file,latv = 'latitude',lonv = 'longitude'):
     c = Dataset(file,'r')
     lat = np.array(c.variables[latv][:])
@@ -188,6 +250,7 @@ def netcdf_create_basic(file,var,var_name,lat,lon,flip=False,units=''):
         sst_o = outp.createVariable(var_name,'f4',('lon','lat'),zlib=True)
         sst_o[:] = var
     sst_o.units = units
+    sst_o.time_generated = datetime.datetime.now().strftime(('%d/%m/%Y'))
 
     lat_o = outp.createVariable('latitude','f4',('lat'))
     lat_o[:] = lat
@@ -202,12 +265,21 @@ def netcdf_create_basic(file,var,var_name,lat,lon,flip=False,units=''):
 def netcdf_append_basic(file,var,var_name,flip=False,units=''):
     outp = Dataset(file,'a',format='NETCDF4_CLASSIC')
     if flip:
-        sst_o = outp.createVariable(var_name,'f4',('lat','lon'),zlib=True)
-        sst_o[:] = np.transpose(var)
+        if var_name in outp.variables.keys():
+            sst_o = outp[var_name]
+            sst_o[:] = np.tranpose(var)
+        else:
+            sst_o = outp.createVariable(var_name,'f4',('lat','lon'),zlib=True)
+            sst_o[:] = np.transpose(var)
     else:
-        sst_o = outp.createVariable(var_name,'f4',('lon','lat'),zlib=True)
-        sst_o[:] = var
+        if var_name in outp.variables.keys():
+            sst_o = outp[var_name]
+            sst_o[:] = var
+        else:
+            sst_o = outp.createVariable(var_name,'f4',('lon','lat'),zlib=True)
+            sst_o[:] = var
     sst_o.units = units
+    sst_o.time_generated = datetime.datetime.now().strftime(('%d/%m/%Y'))
     outp.close()
 
 def lon_switch(var):

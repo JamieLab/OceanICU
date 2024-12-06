@@ -1079,7 +1079,7 @@ def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_la
     import geopandas as gpd
     import cmocean
     data = pd.read_table(os.path.join(model_save_loc,'training_addedneural.tsv'),sep='\t')
-    worldmap = gpd.read_file(gpd.datasets.get_path("ne_50m_land"))
+    worldmap = gpd.read_file(gpd.datasets.get_path("naturalearth_lowres"))
     cmap = cmocean.cm.balance
     cmap = cmocean.tools.crop_by_percent(cmap, 20, which='both', N=None)
     if bin:

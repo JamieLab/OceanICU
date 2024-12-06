@@ -935,7 +935,7 @@ def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False):
 def plot_example_flux(model_save_loc):
     import geopandas as gpd
     #worldmap = gpd.read_file(gpd.datasets.get_path("ne_50m_land"))
-    c = Dataset(model_save_loc+'/output.nc','r')
+    c = Dataset(os.path.join(model_save_loc,'output.nc'),'r')
     lat = np.array(c.variables['latitude'])
     lon = np.array(c.variables['longitude'])
     flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
@@ -975,7 +975,7 @@ def plot_example_flux(model_save_loc):
     vars = ['flux_unc_fco2sw','flux_unc_k','flux_unc_wind','flux_unc_solsubskin_unc']
     label = ['fCO$_{2 (sw)}$','Gas Transfer', 'Wind', 'Subskin solubility']
     cmax = [0.2,0.05,0.05,0.05]
-    c = Dataset(model_save_loc+'/output.nc','r')
+    c = Dataset(os.path.join(model_save_loc,'output.nc'),'r')
 
     flu = np.abs(np.array(c.variables['flux'][:,:,dat]))
     for i in range(len(vars)):
@@ -1288,13 +1288,13 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
     """
     import scipy.interpolate as interp
     import random
-    fluxloc = model_save_loc+'/flux'
+    fluxloc = os.path.join(model_save_loc,'flux')
     # We have our default location for the output file (i.e where all the output data from the Nerual network and flux uncertainty computation per pixel)
     # but we can specify here if this file is different
     if inp_file:
         c = Dataset(inp_file,'r')
     else:
-        c = Dataset(model_save_loc+'/output.nc','r')
+        c = Dataset(os.path.join(model_save_loc,'output.nc'),'r')
 
     # If were not dealing with the seaice component we can load the flux (with the sea ice accounted for) from
     # the flux variable (this is normally 'flux')
@@ -1602,7 +1602,7 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
     import random
     import scipy
     if not input_array:
-        c = Dataset(model_save_loc+'/output.nc','r')
+        c = Dataset(os.path.join(model_save_loc,'output.nc'),'r')
         fco2_sw = np.array(c.variables['fco2'])
         #fco2_tot_unc[:] = 12
         lon = np.array(c.variables['longitude'])

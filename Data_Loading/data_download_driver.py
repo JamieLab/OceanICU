@@ -7,11 +7,11 @@ end_yr = 2024
 
 noaa = False
 era5 = False
-cmems = False
+cmems = True
 cmems_daily=False
 bicep = False
 ccmp = False
-oisst = True
+oisst = False
 cci = False
 gebco = False
 osisaf = False
@@ -49,8 +49,9 @@ if cmems_daily:
 
 if cmems:
     import cmems_glorysv12_download as cm
-    cm.load_glorysv12_monthly('D:\Data\CMEMS\SSS\MONTHLY',end_yr = end_yr,variable = 'so')
-    cm.load_glorysv12_monthly('D:\Data\CMEMS\MLD\MONTHLY',end_yr = end_yr,variable = 'mlotst')
+    # cm.load_glorysv12_monthly('D:\Data\CMEMS\SSS\MONTHLY',end_yr = end_yr,variable = 'so')
+    # cm.load_glorysv12_monthly('D:\Data\CMEMS\MLD\MONTHLY',end_yr = end_yr,variable = 'mlotst')
+    cm.load_glorysv12_monthly('F:\Data\CMEMS\SST\MONTHLY',end_yr = end_yr,variable = 'thetao')
     #lon,lat = du.reg_grid(lon=0.25,lat=0.25)
     #cm.cmems_average('D:/Data/CMEMS/SSS/MONTHLY_TEST','D:/Data/CMEMS/SSS/MONTHLY_TEST/025DEG_test',log=lon,lag=lat,variable='zos',log_av=False)
     # cm.cmems_sss_load('D:\Data\CMEMS\SSS\MONTHLY',end_yr = end_yr)

@@ -168,21 +168,23 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
 
     cinp.append_netcdf(data_file,direct,1,1,1,units=units,longname=longname,comment=comment)
 
-def plot_pyCO2sys_out(data_file,model_save_loc):
+def plot_pyCO2sys_out(data_file,model_save_loc,geopan = True):
 
 
     font = {'weight' : 'normal',
-            'size'   :26}
+            'size'   :30}
     matplotlib.rc('font', **font)
-    label_size = 34
-    worldmap = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+    label_size = 38
+    if geopan:
+        worldmap = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
     fig = plt.figure(figsize=(40,35))
     row = 4; col=2;
     gs = GridSpec(row,col, figure=fig, wspace=0.10,hspace=0.15,bottom=0.025,top=0.975,left=0.05,right=0.975)
     axs = np.array([[fig.add_subplot(gs[i, j]) for j in range(col)] for i in range(row)]).ravel()
     print(axs.shape)
-    for i in range(len(axs)):
-        worldmap.plot(color="lightgrey", ax=axs[i])
+    if geopan:
+        for i in range(len(axs)):
+            worldmap.plot(color="lightgrey", ax=axs[i])
     c = Dataset(data_file,'r')
     lon = np.array(c['longitude'])
     lat = np.array(c['latitude'])
@@ -192,32 +194,32 @@ def plot_pyCO2sys_out(data_file,model_save_loc):
     cbar = fig.colorbar(a); cbar.set_label('fCO$_{2}$ $_{(sw)}$ ($\mu$atm)',fontsize = label_size)
 
     fco2 = np.nanmean(c['fco2_tot_unc'],axis=2)
-    a = axs[1].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =50,cmap=cmocean.cm.thermal)
-    cbar = fig.colorbar(a); cbar.set_label('fCO$_{2}$ $_{(sw)}$ total uncertainty ($\mu$atm)',fontsize = label_size)
+    a = axs[1].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =80,cmap=cmocean.cm.thermal)
+    cbar = fig.colorbar(a); cbar.set_label('fCO$_{2}$ $_{(sw)}$ total\nuncertainty ($\mu$atm)',fontsize = label_size)
 
     fco2 = np.nanmean(c['ta'],axis=2)
     a = axs[2].pcolor(lon,lat,np.transpose(fco2),vmin=2000,vmax =2600,cmap=cmocean.cm.haline)
     cbar = fig.colorbar(a); cbar.set_label('TA ($\mu$mol kg$^{-1}$)',fontsize = label_size)
 
     fco2 = np.nanmean(c['ta_tot_unc'],axis=2)
-    a = axs[3].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =50,cmap=cmocean.cm.thermal)
-    cbar = fig.colorbar(a); cbar.set_label('TA total uncertainty ($\mu$mol kg$^{-1}$)',fontsize = label_size)
+    a = axs[3].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =100,cmap=cmocean.cm.thermal)
+    cbar = fig.colorbar(a); cbar.set_label('TA total\nuncertainty ($\mu$mol kg$^{-1}$)',fontsize = label_size)
 
     fco2 = np.nanmean(c['dic'],axis=2)
     a = axs[4].pcolor(lon,lat,np.transpose(fco2),vmin=1900,vmax =2400,cmap=cmocean.cm.deep)
     cbar = fig.colorbar(a); cbar.set_label('DIC ($\mu$mol kg$^{-1}$)',fontsize = label_size)
 
     fco2 = np.nanmean(c['dic_tot_unc'],axis=2)
-    a = axs[5].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =50,cmap=cmocean.cm.thermal)
-    cbar = fig.colorbar(a); cbar.set_label('DIC total uncertainty ($\mu$mol kg$^{-1}$)',fontsize = label_size)
+    a = axs[5].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =100,cmap=cmocean.cm.thermal)
+    cbar = fig.colorbar(a); cbar.set_label('DIC total\nuncertainty ($\mu$mol kg$^{-1}$)',fontsize = label_size)
 
     fco2 = np.nanmean(c['pH'],axis=2)
     a = axs[6].pcolor(lon,lat,np.transpose(fco2),vmin=7.9,vmax =8.3,cmap=cmocean.cm.matter)
     cbar = fig.colorbar(a); cbar.set_label('pH (total scale)',fontsize = label_size)
 
     fco2 = np.nanmean(c['pH_tot_unc'],axis=2)
-    a = axs[7].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =0.1,cmap=cmocean.cm.thermal)
-    cbar = fig.colorbar(a); cbar.set_label('pH total uncertainty (total scale)',fontsize = label_size)
+    a = axs[7].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =0.2,cmap=cmocean.cm.thermal)
+    cbar = fig.colorbar(a); cbar.set_label('pH total\nuncertainty (total scale)',fontsize = label_size)
 
     c.close()
     fig.savefig(os.path.join(model_save_loc,'plots','carbonate_system.png'),dpi=300)

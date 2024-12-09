@@ -252,7 +252,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     ph2O_t = np.transpose(ph2O_t,(1,0,2))
     pressure = load_flux_var(fluxloc,'air_pressure',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     pressure = np.transpose(pressure,(1,0,2))
-    fco2_atm = load_flux_var(fluxloc,'pgas_air',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
+    fco2_atm = load_flux_var(fluxloc,'OAPC1',start_yr,end_yr,fco2_sw.shape[0],fco2_sw.shape[1],fco2_sw.shape[2],single_run=single_run)
     fco2_atm = np.transpose(fco2_atm,(1,0,2))
 
     ph20 = np.zeros((fco2_sw.shape))

@@ -1075,11 +1075,12 @@ def save_mapped_fco2(data,net_unc,para_unc,data_shape = None, model_save_loc = N
 
     save_netcdf(os.path.join(model_save_loc,'output.nc'),direct,lon,lat,data.shape[2],time_track=time,units = units,long_name=long_name,comment = comment)
 
-def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_lat = False,plot_file = 'mapped_residuals.png',bin = False,log = False,lag = False):
+def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_lat = False,plot_file = 'mapped_residuals.png',bin = False,log = False,lag = False,geopan = True):
     import geopandas as gpd
     import cmocean
     data = pd.read_table(os.path.join(model_save_loc,'training_addedneural.tsv'),sep='\t')
-    worldmap = gpd.read_file(gpd.datasets.get_path("naturalearth_lowres"))
+    if geopan:
+        worldmap = gpd.read_file(gpd.datasets.get_path("naturalearth_lowres"))
     cmap = cmocean.cm.balance
     cmap = cmocean.tools.crop_by_percent(cmap, 20, which='both', N=None)
     if bin:
@@ -1089,7 +1090,8 @@ def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_la
         fig = plt.figure(figsize=(15,7))
         gs = GridSpec(1,1, figure=fig, wspace=0.18,hspace=0.18,bottom=0.05,top=0.95,left=0.05,right=0.95)
     ax = fig.add_subplot(gs[0,0])
-    worldmap.plot(color="lightgrey", ax=ax)
+    if geopan:
+        worldmap.plot(color="lightgrey", ax=ax)
     a = plt.scatter(data[lonv],data[latv],c = data[var] - data[out_var],vmin = -30, vmax=30,cmap = cmap)
     cbar = fig.colorbar(a); cbar.set_label(var + ' - ' + out_var)
     if zoom_lat:
@@ -1097,7 +1099,8 @@ def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_la
         ax.set_ylim(zoom_lat)
     if bin:
         ax = fig.add_subplot(gs[1,0])
-        worldmap.plot(color="lightgrey", ax=ax)
+        if geopan:
+            worldmap.plot(color="lightgrey", ax=ax)
         lat = np.array(data[latv])
         lon = np.array(data[lonv])
         res = np.abs(log[0]-log[1])/2

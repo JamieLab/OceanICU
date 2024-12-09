@@ -105,7 +105,7 @@ var.description = 'Surface ocean fCO2 at the subskin temperature; fCO2(sw,subski
 var.subskin_temp_dataset = 'Subskin temperature dataset used = SST-CCI v3.0 (https://dx.doi.org/10.5285/4a9654136a7148e39b7feb56f8bb02d2)'
 var.Units = 'uatm; micro atmospheres'
 
-ou = fl.load_flux_var(fluxloc,'pgas_air',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
+ou = fl.load_flux_var(fluxloc,'OAPC1',1985,2022,lon.shape[0],lat.shape[0],fco2_sw.shape[2])
 ou[ou == -999] = np.nan
 print(ou.shape)
 var = outs.createVariable('fco2atm','f4',('time','lat','lon'))

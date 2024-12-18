@@ -152,6 +152,6 @@ def mode(data):
     #print(data)
     f = np.where(np.isnan(data) == 0)
     #print(f)
-    out = stats.mode(data[f],axis=None)
+    out = stats.mode(data[f].ravel(),keepdims=False)
     #print(out)
     return out[0]

@@ -34,7 +34,7 @@ def lon_switch_2d(var):
     temp[:,180:] = var[:,0:180]
     return temp
 
-model_save_loc = 'D:/OceanCarbon4Climate/NN/GCB2024_full_version_biascorrected'
+model_save_loc = 'F:/OceanCarbon4Climate/NN/GCB2024_full_version_biascorrected'
 fluxloc = model_save_loc+'/flux'
 gcb_file = model_save_loc+'/GCB_output.nc'
 lon,lat = du.reg_grid()

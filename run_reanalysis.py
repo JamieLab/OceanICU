@@ -205,6 +205,11 @@ def model_fco2_append(input_file,output_file,start_yr=1990, end_yr = 2020,name='
     var_o.model_data = 'Data from ' + input_file
     var_o.model_subsampled_data = 'These data are model subsampled data - NetCDF variable name is just for compatiability with the nerual network setup'
     var_o.padded_zeros = 'This data array is just padded with zeros...'
+    var_o = c.createVariable('model_reanalysed_count_obs','f4',('longitude','latitude','time'))
+    var_o[:] = np.ones((data.shape))
+    var_o.model_data = 'Data from ' + input_file
+    var_o.model_subsampled_data = 'These data are model subsampled data - NetCDF variable name is just for compatiability with the nerual network setup'
+    var_o.padded_zeros = 'This data array is just padded with ones...'
     c.close()
 
 

@@ -323,5 +323,5 @@ def plot_carbonate_validation(model_save_loc,insitu_file,insitu_var,nn_file,nn_v
     dif = np.nanmean(insitu - nn,axis=2)
 
     a = ax2.pcolor(lon,lat,np.transpose(dif),cmap = cmocean.tools.crop_by_percent(cmocean.cm.balance, 20, which='both', N=None),vmin = vma[0],vmax=vma[1])
-    cbar = fig.colorbar(a); cbar.set_label(var_name + ' Bias (' + unit+')')
+    cbar = fig.colorbar(a); cbar.set_label(var_name + ' Bias (' + unit+')\n (in situ - nerual network)')
     fig.savefig(os.path.join(model_save_loc,'plots',var_name+'_validation_bias.png'),dpi=300)

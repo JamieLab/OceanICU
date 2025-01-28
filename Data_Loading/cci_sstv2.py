@@ -59,22 +59,26 @@ def cci_retrieve_v2(loc="D:/Data/SST-CCI/",start_yr = 1981,end_yr = 2023):
         d = d+datetime.timedelta(days=1)
 
 def cci_sst_v3(loc,start_yr=1990,end_yr=2023):
+    from urllib.request import urlretrieve
     du.makefolder(loc)
-    htt = 'https://data.ceda.ac.uk/neodc/eocis/data/global_and_regional/sea_surface_temperature/CDR_v3/Analysis/L4/v3.0.1/'
+    htt = 'https://dap.ceda.ac.uk/neodc/eocis/data/global_and_regional/sea_surface_temperature/CDR_v3/Analysis/L4/v3.0.1/'
     d = datetime.datetime(start_yr,1,1)
     # t = 1
-    while d.year < end_yr:
+    while d.year <= end_yr:
         if d.day == 1:
             du.makefolder(os.path.join(loc,str(d.year)))
             du.makefolder(os.path.join(loc,str(d.year),du.numstr(d.month)))
-
-        file = os.path.join(loc,str(d.year),du.numstr(d.month),d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR3.0-v02.0-fv01.0.nc'))
-        htt_file = htt+'/'+d.strftime('%Y/%m/%d')+'/'+d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR3.0-v02.0-fv01.0.nc')
+        if d.year >=2022:
+            file = os.path.join(loc,str(d.year),du.numstr(d.month),d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR3.0-v02.0-fv01.0.nc'))
+            htt_file = htt+'/'+d.strftime('%Y/%m/%d')+'/'+d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_ICDR3.0-v02.0-fv01.0.nc')
+        else:
+            file = os.path.join(loc,str(d.year),du.numstr(d.month),d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR3.0-v02.0-fv01.0.nc'))
+            htt_file = htt+'/'+d.strftime('%Y/%m/%d')+'/'+d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR3.0-v02.0-fv01.0.nc')
         print(file)
         #print(htt_file)
         if not du.checkfileexist(file):
             print('Downloading... ' + file)
-            urllib.request.urlretrieve(htt_file,file)
+            urlretrieve(htt_file,file)
         #open(file).write(requests.get(htt_file))
         d = d + datetime.timedelta(days=1)
         # t = t+1

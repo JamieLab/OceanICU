@@ -34,10 +34,10 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws
     timesteps =((end_yr-start_yr)+1)*12
     vars = [tsub,ws,seaice,sal,msl,xCO2]
     vars_name = ['t_subskin','wind_speed','sea_ice_fraction','salinity','air_pressure','xCO2_atm']
-    if ws2:
+    if ws2 != None:
         vars.append(ws2)
         vars_name.append('wind_speed_2')
-    if ws3:
+    if ws3 != None:
         vars.append(ws3)
         vars_name.append('wind_speed_3')
     direct = {}
@@ -63,9 +63,9 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws
     direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
 
     #append_netcdf(input_file,direct,lon,lat,timesteps)
-    if not ws2:
+    if ws2 == None:
         direct['wind_speed_2'] = direct['wind_speed'] ** 2
-    if not ws3:
+    if ws3 == None:
         direct['wind_speed_3'] = direct['wind_speed'] ** 3
     #direct['sea_ice_fraction'] = direct['sea_ice_fraction']# * 100
     direct['fco2sw'] = du.load_netcdf_var(os.path.join(model_save_loc,'output.nc'),'fco2')
@@ -899,7 +899,7 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
     #     file = os.path.join(model_save_loc,'annual_flux.csv')
     # np.savetxt(file,out_f,delimiter=',',fmt='%.5f',header=head)
 
-def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False):
+def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False,output_file = 'annual_flux.csv'):
     fix = ['k','ph2o_fixed','schmidt_fixed','solskin_unc_fixed','solsubskin_unc_fixed']
     res = np.abs(lon[0]-lon[1])
     area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
@@ -927,10 +927,10 @@ def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False):
     for i in range(0,flux.shape[2],12):
         for j in fix:
             comp[j].append(np.nansum(flux_components[j][:,:,i:i+12])/2)
-    data = pd.read_table(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',')
+    data = pd.read_table(os.path.join(model_save_loc,output_file),delimiter=',')
     for j in fix:
         data['flux_unc_'+j+' (Pg C yr-1)'] = comp[j]
-    data.to_csv(os.path.join(model_save_loc,'annual_flux.csv'),index=False)
+    data.to_csv(os.path.join(model_save_loc,output_file),index=False)
 
 def plot_example_flux(model_save_loc):
     import geopandas as gpd
@@ -1269,7 +1269,7 @@ def plot_absolute_contribution(model_save_loc,model_plot=False,model_plot_label=
     # ax2.plot(year,np.sum(gross,axis=1),'k-',linewidth=3)
 
 def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[2000,200],flux_var = '',flux_variable='flux',seaice = False,seaice_var='',
-    inp_file=False,single_output=False,ens=100,bath_cutoff=False):
+    inp_file=False,single_output=False,ens=100,bath_cutoff=False,output_file = 'annual_flux.csv'):
     """
     Code to evaluate the effect of uncertainties that decorrelate over a specified length scale.
     The pre-calculated flux uncertainties are loaded from the framework output, and then a random grid
@@ -1537,13 +1537,13 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
         ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
         print(st)
         fig.savefig(os.path.join(model_save_loc,'plots','pco2_uncertainty_contribution_revised.png'),format='png',dpi=300) # Save the debug figure
-        data = pd.read_table(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',')# Read our annual flux table with the already computed flux uncertainties
+        data = pd.read_table(os.path.join(model_save_loc,output_file),delimiter=',')# Read our annual flux table with the already computed flux uncertainties
         #Then we save the uncertainity on the fluxes into the table before resaving with the appended values
         if seaice:#For seaice we manual assign the column name and values
             data['flux_unc_seaice (Pg C yr-1)'] = st
         else: # If were using a precomputed value, then we name it as such.
             data[flux_var+' (Pg C yr-1)'] = st
-        data.to_csv(os.path.join(model_save_loc,'annual_flux.csv'),index=False) # save the data back on to the file.
+        data.to_csv(os.path.join(model_save_loc,output_file),index=False) # save the data back on to the file.
         #np.savetxt(os.path.join(model_save_loc,'unc_monte_revised.csv'),np.stack((np.array(a),st)),delimiter=',',fmt='%.5f')
         #plt.show()
 

@@ -54,7 +54,7 @@ def append_woa(file,delimiter,col_year,col_mon,col_lat,col_lon,woa_location,woa_
         woa_data_ex[np.isnan(woa_data_ex) == 1] = woa_data_ex2[np.isnan(woa_data_ex) == 1]
         f = np.where(data[col_mon] == i)[0]
         a = du.point_interp(lon,lat,woa_data_ex,data[col_lon][f],data[col_lat][f],plot=False)
-        grid_out = du.grid_interp(lon,lat,woa_data_ex,long,latg,plot=False)
+        grid_out = du.grid_interp(lon,lat,np.transpose(woa_data_ex),long,latg,plot=False)
         du.netcdf_create_basic(os.path.join(woa_save_loc,woa_var+'_'+du.numstr(int(i))+'.nc'),grid_out,woa_var,latg,long)
 
         out[f] = a

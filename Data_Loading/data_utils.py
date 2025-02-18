@@ -10,6 +10,7 @@ import os
 from netCDF4 import Dataset
 import numpy as np
 import scipy.interpolate as interp
+from pathlib import Path
 
 def load_netcdf_var(file, variable):
     """
@@ -96,7 +97,26 @@ def grid_average_nonreg(var,in_grid):
             var_o[i] = np.nanmean(var[in_grid[i]])
     return var_o
 
-def grid_average(var,lo_grid,la_grid):
+def grid_average(var,lo_grid,la_grid,lon=[],lat=[],area_wei = False,land_mask=False,gebco_file=False,gebco_out=False):
+    """
+
+    """
+    if area_wei:
+        res = np.abs(lon[0] - lon[1])
+        area = area_grid(lon,lat,res)
+        area = np.transpose(area)
+
+    if land_mask:
+        import gebco_resample as geb
+
+        file_t = Path(gebco_file).stem
+        geb.gebco_resample(gebco_file,lon,lat,save_loc = os.path.join(gebco_out,file_t+'_'+str(res)+'.nc'))
+        c=Dataset(os.path.join(gebco_out,file_t+'_'+str(res)+'.nc'),'r')
+        ocean_proportion = np.array(c['ocean_proportion'])
+        c.close()
+        print(area.shape)
+        area = area * ocean_proportion
+
     print(var.shape)
     print(len(lo_grid))
     print(len(la_grid))
@@ -121,7 +141,20 @@ def grid_average(var,lo_grid,la_grid):
                 # print(temp_lo)
                 # print(temp_la)
                 # print(var[temp_lo,temp_la])
-                var_o[i,j] = np.nanmean(var[temp_lo,temp_la])
+                var_t = var[temp_lo,temp_la]
+                if area_wei:
+                    area_t = area[temp_lo,temp_la]
+                    a = np.where(np.isnan(var_t) ==0)
+                    # print(a)
+                    if len(a[0]) == 0:
+                        var_o[i,j] = np.nan
+                    else:
+                        if np.sum(area_t[a]) == 0:
+                            var_o[i,j] = np.nan
+                        else:
+                            var_o[i,j] = np.average(var_t[a],weights = area_t[a])
+                else:
+                    var_o[i,j] = np.nanmean(var[temp_lo,temp_la])
     return var_o
 
 def grid_switch(lon,var):

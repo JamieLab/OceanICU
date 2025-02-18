@@ -7,12 +7,12 @@ end_yr = 2024
 
 noaa = False
 era5 = False
-cmems = True
+cmems = False
 cmems_daily=False
 bicep = False
 ccmp = False
 oisst = False
-cci = False
+cci = True
 gebco = False
 osisaf = False
 lon,lat = du.reg_grid()
@@ -79,12 +79,12 @@ if oisst:
     OI.oisst_monthly_av('D:/Data/OISSTv2_1',start_yr=start_yr,end_yr=end_yr)
 
 if cci:
-    import cci_sst_retrieve_v2 as cc
+    # import cci_sst_retrieve_v2 as cc
     import cci_sstv2 as cc2
     #cc.cci_sst_v3_trailblaze('D:/Data/SST-CCI/v3',start_yr=start_yr,end_yr=end_yr)
     #cc2.cci_monthly_av('D:/Data/SST-CCI/v301',start_yr = 1980,end_yr = 2024,v3 = True)
     #cc2.cci_sst_spatial_average(data='D:/Data/SST-CCI/v301/monthly',start_yr = start_yr,end_yr = end_yr,out_loc = 'D:/Data/SST-CCI/v301/monthly/1DEG',log = lon,lag = lat,v3=True,flip=True)
-    cc2.cci_sst_spatial_average(data='D:/Data/SST-CCI/v301/monthly',start_yr = start_yr,end_yr = end_yr,out_loc = 'D:/Data/SST-CCI/v301/monthly/1DEG_biascorrected',log = lon,lag = lat,v3=True,flip=True,bia = 0.05)
+    cc2.cci_sst_spatial_average(data='E:/Data/SST-CCI/v301/monthly',start_yr = start_yr,end_yr = end_yr,out_loc = 'E:/Data/SST-CCI/v301/monthly/1DEG_biascorrected',log = lon,lag = lat,v3=True,flip=True,bia = 0.04,monthly=True,area_wei=True)
 
 if osisaf:
     import OSISAF_download as OSI

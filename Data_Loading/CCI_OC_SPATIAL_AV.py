@@ -6,7 +6,8 @@ from netCDF4 import Dataset
 import numpy as np
 import data_utils as du
 
-def oc_cci_average(loc,out_folder = '',start_yr = 1993,end_yr = 2020,log='',lag='',conv = False):
+def oc_cci_average(loc,out_folder = '',start_yr = 1993,end_yr = 2020,log='',lag='',conv = False,area_wei=False,
+    gebco_file = False,gebco_out=False,land_mask=False):
     if start_yr <= 1997:
         start_yr = 1997
         st_mon = 9 # Needs to be manually modified - OC-CCI starts in 09 / 1997
@@ -37,9 +38,9 @@ def oc_cci_average(loc,out_folder = '',start_yr = 1993,end_yr = 2020,log='',lag=
             chl[chl>2000] = np.nan; chl_rmsd[chl_rmsd>2000] = np.nan; chl_bias[chl_bias>2000] = np.nan;
             # Averaging done in log10 space due to log normal distribution of chl-a values.
             chl = np.log10(chl)
-            chl_o = du.grid_average(chl,lo_grid,la_grid)
-            chl_rmsd_o = du.grid_average(chl_rmsd,lo_grid,la_grid)
-            chl_bias_o = du.grid_average(chl_bias,lo_grid,la_grid)
+            chl_o = du.grid_average(chl,lo_grid,la_grid,lon=lon,lat=lat,area_wei = area_wei,gebco_file=gebco_file,gebco_out=gebco_out,land_mask=land_mask)
+            chl_rmsd_o = du.grid_average(chl_rmsd,lo_grid,la_grid,lon=lon,lat=lat,area_wei = area_wei,gebco_file=gebco_file,gebco_out=gebco_out,land_mask=land_mask)
+            chl_bias_o = du.grid_average(chl_bias,lo_grid,la_grid,lon=lon,lat=lat,area_wei = area_wei,gebco_file=gebco_file,gebco_out=gebco_out,land_mask=land_mask)
             # Convert back to normal unit space.
             if conv:
                 chl_o = 10**chl_o

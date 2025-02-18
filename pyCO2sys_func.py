@@ -46,7 +46,15 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
         ['u_pH__temperature','pH_sst_unc','-log([H+])','pH on total scale SST uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ['u_pH__salinity','pH_sss_unc','-log([H+])','pH on total scale SSS uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ['u_pH__total_phosphate','pH_phos_unc','-log([H+])','pH on total scale phosphate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
-        ['u_pH__total_silicate','pH_sili_unc','-log([H+])','pH on total scale silicate uncertainty','Uncertainties considered 95% confidence (2 sigma)']
+        ['u_pH__total_silicate','pH_sili_unc','-log([H+])','pH on total scale silicate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['saturation_aragonite','saturation_aragonite','unitless','Saturation state of Aragonite',''],
+        ['u_saturation_aragonite','saturation_aragonite_tot_unc','unitless','Saturation state of Aragonite total uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_saturation_aragonite__par2','saturation_aragonite_ta_unc','unitless','Saturation state of Aragonite alkalinity uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_saturation_aragonite__par1','saturation_aragonite_fco2_unc','unitless','Saturation state of Aragonite fCO2(sw) uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_saturation_aragonite__temperature','saturation_aragonite_sst_unc','unitless','Saturation state of Aragonite SST uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_saturation_aragonite__salinity','saturation_aragonite_sss_unc','unitless','Saturation state of Aragonite SSS uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_saturation_aragonite__total_phosphate','saturation_aragonite_phos_unc','unitless','Saturation state of Aragonite phosphate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_saturation_aragonite__total_silicate','saturation_aragonite_sili_unc','unitless','Saturation state of Aragonite silicate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ]
     # var_out_list = ['dic',
     #     'u_dic',
@@ -159,9 +167,10 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
             salinity = sss[:,:,i],
             total_phosphate=phosphate[:,:,i],
             total_silicate=silicate[:,:,i],
-            uncertainty_into = ['dic','pH'],
+            uncertainty_into = ['dic','pH','saturation_aragonite'],
             uncertainty_from = {'par2':ta_unc[:,:,i], 'par1':fco2_unc[:,:,i], 'temperature': sst_unc[:,:,i],'salinity': sss_unc[:,:,i],'total_phosphate': phosphate_unc[:,:,i],
                 'total_silicate':silicate_unc[:,:,i]})
+        #print(py_out)
         for a in var_out:
             direct[a[1]][:,:,i] = py_out[a[0]]
 
@@ -286,7 +295,7 @@ def load_DIVA_glodap(file,delimiter,out_file,log,lag,var_name='ta'):
     out = griddata((lon.ravel(),lat.ravel()), var.ravel(), (log_o.ravel(), lag_o.ravel()), method='linear').reshape(log_o.shape)
     netcdf_create_basic(out_file,out,var_name,lag,log)
 
-def plot_carbonate_validation(model_save_loc,insitu_file,insitu_var,nn_file,nn_var,lims = [1200,2400],var_name = 'DIC',unit='umol kg$^{-1}$',vma = [-40,40]):
+def plot_carbonate_validation(model_save_loc,insitu_file,insitu_var,nn_file,nn_var,lims = [1200,2400],var_name = 'DIC',unit='umol kg$^{-1}$',vma = [-40,40],geopan=True):
     from neural_network_train import unweight
     font = {'weight' : 'normal',
             'size'   :14}
@@ -317,9 +326,9 @@ def plot_carbonate_validation(model_save_loc,insitu_file,insitu_var,nn_file,nn_v
     ax.set_ylabel('UExP-FNN-U ' + var_name +' (' + unit +')')
     ax.set_xlabel('in situ ' + var_name +' (' + unit +')')
     ax.plot(lims,lims,'k-')
-
-    worldmap = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
-    worldmap.plot(color="lightgrey", ax=ax2)
+    if geopan:
+        worldmap = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+        worldmap.plot(color="lightgrey", ax=ax2)
     dif = np.nanmean(insitu - nn,axis=2)
 
     a = ax2.pcolor(lon,lat,np.transpose(dif),cmap = cmocean.tools.crop_by_percent(cmocean.cm.balance, 20, which='both', N=None),vmin = vma[0],vmax=vma[1])

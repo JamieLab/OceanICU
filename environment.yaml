@@ -1,4 +1,4 @@
-name: UoEx_OceanICU
+name: UoEx_OceanICU_v2.2
 channels:
   - conda-forge
 dependencies:
@@ -7,7 +7,7 @@ dependencies:
   - geopandas = 0.12.2
   - statsmodels
   - cmocean
-  - numpy = 1.26.0
+  - scipy = 1.10.1
   - pip
   - pip:
     - tensorflow == 2.10.0

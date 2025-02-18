@@ -1060,7 +1060,7 @@ def neural_network_map(mapping_data,var=None,model_save_loc=None,prov = None,out
     unc_para = np.reshape(unc_para,(output_size))
     return out,unc_net,unc_para
 
-def save_mapped_fco2(data,net_unc,para_unc,data_shape = None, model_save_loc = None, lon = None,lat = None,time = None,name = 'fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm'):
+def save_mapped_fco2(data,net_unc,para_unc,data_shape = None, model_save_loc = None, lon = None,lat = None,time = [],name = 'fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm'):
     """
     Function to save the mapped fco2 data produced by nerual_network_map.
     """

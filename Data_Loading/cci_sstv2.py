@@ -216,7 +216,7 @@ def cci_sst_8day(loc,out_folder,start_yr = 1993,end_yr=2022,time_cor = 5):
             if ye != d.year:
                 d = datetime.datetime(d.year,1,1)
 
-def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_yr=2023,out_loc='',log='',lag='',v3=False,flip=False,bia=0,monthly = True):
+def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_yr=2023,out_loc='',log='',lag='',v3=False,flip=False,bia=0,monthly = True,area_wei=False):
     du.makefolder(out_loc)
     res = np.round(np.abs(log[0]-log[1]),2)
     if monthly:
@@ -232,7 +232,7 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
                 mon = 1
     else:
         d = datetime.datetime(start_yr,1,1)
-    ye = d.year
+        ye = d.year
     t=0
     while ye <= end_yr:
 
@@ -256,17 +256,23 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
             sst = np.array(c.variables['analysed_sst'][:]); sst[sst<0] = np.nan
             ice = np.array(c.variables['sea_ice_fraction'][:])
             unc = np.array(c.variables['analysed_sst_uncertainty'][:])*2 # We want 2 sigma/95% confidence uncertainties
+            lon = np.array(c.variables['longitude'][:])
+            lat = np.array(c.variables['latitude'][:])
             c.close()
             #print(sst.shape)
-            sst_o = du.grid_average(sst,lo_grid,la_grid)
-            ice_o = du.grid_average(ice,lo_grid,la_grid)
-            unc_o = du.grid_average(unc,lo_grid,la_grid)
+            sst_o = du.grid_average(sst,lo_grid,la_grid,lon=lon,lat=lat,area_wei=True)
+            ice_o = du.grid_average(ice,lo_grid,la_grid,lon=lon,lat=lat,area_wei=True)
+            unc_o = du.grid_average(unc,lo_grid,la_grid,lon=lon,lat=lat,area_wei=True)
             du.netcdf_create_basic(file_o,sst_o+bia,'analysed_sst',lag,log,flip=flip,units='Kelvin')
             du.netcdf_append_basic(file_o,ice_o,'sea_ice_fraction',flip=flip)
             du.netcdf_append_basic(file_o,unc_o,'analysed_sst_uncertainty',flip=flip,units = 'Kelvin')
             c = Dataset(file_o,'a')
             c.variables['analysed_sst_uncertainty'].uncertainty = 'These uncertainties are 2 sigma (95% confidence) equivalents!'
             c.variables['analysed_sst'].bias_correction = 'Bias correction of ' + str(bia) + ' applied!'
+            if area_wei:
+                c.variables['analysed_sst_uncertainty'].area_weighted_average = 'True'
+                c.variables['analysed_sst'].area_weighted_average = 'True'
+                c.variables['sea_ice_fraction'].area_weighted_average = 'True'
             c.close()
         if monthly:
             mon = mon+1

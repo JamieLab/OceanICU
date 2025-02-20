@@ -883,8 +883,10 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
 
     # Save the figures.
     fig.savefig(save_file,format='png',dpi=300)
+    fig.close()
     if per_prov:
         fig2.savefig(save_file_p,format='png',dpi=300)
+        fig2.close()
 
 def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm'):
     """
@@ -1021,6 +1023,7 @@ def plot_mapped(model_save_loc,dat=300):
     ax1.set_title(s[-1])
     # Save the figure.
     fig.savefig(os.path.join(model_save_loc,'plots','mapped_example.png'),format='png',dpi=300)
+    fig.close()
 
 def neural_network_map(mapping_data,var=None,model_save_loc=None,prov = None,output_size=None,unc = None,ens=10):
     """
@@ -1118,3 +1121,4 @@ def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_la
             ax.set_ylim(zoom_lat)
 
     fig.savefig(os.path.join(model_save_loc,'plots',plot_file),dpi=300)
+    fig.close()

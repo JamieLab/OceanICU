@@ -965,7 +965,7 @@ def plot_example_flux(model_save_loc):
     pc.set_clim([0,0.1])
     ax2.set_facecolor('gray')
     fig.savefig(os.path.join(model_save_loc,'plots','mapped_flux_example.png'),format='png',dpi=300)
-
+    fig.close()
 
     row = 2
     col = 2
@@ -987,6 +987,7 @@ def plot_example_flux(model_save_loc):
         axs[i].set_title(label[i])
         axs[i].set_facecolor('gray')
     fig.savefig(os.path.join(model_save_loc,'plots','mapped_flux_components_example.png'),format='png',dpi=300)
+    fig.close()
 
 
 def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=False):
@@ -1131,7 +1132,7 @@ def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=
         #worldmap.plot(color="lightgrey", ax=ax[i])
         ax[i].text(0.92,1.06,f'({let[i]})',transform=ax[i].transAxes,va='top',fontweight='bold',fontsize = 24)
     fig.savefig(os.path.join(model_save_loc,'plots','relative_uncertainty_contribution.png'),format='png',dpi=300)
-
+    fig.close()
     # fig = plt.figure(figsize=(10,10))
     # gs = GridSpec(1,2, figure=fig, wspace=0.9,hspace=0.2,bottom=0.07,top=0.95,left=0.075,right=0.9)
     # ax = fig.add_subplot(gs[0,0])
@@ -1262,7 +1263,7 @@ def plot_absolute_contribution(model_save_loc,model_plot=False,model_plot_label=
         #worldmap.plot(color="lightgrey", ax=ax[i])
         ax[i].text(0.92,1.06,f'({let[i]})',transform=ax[i].transAxes,va='top',fontweight='bold',fontsize = 24)
     fig.savefig(os.path.join(model_save_loc,'plots','absolute_uncertainty_contribution.jpg'),format='jpg',dpi=300)
-
+    fig.close()
     # fig = plt.figure(figsize=(10,10))
     # gs = GridSpec(1,2, figure=fig, wspace=0.9,hspace=0.2,bottom=0.07,top=0.95,left=0.075,right=0.9)
     # ax = fig.add_subplot(gs[0,0])
@@ -1515,6 +1516,7 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
         # ax.plot(a,out)
         # ax.plot(a,out2,'k--',linewidth=3)
         fig.savefig(single_output+'.png',format='png',dpi=300) #Save the figure
+        fig.close()
         data.to_csv(single_output+'.csv',index=False) # Save the year, flux, standard deviation of the ensemble.
     else:
         # If multiple uncertainty components will be calculated then we do this
@@ -1537,6 +1539,7 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
         ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
         print(st)
         fig.savefig(os.path.join(model_save_loc,'plots','pco2_uncertainty_contribution_revised.png'),format='png',dpi=300) # Save the debug figure
+        fig.close()
         data = pd.read_table(os.path.join(model_save_loc,output_file),delimiter=',')# Read our annual flux table with the already computed flux uncertainties
         #Then we save the uncertainity on the fluxes into the table before resaving with the appended values
         if seaice:#For seaice we manual assign the column name and values
@@ -1564,6 +1567,7 @@ def plot_net_flux_unc(model_save_loc):
     ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     ax.set_xlabel('Year')
     fig.savefig(os.path.join(model_save_loc,'plots','net_flux_uncertainty.png'),format='png',dpi=300)
+    fig.close()
 
 def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_array = False,input_datafile = False,ens=100,hemisphere=False,
     start_yr=1985,end_yr=2022,estimator='dowd'):
@@ -1706,6 +1710,7 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
     out[t,1] = np.median(a); out[t,2] = scipy.stats.iqr(a); out[t,3] = np.mean(a); out[t,4] = np.std(a)
 
     fig.savefig(os.path.join(model_save_loc,'plots',output_file+'.png'),format='png',dpi=300)
+    fig.close()
     vals = scipy.stats.iqr(a)
     print(f'Median: {np.median(a)}')
     print(f'IQR: {vals}')
@@ -1746,6 +1751,7 @@ def plot_decorrelation(model_save_loc,start_yr = 1985,end_yr = 2022):
     plt.ylabel('Decorrelation Length (km)')
     plt.xlabel('Year')
     fig.savefig(os.path.join(model_save_loc,'plots','decorrelation_comparision.png'),format='png',dpi=300)
+    fig.close()
 
 def plot_gcb(model_save_loc):
     data = np.loadtxt(os.path.join(model_save_loc,'unc_monte.csv'),delimiter=',')
@@ -1760,6 +1766,7 @@ def plot_gcb(model_save_loc):
     ax.set_xlabel('Year')
     ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     fig.savefig(os.path.join(model_save_loc,'plots','gcb_flux_workshop.png'),format='png',dpi=300)
+    fig.close()
 
     fig = plt.figure(figsize=(7,7))
     gs = GridSpec(1,1, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.2,right=0.98)
@@ -1772,6 +1779,7 @@ def plot_gcb(model_save_loc):
     ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     ax.legend()
     fig.savefig(os.path.join(model_save_loc,'plots','gcb_flux_workshop_split.png'),format='png',dpi=300)
+    fig.close()
 
 EARTHRADIUS = 6371.0
 def getDistanceByHaversine(loc1, loc2):

@@ -273,7 +273,8 @@ def netcdf_create_basic(file,var,var_name,lat,lon,flip=False,units=''):
     #copts={"zlib":True,"complevel":5} # Compression variables to save space :-)
     outp = Dataset(file,'w',format='NETCDF4_CLASSIC')
     outp.date_created = datetime.datetime.now().strftime(('%d/%m/%Y'))
-    outp.created_by = 'Daniel J. Ford (d.ford@exeter.ac.uk)'
+    outp.code_by = 'Daniel J. Ford (d.ford@exeter.ac.uk)'
+    outp.code_location = 'https://github.com/JamieLab/OceanICU'
     outp.createDimension('lon',lon.shape[0])
     outp.createDimension('lat',lat.shape[0])
     if flip:

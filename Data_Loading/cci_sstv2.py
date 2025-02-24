@@ -153,6 +153,12 @@ def cci_monthly_av(inp='D:/Data/SST-CCI',start_yr = 1981,end_yr = 2023,time_cor 
             du.netcdf_append_basic(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc'),ice_o,'sea_ice_fraction')
             du.netcdf_append_basic(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc'),unc_o,'analysed_sst_uncertainty')
 
+            c = Dataset(os.path.join(inp,'monthly',str(ye),'ESA_CCI_MONTHLY_SST_'+str(ye)+du.numstr(mon)+'.nc'),'a')
+            c.daily_file_loc = inp
+            c.start_yr = start_yr
+            c.end_yr = end_yr
+            c.created_with = 'cci_sstv2.monthly_av'
+            c.close()
         mon = mon+1
         if mon == 13:
             mon = 1
@@ -273,6 +279,24 @@ def cci_sst_spatial_average(data='D:/Data/SST-CCI/monthly',start_yr = 1981, end_
                 c.variables['analysed_sst_uncertainty'].area_weighted_average = 'True'
                 c.variables['analysed_sst'].area_weighted_average = 'True'
                 c.variables['sea_ice_fraction'].area_weighted_average = 'True'
+
+            c.monthly_file_loc = data
+            c.output_loc = out_loc
+            c.start_yr = start_yr
+            c.end_yr = end_yr
+            if v3:
+                c.v3 = 'True'
+            else:
+                c.v3 = 'False'
+            if flip:
+                c.flip = 'True'
+            else:
+                c.flip = 'False'
+            if area_wei:
+                c.area_weighting = 'True'
+            else:
+                c.area_weighting = 'False'
+            c.created_with = 'cci_sstv2.cci_sst_spatial_average'
             c.close()
         if monthly:
             mon = mon+1

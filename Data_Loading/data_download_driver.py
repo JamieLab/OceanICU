@@ -84,6 +84,7 @@ if cci:
     #cc.cci_sst_v3_trailblaze('D:/Data/SST-CCI/v3',start_yr=start_yr,end_yr=end_yr)
     #cc2.cci_monthly_av('D:/Data/SST-CCI/v301',start_yr = 1980,end_yr = 2024,v3 = True)
     #cc2.cci_sst_spatial_average(data='D:/Data/SST-CCI/v301/monthly',start_yr = start_yr,end_yr = end_yr,out_loc = 'D:/Data/SST-CCI/v301/monthly/1DEG',log = lon,lag = lat,v3=True,flip=True)
+    cc2.cci_sst_spatial_average(data='E:/Data/SST-CCI/v301/monthly',start_yr = start_yr,end_yr = end_yr,out_loc = 'E:/Data/SST-CCI/v301/monthly/1DEG',log = lon,lag = lat,v3=True,flip=True,bia = 0.00,monthly=True,area_wei=True)
     cc2.cci_sst_spatial_average(data='E:/Data/SST-CCI/v301/monthly',start_yr = start_yr,end_yr = end_yr,out_loc = 'E:/Data/SST-CCI/v301/monthly/1DEG_biascorrected',log = lon,lag = lat,v3=True,flip=True,bia = 0.04,monthly=True,area_wei=True)
 
 if osisaf:

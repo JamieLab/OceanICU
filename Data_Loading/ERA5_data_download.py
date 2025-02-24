@@ -108,7 +108,7 @@ def era5_wind_time_average(loc,outloc,start_yr,end_yr):
             yr = yr+1
             mon=1
 
-def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,orgi_res = 0.25):
+def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,orgi_res = 0.25,area_wei=True):
     du.makefolder(outloc)
     res = np.round(np.abs(log[0]-log[1]),2)
 
@@ -138,7 +138,7 @@ def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,org
                 if t == 0:
                     lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
                     t = 1
-                va_da_out = du.grid_average(va_da,lo_grid,la_grid)
+                va_da_out = du.grid_average(va_da,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei)
             else:
                 va_da_out = du.grid_interp(lon,lat,va_da,log,lag)
                 t = 1

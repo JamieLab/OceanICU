@@ -34,45 +34,63 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws
     timesteps =((end_yr-start_yr)+1)*12
     vars = [tsub,ws,seaice,sal,msl,xCO2]
     vars_name = ['t_subskin','wind_speed','sea_ice_fraction','salinity','air_pressure','xCO2_atm']
+    comment = {}
     if ws2 != None:
         vars.append(ws2)
         vars_name.append('wind_speed_2')
+        comment['wind_speed_2'] = 'Variable = ' + ws2
     if ws3 != None:
         vars.append(ws3)
         vars_name.append('wind_speed_3')
+        comment['wind_speed_3'] = 'Variable = ' + ws3
     direct = {}
+
+    comment['t_subskin'] = 'Variable = ' + tsub
+    comment['wind_speed'] = 'Variable = ' + ws
+    comment['sea_ice_fraction'] = 'Variable = ' + seaice
+    comment['salinity'] = 'Variable = ' + sal
+    comment['air_pressure'] = 'Variable = ' + msl
+    comment['xCO2_atm'] = 'Variable = ' + xCO2
+
+
     for i in range(len(vars)):
         direct[vars_name[i]] = du.load_netcdf_var(input_file,vars[i])
 
     if coolskin == 'Donlon02':
         coolskin_dt = (-0.14 - 0.30 * np.exp(- (direct['wind_speed'] / 3.7)))
         direct['t_skin'] = direct['t_subskin'] + coolskin_dt
+        comment['t_skin'] = 'Variable generated from "' + tsub + '" with the Donlon et al. (2002) wind speed parameteriation for the cool skin'
     elif coolskin == 'Donlon98':
         direct['t_skin'] = direct['t_subskin'] - 0.17
-
+        comment['t_skin'] = 'Variable generated from "' + tsub + '" with the Donlon et al. (1998) fixed cool skin'
     elif coolskin == 'COARE3.5':
         import coare_cool_skin as ccs
         dt_coare = ccs.calc_coare(input_file,coare_out,ws = ws,tair = tair, dewair = dewair, sst = tsub, msl = msl,
             rs = rs, rl = rl, zi = zi,start_yr=start_yr,end_yr=end_yr)
         direct['t_skin'] = direct['t_subskin'] - dt_coare
+        comment['t_skin'] = 'Variable generated from "' + tsub + '" with the NOAA-COARE3.5 cool skin. NOAA-COARE 3.5 inputs; wind speed: ' + ws + '; temperature air = ' + tair + '; dewpoint temperature = ' + dewair +'; sea surface temperature = ' + tsub +'; sea level pressure: ' + msl + '; downward shortwave radiation = ' + rs + '; downward longwave radiation = ' + rl + '; boundary layer height = ' + zi
         #direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
     elif coolskin == 'None':
         # No coolskin effect applied (so Tskin == Tsubskin)
         direct['t_skin'] = direct['t_subskin']
+        comment['t_skin'] = 'No cool skin applied'
 
     direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
 
     #append_netcdf(input_file,direct,lon,lat,timesteps)
     if ws2 == None:
         direct['wind_speed_2'] = direct['wind_speed'] ** 2
+        comment['wind_speed_2'] = 'Second moment of wind generated from wind speed = ' + ws
     if ws3 == None:
         direct['wind_speed_3'] = direct['wind_speed'] ** 3
+        comment['wind_speed_3'] = 'Third moment of wind generated from wind speed = ' + ws
     #direct['sea_ice_fraction'] = direct['sea_ice_fraction']# * 100
     direct['fco2sw'] = du.load_netcdf_var(os.path.join(model_save_loc,'output.nc'),'fco2')
+    comment['fco2sw'] = 'Loaded from nerual network outputs'
     #save_netcdf(os.path.join(model_save_loc,'fluxengine.nc'),direct,lon,lat,timesteps)
-    fluxengine_individual_netcdf(model_save_loc,direct,lon,lat,start_yr,end_yr)
+    fluxengine_individual_netcdf(model_save_loc,direct,lon,lat,start_yr,end_yr,comment=comment)
 
-def fluxengine_individual_netcdf(model_save_loc,direct,lon,lat,start_yr = 1990,end_yr = 2020):
+def fluxengine_individual_netcdf(model_save_loc,direct,lon,lat,start_yr = 1990,end_yr = 2020,comment=[]):
     """
     Function to split out the individual monthly data into seperate files for input into fluxengine.
     """
@@ -89,7 +107,7 @@ def fluxengine_individual_netcdf(model_save_loc,direct,lon,lat,start_yr = 1990,e
         direct_temp = {}
         for a in head:
             direct_temp[a] = np.expand_dims(direct[a][:,:,t],axis=2)
-        save_netcdf(out_file,direct_temp,lon,lat,1,flip=True)
+        save_netcdf(out_file,direct_temp,lon,lat,1,flip=True,comment=comment)
         t = t+1
         mon = mon+1
         if mon == 13:
@@ -965,7 +983,7 @@ def plot_example_flux(model_save_loc):
     pc.set_clim([0,0.1])
     ax2.set_facecolor('gray')
     fig.savefig(os.path.join(model_save_loc,'plots','mapped_flux_example.png'),format='png',dpi=300)
-    fig.close()
+    plt.close(fig)
 
     row = 2
     col = 2
@@ -987,7 +1005,7 @@ def plot_example_flux(model_save_loc):
         axs[i].set_title(label[i])
         axs[i].set_facecolor('gray')
     fig.savefig(os.path.join(model_save_loc,'plots','mapped_flux_components_example.png'),format='png',dpi=300)
-    fig.close()
+    plt.close(fig)
 
 
 def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=False):
@@ -1132,7 +1150,7 @@ def plot_relative_contribution(model_save_loc,model_plot=False,model_plot_label=
         #worldmap.plot(color="lightgrey", ax=ax[i])
         ax[i].text(0.92,1.06,f'({let[i]})',transform=ax[i].transAxes,va='top',fontweight='bold',fontsize = 24)
     fig.savefig(os.path.join(model_save_loc,'plots','relative_uncertainty_contribution.png'),format='png',dpi=300)
-    fig.close()
+    plt.close(fig)
     # fig = plt.figure(figsize=(10,10))
     # gs = GridSpec(1,2, figure=fig, wspace=0.9,hspace=0.2,bottom=0.07,top=0.95,left=0.075,right=0.9)
     # ax = fig.add_subplot(gs[0,0])
@@ -1263,7 +1281,7 @@ def plot_absolute_contribution(model_save_loc,model_plot=False,model_plot_label=
         #worldmap.plot(color="lightgrey", ax=ax[i])
         ax[i].text(0.92,1.06,f'({let[i]})',transform=ax[i].transAxes,va='top',fontweight='bold',fontsize = 24)
     fig.savefig(os.path.join(model_save_loc,'plots','absolute_uncertainty_contribution.jpg'),format='jpg',dpi=300)
-    fig.close()
+    plt.close(fig)
     # fig = plt.figure(figsize=(10,10))
     # gs = GridSpec(1,2, figure=fig, wspace=0.9,hspace=0.2,bottom=0.07,top=0.95,left=0.075,right=0.9)
     # ax = fig.add_subplot(gs[0,0])
@@ -1516,7 +1534,7 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
         # ax.plot(a,out)
         # ax.plot(a,out2,'k--',linewidth=3)
         fig.savefig(single_output+'.png',format='png',dpi=300) #Save the figure
-        fig.close()
+        plt.close(fig)
         data.to_csv(single_output+'.csv',index=False) # Save the year, flux, standard deviation of the ensemble.
     else:
         # If multiple uncertainty components will be calculated then we do this
@@ -1539,7 +1557,7 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
         ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
         print(st)
         fig.savefig(os.path.join(model_save_loc,'plots','pco2_uncertainty_contribution_revised.png'),format='png',dpi=300) # Save the debug figure
-        fig.close()
+        plt.close(fig)
         data = pd.read_table(os.path.join(model_save_loc,output_file),delimiter=',')# Read our annual flux table with the already computed flux uncertainties
         #Then we save the uncertainity on the fluxes into the table before resaving with the appended values
         if seaice:#For seaice we manual assign the column name and values
@@ -1567,7 +1585,7 @@ def plot_net_flux_unc(model_save_loc):
     ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     ax.set_xlabel('Year')
     fig.savefig(os.path.join(model_save_loc,'plots','net_flux_uncertainty.png'),format='png',dpi=300)
-    fig.close()
+    plt.close(fig)
 
 def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_array = False,input_datafile = False,ens=100,hemisphere=False,
     start_yr=1985,end_yr=2022,estimator='dowd'):
@@ -1710,7 +1728,7 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
     out[t,1] = np.median(a); out[t,2] = scipy.stats.iqr(a); out[t,3] = np.mean(a); out[t,4] = np.std(a)
 
     fig.savefig(os.path.join(model_save_loc,'plots',output_file+'.png'),format='png',dpi=300)
-    fig.close()
+    plt.close(fig)
     vals = scipy.stats.iqr(a)
     print(f'Median: {np.median(a)}')
     print(f'IQR: {vals}')
@@ -1751,7 +1769,7 @@ def plot_decorrelation(model_save_loc,start_yr = 1985,end_yr = 2022):
     plt.ylabel('Decorrelation Length (km)')
     plt.xlabel('Year')
     fig.savefig(os.path.join(model_save_loc,'plots','decorrelation_comparision.png'),format='png',dpi=300)
-    fig.close()
+    plt.close(fig)
 
 def plot_gcb(model_save_loc):
     data = np.loadtxt(os.path.join(model_save_loc,'unc_monte.csv'),delimiter=',')
@@ -1766,7 +1784,7 @@ def plot_gcb(model_save_loc):
     ax.set_xlabel('Year')
     ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     fig.savefig(os.path.join(model_save_loc,'plots','gcb_flux_workshop.png'),format='png',dpi=300)
-    fig.close()
+    plt.close(fig)
 
     fig = plt.figure(figsize=(7,7))
     gs = GridSpec(1,1, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.2,right=0.98)
@@ -1779,7 +1797,7 @@ def plot_gcb(model_save_loc):
     ax.set_ylabel('Net air-sea CO$_{2}$ flux (Pg C yr$^{-1}$)')
     ax.legend()
     fig.savefig(os.path.join(model_save_loc,'plots','gcb_flux_workshop_split.png'),format='png',dpi=300)
-    fig.close()
+    plt.close(fig)
 
 EARTHRADIUS = 6371.0
 def getDistanceByHaversine(loc1, loc2):

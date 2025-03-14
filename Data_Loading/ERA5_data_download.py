@@ -108,7 +108,7 @@ def era5_wind_time_average(loc,outloc,start_yr,end_yr):
             yr = yr+1
             mon=1
 
-def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,orgi_res = 0.25,area_wei=True):
+def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,orgi_res = 0.25,area_wei=True,land_mask=False,gebco_file = False, gebco_out = False):
     du.makefolder(outloc)
     res = np.round(np.abs(log[0]-log[1]),2)
 
@@ -138,12 +138,29 @@ def era5_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],var=None,org
                 if t == 0:
                     lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
                     t = 1
-                va_da_out = du.grid_average(va_da,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei)
+                va_da_out = du.grid_average(va_da,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei,land_mask=land_mask,gebco_file = gebco_file, gebco_out = gebco_out,app='_era')
             else:
                 va_da_out = du.grid_interp(lon,lat,va_da,log,lag)
                 t = 1
             #print(va_da_out)
             du.netcdf_create_basic(outfile,va_da_out,var,lag,log)
+            c = Dataset(outfile,'a')
+            if res > orgi_res:
+                if area_wei:
+                    if land_mask:
+                        c.variables[var].area_weighted_average_land_mask = 'True'
+                        c.land_mask='True'
+                    c.variables[var].area_weighted_average = 'True'
+                    c.area_weighting = 'True'
+                else:
+                    c.area_weighting = 'False'
+            c.monthly_file_loc = loc
+            c.output_loc = outloc
+            c.start_yr = start_yr
+            c.end_yr = end_yr
+
+            c.created_with = 'ERA5_data_download.era5_average'
+            c.close()
         mon = mon+1
         if mon == 13:
             yr = yr+1

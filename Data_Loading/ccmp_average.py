@@ -14,7 +14,7 @@ import gebco_resample as geb
 import glob
 import matplotlib.pyplot as plt
 
-def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0.25,var='w',v=3,geb_file = False):
+def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0.25,var='w',v=3,area_wei=True,gebco_file = False,gebco_out=False,land_mask=False):
     du.makefolder(outloc)
     res = np.round(np.abs(log[0]-log[1]),2)
     yr = start_yr
@@ -45,17 +45,17 @@ def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0
             lon2,va_da2 = du.grid_switch(lon2,va_da2)
 
             c.close()
-            if t2 == 0:
-                gebfile = os.path.join(loc,'gebco_0.25_grid.nc')
-                geb.gebco_resample(geb_file,lon,lat,save_loc = gebfile)
-                c = Dataset(gebfile)
-                ocean = np.array(c.variables['ocean_proportion'])
-                c.close()
-
-                #lon2 = np.copy(lon)
-                #lon2,ocean = du.grid_switch(lon2,ocean)
-                #ocean = np.flipud(ocean)
-                t2=1
+            # if t2 == 0:
+            #     gebfile = os.path.join(loc,'gebco_0.25_grid.nc')
+            #     geb.gebco_resample(geb_file,lon,lat,save_loc = gebfile)
+            #     c = Dataset(gebfile)
+            #     ocean = np.array(c.variables['ocean_proportion'])
+            #     c.close()
+            #
+            #     #lon2 = np.copy(lon)
+            #     #lon2,ocean = du.grid_switch(lon2,ocean)
+            #     #ocean = np.flipud(ocean)
+            #     t2=1
             if res > orgi_res:
                 # If we are averaging to a 1 deg grid for example then we use the grid averaging.
                 # However if the new grid is higher resolution then we need to spatially interpolate.
@@ -63,17 +63,38 @@ def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0
                 if t == 0:
                     lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
                     t = 1
-                va_da[ocean == 0.0] = np.nan; va_da2[ocean == 0.0] = np.nan;
-                va_da_out = du.grid_average(va_da,lo_grid,la_grid)
-                va_da_out2 = du.grid_average(va_da2,lo_grid,la_grid)
+                # va_da[ocean == 0.0] = np.nan; va_da2[ocean == 0.0] = np.nan;
+                va_da_out = du.grid_average(va_da,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei,gebco_file=gebco_file,gebco_out=gebco_out,land_mask=land_mask)
+                va_da_out2 = du.grid_average(va_da2,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei,gebco_file=gebco_file,gebco_out=gebco_out,land_mask=land_mask)
             else:
                 print('Interpolation')
 
                 va_da_out = du.grid_interp(lon,lat,va_da,log,lag)
                 va_da_out2 = du.grid_interp(lon,lat,va_da2,log,lag)
-                
+
             du.netcdf_create_basic(outfile,va_da_out,var,lag,log)
             du.netcdf_append_basic(outfile,va_da_out2,var+'^2')
+            c = Dataset(outfile,'a')
+            if res > orgi_res:
+                if area_wei:
+                    if land_mask:
+                        c.variables[var].area_weighted_average_land_mask = 'True'
+                        c.variables[var+'^2'].area_weighted_average_land_mask = 'True'
+                        c.land_mask='True'
+                    c.variables[var].area_weighted_average = 'True'
+                    c.variables[var+'^2'].area_weighted_average = 'True'
+                    c.area_weighting = 'True'
+
+                else:
+                    c.land_mask = 'False'
+                    c.area_weighting = 'False'
+            c.monthly_file_loc = loc
+            c.output_loc = outloc
+            c.start_yr = start_yr
+            c.end_yr = end_yr
+            c.ccmp_version = str(v)
+            c.created_with = 'ccmp_average.ccmp_average'
+            c.close()
         mon = mon+1
         if mon == 13:
             yr = yr+1

@@ -38,7 +38,7 @@ matplotlib.rc('font', **font)
 tf.autograph.set_verbosity(0)
 
 def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_save_loc = None,
-    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,activ = 'sigmoid',socat_sst=False,ens=10):
+    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,activ = 'sigmoid',socat_sst=False,ens=10,name='fco2'):
     """
     This is the driver function to load the data from the input file, trim the data extremes(?) and then call
     the neural network package.
@@ -123,10 +123,19 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     # Plot the mean of the last year of the timeseries for a sanity check.
     plot_mapped(model_save_loc)
 
+    c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
+    c.variables[name].predictor_parameters = str(var)
+    c.variables[name].ensemble_size = str(ens)
+    c.variables[name].province_variable = str(prov)
+    c.variables[name+'_para_unc'].uncertainty_vals_lut = str(unc)
+    c.variables[name+'_para_unc'].uncertainty_vals_lut_parameters = str(var)
+    c.variables[name+'_para_unc'].lut_table_max_size = str(tot_lut_val)
+    c.close()
+
 def daily_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_var=[],mapping_prov = [],unc = None, model_save_loc = None,
     bath = None, bath_cutoff = None, cutoff_low = None, cutoff_high = None,sea_ice=None,tot_lut_val=6000,mapping_file=[],ktoc = None,epochs=200,node_in = range(6,31,3),
     sep = '\t',name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm',c = [0,1500],learning_rate=0.01,plot_unit = '$\mu$atm',plot_parameter = 'fCO$_{2 (sw)}$',
-    lat_v = '',lon_v=''):
+    lat_v = '',lon_v='',ens=10):
     vars = [fco2_sst,fco2_sst+'_std',lat_v,lon_v]
     vars.append(prov)
     if not bath_cutoff == None:
@@ -155,7 +164,7 @@ def daily_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_
     for v in np.unique(data[prov]):
         print(str(v) + ' : '+str(np.argwhere(np.array(data[prov]) == v).shape))
 
-    run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,epochs=epochs,node_in = node_in,learning_rate = learning_rate)
+    run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,epochs=epochs,node_in = node_in,learning_rate = learning_rate,ens=ens)
     plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov,daily=True,var=var,fco2_cutoff_low = cutoff_low,fco2_cutoff_high=cutoff_high,c_plot=np.array(c),unit = plot_unit,parameter = plot_parameter)
     print(mapping_var)
     map_vars = mapping_var.copy()
@@ -170,6 +179,15 @@ def daily_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_
     save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,name = name,longname=longname,unit = unit)
     add_validation_unc(model_save_loc,mapping_file,prov,name = name,longname=longname,unit = unit)
     add_total_unc(model_save_loc,name = name,longname=longname,unit = unit)
+
+    c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
+    c.variables[name].predictor_parameters = str(var)
+    c.variables[name].ensemble_size = str(ens)
+    c.variables[name].province_variable = str(prov)
+    c.variables[name+'_para_unc'].uncertainty_vals_lut = str(unc)
+    c.variables[name+'_para_unc'].uncertainty_vals_lut_parameters = str(var)
+    c.variables[name+'_para_unc'].lut_table_max_size = str(tot_lut_val)
+    c.close()
 
 """
 Flag E valdiation needs updating to the new construct. Treat this as a independent test dataset (29/07/2023).
@@ -493,7 +511,7 @@ def unc_lut_generate(minmax,model,scalar,unc,res = False,tot_lut_val=6000):
         res = step-1
 
     print(f'Resolution of LUT = {res}... total values = {res**len(unc)}')
-    rang = ((minmax[1,:] - minmax[0,:])*1.5)/2 # Calculate the range of each value, and divide by two
+    rang = (((minmax[1,:] - minmax[0,:])*1.5)+0.01)/2 # Calculate the range of each value, and divide by two
     me = np.mean(minmax,axis=0) # Find the middle value of the the range
     m = [np.linspace(i,j,res) for i,j in zip(me-rang,me+rang)] # For each value we produce a linearly space grid between the min and max values.
     grids = np.meshgrid(*m) # Then mesh these together into one big grid.
@@ -883,10 +901,10 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
 
     # Save the figures.
     fig.savefig(save_file,format='png',dpi=300)
-    fig.close()
+    plt.close(fig)
     if per_prov:
         fig2.savefig(save_file_p,format='png',dpi=300)
-        fig2.close()
+        plt.close(fig2)
 
 def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm'):
     """
@@ -1023,7 +1041,7 @@ def plot_mapped(model_save_loc,dat=300):
     ax1.set_title(s[-1])
     # Save the figure.
     fig.savefig(os.path.join(model_save_loc,'plots','mapped_example.png'),format='png',dpi=300)
-    fig.close()
+    plt.close(fig)
 
 def neural_network_map(mapping_data,var=None,model_save_loc=None,prov = None,output_size=None,unc = None,ens=10):
     """
@@ -1121,4 +1139,4 @@ def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_la
             ax.set_ylim(zoom_lat)
 
     fig.savefig(os.path.join(model_save_loc,'plots',plot_file),dpi=300)
-    fig.close()
+    plt.close(fig)

@@ -99,7 +99,7 @@ def load_glorysv12_daily(loc,start_yr = 1993,end_yr = 2020,variable=None):
             yr = yr+1
             mon=1
 
-def cmems_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable='',log_av=False):
+def cmems_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable='',log_av=False,area_wei = True):
     du.makefolder(outloc)
     res = np.round(np.abs(log[0]-log[1]),2)
     #log,lag = du.reg_grid(lon=res,lat=res)
@@ -133,13 +133,19 @@ def cmems_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable=''
                     if t == 0:
                         lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
                         t = 1
-                    va_da_out = du.grid_average(va_da,lo_grid,la_grid)
+                    va_da_out = du.grid_average(va_da,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei)
                     if tp2 == 0:
                         du.netcdf_create_basic(outfile,va_da_out,v,lag,log)
                         tp2=1
                     else:
                         du.netcdf_append_basic(outfile,va_da_out,v)
+                    if area_wei:
+                        d = Dataset(outfile,'a')
+                        d.variables[v].area_weighted_average = 'True'
+                        d.close()
                 c.close()
+
+
             else:
                 va_da = np.transpose(np.squeeze(np.array(c.variables[variable][:])))
                 va_da[va_da<-100] = np.nan
@@ -155,8 +161,13 @@ def cmems_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable=''
                 if t == 0:
                     lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
                     t = 1
-                va_da_out = du.grid_average(va_da,lo_grid,la_grid)
+                va_da_out = du.grid_average(va_da,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei)
                 du.netcdf_create_basic(outfile,va_da_out,variable,lag,log)
+                if area_wei:
+                    d = Dataset(outfile,'a')
+                    d.variables[variable].area_weighted_average = 'True'
+                    d.close()
+
         mon = mon+1
         if mon == 13:
             yr = yr+1

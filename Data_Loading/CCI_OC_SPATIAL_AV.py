@@ -36,6 +36,7 @@ def oc_cci_average(loc,out_folder = '',start_yr = 1993,end_yr = 2020,log='',lag=
             chl_rmsd = np.transpose(np.array(c.variables['chlor_a_log10_rmsd'][0,:,:]))
             chl_bias = np.transpose(np.array(c.variables['chlor_a_log10_bias'][0,:,:]))
             chl[chl>2000] = np.nan; chl_rmsd[chl_rmsd>2000] = np.nan; chl_bias[chl_bias>2000] = np.nan;
+            c.close()
             # Averaging done in log10 space due to log normal distribution of chl-a values.
             chl = np.log10(chl)
             chl_o = du.grid_average(chl,lo_grid,la_grid,lon=lon,lat=lat,area_wei = area_wei,gebco_file=gebco_file,gebco_out=gebco_out,land_mask=land_mask)

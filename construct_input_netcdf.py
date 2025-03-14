@@ -8,6 +8,7 @@ avaiable (i.e before 1997 for ocean colour data).
 """
 import glob
 import datetime
+from dateutil.relativedelta import relativedelta
 import os
 from netCDF4 import Dataset
 import numpy as np
@@ -376,8 +377,8 @@ def convert_prov(model_save_loc,prov_var,prov_num_replace,prov_num_replaced):
     c.variables[prov_var][:] = prov
     c.close()
 
-def fill_with_var(model_save_loc,var_o,var_f,log,lag,mod = None):
-    c = Dataset(os.path.join(model_save_loc,'inputs','neural_network_input.nc'),'a')
+def fill_with_var(input_file,var_o,var_f,log,lag,mod = None,calc_anom=False):
+    c = Dataset(input_file,'a')
     var_o_d = np.array(c.variables[var_o][:])
     var_f_d = np.array(c.variables[var_f][:])
     if mod == 'power2':
@@ -394,7 +395,22 @@ def fill_with_var(model_save_loc,var_o,var_f,log,lag,mod = None):
         var_o = c.createVariable(var,'f4',('longitude','latitude','time'))#,**copts)
         var_o[:] = var_o_d
     c.variables[var].comment = 'Missing data filled with: '+var_f
-    c.close()
+
+    if calc_anom:
+        time = c.variables['time'][:]
+        uni = datetime.datetime.strptime(c.variables['time'].units.split(' ')[-1],'%Y-%m-%d')
+        c.close()
+        time2 = []
+        for i in range(len(time)):
+            time2.append((uni + relativedelta(days=time[i])).month)
+        time2=np.array(time2)
+        anom = {}
+        clim = {}
+        anom[var+'_anom'],clim[var+'_clim'] = produce_anomaly(var_o_d,time2)
+        append_netcdf(input_file,anom,1,1,1)
+        save_climatology(input_file,clim)
+    else:
+        c.close()
 
 def land_clear(model_save_loc):
     """
@@ -513,3 +529,58 @@ def netcdf_var_bias(file,var,bias, nvar=0):
             direct[var[v]] = np.array(c[var[v]]) + bias
     c.close()
     append_netcdf(file,direct,1,1,1)
+
+def extract_independent_test(output_file,sst_name,province_file,province_var,percent=0.05,seed=42):
+    """
+    """
+    rng = np.random.RandomState(seed) # This allows us to generated the same data again from the same input data.
+    c = Dataset(output_file,'r')
+    fco2 = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw'])
+    fco2_std = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw_std'])
+    fco2_count = np.array(c.variables[sst_name+'_reanalysed_count_obs'])
+    sst = np.array(c.variables[sst_name+'_reanalysed_sst'])
+    c.close()
+
+    c = Dataset(province_file,'r')
+    provs = np.array(c.variables[province_var])
+    uni = np.unique(provs[~np.isnan(provs)])
+
+    print(uni)
+    c.close()
+
+    ind_fco2 = np.zeros((fco2.shape)); ind_fco2[:] = np.nan;
+    ind_fco2_std = np.copy(ind_fco2)
+    ind_fco2_count = np.copy(ind_fco2)
+    ind_sst = np.copy(ind_fco2)
+
+    for i in range(0,fco2.shape[2]):
+        for j in uni:
+            print(j)
+            f = np.where((provs == j) & (np.isnan(fco2[:,:,i])==0)) # Find all places in the region that aren't nan
+            if len(f[0]) != 0:
+                print(f)
+                inds = rng.choice(len(f[0]), int(np.ceil(len(f[0])*percent)), replace=False)
+
+                ind_fco2[f[0][inds],f[1][inds],i] = fco2[f[0][inds],f[1][inds],i]; fco2[f[0][inds],f[1][inds],i] = np.nan;
+                ind_fco2_std[f[0][inds],f[1][inds],i] = fco2_std[f[0][inds],f[1][inds],i]; fco2_std[f[0][inds],f[1][inds],i] = np.nan;
+                ind_fco2_count[f[0][inds],f[1][inds],i] = fco2_count[f[0][inds],f[1][inds],i]; fco2_count[f[0][inds],f[1][inds],i] = np.nan;
+                ind_sst[f[0][inds],f[1][inds],i] = sst[f[0][inds],f[1][inds],i]; sst[f[0][inds],f[1][inds],i] = np.nan;
+
+    direct = {}
+    direct[sst_name+'_reanalysed_fCO2_sw'] = fco2
+    direct[sst_name+'_reanalysed_fCO2_sw_std'] = fco2_std
+    direct[sst_name+'_reanalysed_count_obs'] = fco2_count
+    direct[sst_name+'_reanalysed_sst'] = sst
+    direct[sst_name+'_reanalysed_fCO2_sw_indpendent'] = ind_fco2
+    direct[sst_name+'_reanalysed_fCO2_sw_std_indpendent'] = ind_fco2_std
+    direct[sst_name+'_reanalysed_count_obs_indpendent'] = ind_fco2_count
+    direct[sst_name+'_reanalysed_sst_indpendent'] = ind_sst
+
+    append_netcdf(output_file,direct,1,1,1)
+
+    c = Dataset(output_file,'a')
+    c.variables[sst_name+'_reanalysed_fCO2_sw_indpendent'].random_seed = seed
+    c.variables[sst_name+'_reanalysed_fCO2_sw_std_indpendent'].random_seed = seed
+    c.variables[sst_name+'_reanalysed_count_obs_indpendent'].random_seed = seed
+    c.variables[sst_name+'_reanalysed_sst_indpendent'].random_seed = seed
+    c.close()

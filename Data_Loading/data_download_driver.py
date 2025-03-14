@@ -7,12 +7,13 @@ end_yr = 2024
 
 noaa = False
 era5 = False
+era5_daily = True
 cmems = False
 cmems_daily=False
 bicep = False
 ccmp = False
 oisst = False
-cci = True
+cci = False
 gebco = False
 osisaf = False
 lon,lat = du.reg_grid()
@@ -90,3 +91,8 @@ if cci:
 if osisaf:
     import OSISAF_download as OSI
     OSI.OSISAF_monthly_av('D:/Data/OSISAF',start_yr=start_yr,end_yr=end_yr)
+
+if era5_daily:
+    from ERA5_data_download import era5_average,era5_daily,era5_wind_time_average
+    era5_daily(loc = "F:/Data/ERA5/DAILY",start_yr=start_yr,end_yr=end_yr)
+    # era5_wind_time_average(loc = "F:/Data/ERA5/DAILY",outloc = "F:/Data/ERA5/DAILY/monthly",start_yr=start_yr,end_yr=end_yr)

@@ -232,7 +232,7 @@ def plot_pyCO2sys_out(data_file,model_save_loc,geopan = True):
 
     c.close()
     fig.savefig(os.path.join(model_save_loc,'plots','carbonate_system.png'),dpi=300)
-    fig.close()
+    plt.close(fig)
 
 def calc_nstar(file,delimiter,nitrate_var,phosphate_var,gridded=False,prefix=''):
     """
@@ -335,4 +335,4 @@ def plot_carbonate_validation(model_save_loc,insitu_file,insitu_var,nn_file,nn_v
     a = ax2.pcolor(lon,lat,np.transpose(dif),cmap = cmocean.tools.crop_by_percent(cmocean.cm.balance, 20, which='both', N=None),vmin = vma[0],vmax=vma[1])
     cbar = fig.colorbar(a); cbar.set_label(var_name + ' Bias (' + unit+')\n (in situ - nerual network)')
     fig.savefig(os.path.join(model_save_loc,'plots',var_name+'_validation_bias.png'),dpi=300)
-    fig.close()
+    plt.close(fig)

@@ -128,6 +128,14 @@ def som_feed_forward(model_save_loc,data_file,inp_vars,ref_year = 1970,o_var = '
     direct[o_var+'_smoothed'] = map_filtered
     cinp.append_netcdf(data_file,direct,lon,lat,int(s))
 
+    c = Dataset(data_file,'a')
+    c.variables[o_var].input_variables = str(inp_vars)
+    c.variables[o_var].normalise = str(normalise)
+    c.variables[o_var+'_smoothed'].input_variables = str(inp_vars)
+    c.variables[o_var+'_smoothed'].normalise = str(normalise)
+    c.variables[o_var+'_smoothed'].smoothing_boxes = str(box)
+    c.close()
+
 def mode_smooth(data,box = 3):
     """
     Function to implement a mode filter that can be applied to 2 dimensional arrays

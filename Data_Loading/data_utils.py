@@ -97,7 +97,7 @@ def grid_average_nonreg(var,in_grid):
             var_o[i] = np.nanmean(var[in_grid[i]])
     return var_o
 
-def grid_average(var,lo_grid,la_grid,lon=[],lat=[],area_wei = False,land_mask=False,gebco_file=False,gebco_out=False):
+def grid_average(var,lo_grid,la_grid,lon=[],lat=[],area_wei = False,land_mask=False,gebco_file=False,gebco_out=False,app=''):
     """
 
     """
@@ -110,8 +110,8 @@ def grid_average(var,lo_grid,la_grid,lon=[],lat=[],area_wei = False,land_mask=Fa
         import gebco_resample as geb
 
         file_t = Path(gebco_file).stem
-        geb.gebco_resample(gebco_file,lon,lat,save_loc = os.path.join(gebco_out,file_t+'_'+str(res)+'.nc'))
-        c=Dataset(os.path.join(gebco_out,file_t+'_'+str(res)+'.nc'),'r')
+        geb.gebco_resample(gebco_file,lon,lat,save_loc = os.path.join(gebco_out,file_t+'_'+str(res)+app+'.nc'))
+        c=Dataset(os.path.join(gebco_out,file_t+'_'+str(res)+app+'.nc'),'r')
         ocean_proportion = np.array(c['ocean_proportion'])
         c.close()
         print(area.shape)

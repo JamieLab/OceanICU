@@ -68,14 +68,14 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
         #Extracting the non-reanalysed SOCAT data...
         fco2 = np.array(c.variables['fco2_ave_weighted'])
         fco2_std = np.array(c.variables['fco2_std_weighted'])
-        fco2_nobs = np.array(c.variables['count_nobs_reanalysed'])
+        fco2_nobs = np.array(c.variables['fco2_count_nobs'])
         sst = np.array(c.variables['sst_ave_weighted'])
     else:
         #Extracting the reanalysed fCO2 data
         fco2 = np.array(c.variables['fco2_reanalysed_ave_weighted'])
         fco2_std = np.array(c.variables['fco2_reanalysed_std_weighted'])
         fco2_nobs = np.array(c.variables['count_nobs_reanalysed'])
-        sst = np.array(c.variables['sst_reynolds'])
+        sst = np.array(c.variables['sst_subskin_weighted'])
     #Toggle to allow the function to output the SST paired to the observations as degC or K
     if kelvin:
         #Kelvin output (as prereanalysed files are in degC)
@@ -130,7 +130,10 @@ def append_to_file(output_file,fco2,fco2_std,sst,obs,name,socat_files,not_reanal
     socat_files = string of the reanalysed SOCAT file location
     """
     c = Dataset(output_file,'a',format='NETCDF4_CLASSIC')
-    var_o = c.createVariable(name+'_reanalysed_fCO2_sw','f4',('longitude','latitude','time'))
+    if not name+'_reanalysed_fCO2_sw' in c.variables.keys():
+        var_o = c.createVariable(name+'_reanalysed_fCO2_sw','f4',('longitude','latitude','time'))
+    else:
+        var_o = c.variables[name+'_reanalysed_fCO2_sw']
     var_o[:] = fco2
     # var_o.standard_name = 'Reanalysed fCO2(sw, subskin) using ' + name + ' datset'
     var_o.sst = name
@@ -139,7 +142,10 @@ def append_to_file(output_file,fco2,fco2_std,sst,obs,name,socat_files,not_reanal
     if not_reanalysed:
         var_o.not_reanalysed = 'These data are not reanalysed and are the orginial SOCAT data. NetCDF variable name is just for compatiability with the nerual network setup'
 
-    var_o = c.createVariable(name+'_reanalysed_fCO2_sw_std','f4',('longitude','latitude','time'))
+    if not name+'_reanalysed_fCO2_sw_std' in c.variables.keys():
+        var_o = c.createVariable(name+'_reanalysed_fCO2_sw_std','f4',('longitude','latitude','time'))
+    else:
+        var_o = c.variables[name+'_reanalysed_fCO2_sw_std']
     var_o[:] = fco2_std
     # var_o.standard_name = 'Reanalysed fCO2(sw, subskin) std using ' + name + ' datset'
     var_o.sst = name
@@ -147,7 +153,10 @@ def append_to_file(output_file,fco2,fco2_std,sst,obs,name,socat_files,not_reanal
     var_o.created_from = socat_files
     if not_reanalysed:
         var_o.not_reanalysed = 'These data are not reanalysed and are the orginial SOCAT data. NetCDF variable name is just for compatiability with the nerual network setup'
-    var_o = c.createVariable(name+'_reanalysed_sst','f4',('longitude','latitude','time'))
+    if not name+'_reanalysed_sst' in c.variables.keys():
+        var_o = c.createVariable(name+'_reanalysed_sst','f4',('longitude','latitude','time'))
+    else:
+        var_o = c.variables[name+'_reanalysed_sst']
     var_o[:] = sst
     # var_o.standard_name = 'Reanalysed fCO2(sw, subskin) std using ' + name + ' datset'
     var_o.sst = name
@@ -159,7 +168,10 @@ def append_to_file(output_file,fco2,fco2_std,sst,obs,name,socat_files,not_reanal
     else:
         var_o.comment = 'SST data that is coincident to the reanalysed fCO2(sw)'
 
-    var_o = c.createVariable(name+'_reanalysed_count_obs','f4',('longitude','latitude','time'))
+    if not name+'_reanalysed_count_obs' in c.variables.keys():
+        var_o = c.createVariable(name+'_reanalysed_count_obs','f4',('longitude','latitude','time'))
+    else:
+        var_o = c.variables[name+'_reanalysed_count_obs']
     var_o[:] = obs
     # var_o.standard_name = 'Reanalysed fCO2(sw, subskin) std using ' + name + ' datset'
     var_o.sst = name
@@ -167,13 +179,13 @@ def append_to_file(output_file,fco2,fco2_std,sst,obs,name,socat_files,not_reanal
     var_o.created_from = socat_files
     c.close()
 
-def model_fco2_append(input_file,output_file,start_yr=1990, end_yr = 2020,name='',ref_yr = 1970):
+def model_fco2_append(input_file,output_file,start_yr=1990, end_yr = 2020,name='',ref_yr = 1970,var_name='sfco2'):
     """
     Function to append GCB model fCO2 into the neural network framework input file
     """
 
     c = Dataset(input_file,'r')
-    data = np.array(c['sfco2'])
+    data = np.array(c[var_name])
     c.close()
     #Setup a time array so we know the year that the data is from.
     time = []

@@ -54,7 +54,9 @@ def land_proportion_calc(var,lo_grid,la_grid):
             if (la_grid[j][0].size == 0) or (lo_grid[i][0].size == 0):
                 out[i,j] = np.nan
             else:
-                v = var[lo_grid[i],la_grid[j]]
+                temp_lo,temp_la = np.meshgrid(lo_grid[i],la_grid[j])
+                temp_lo = temp_lo.ravel(); temp_la = temp_la.ravel()
+                v = var[temp_lo,temp_la]
                 #print(v)
                 p = np.where(v < 0)
                 #print(len(p[0]))

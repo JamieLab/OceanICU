@@ -68,7 +68,7 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
         #Extracting the non-reanalysed SOCAT data...
         fco2 = np.array(c.variables['fco2_ave_weighted'])
         fco2_std = np.array(c.variables['fco2_std_weighted'])
-        fco2_nobs = np.array(c.variables['fco2_count_nobs'])
+        fco2_nobs = np.array(c.variables['fco2_count_nobs']).astype(float)
         sst = np.array(c.variables['sst_ave_weighted'])
     else:
         #Extracting the reanalysed fCO2 data
@@ -76,6 +76,9 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
         fco2_std = np.array(c.variables['fco2_reanalysed_std_weighted'])
         fco2_nobs = np.array(c.variables['count_nobs_reanalysed'])
         sst = np.array(c.variables['sst_subskin_weighted'])
+    fco2[fco2<0] = np.nan
+    fco2_nobs[fco2_nobs<0] = np.nan
+    fco2_std[fco2_std<0] = np.nan
     #Toggle to allow the function to output the SST paired to the observations as degC or K
     if kelvin:
         #Kelvin output (as prereanalysed files are in degC)

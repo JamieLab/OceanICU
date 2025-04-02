@@ -13,6 +13,8 @@ import os
 from netCDF4 import Dataset
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.transforms
+from matplotlib.gridspec import GridSpec
 import Data_Loading.data_utils as du
 
 def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year = 1970,fill_clim=True,append = False):
@@ -584,3 +586,39 @@ def extract_independent_test(output_file,sst_name,province_file,province_var,per
     c.variables[sst_name+'_reanalysed_count_obs_indpendent'].random_seed = seed
     c.variables[sst_name+'_reanalysed_sst_indpendent'].random_seed = seed
     c.close()
+
+
+def plot_indpendent(output_file,model_save_loc,sst_name,province_file,province_var):
+    c = Dataset(output_file,'r')
+    fco2 = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw_indpendent'])
+    fco2_std = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw_std_indpendent'])
+    fco2_count = np.array(c.variables[sst_name+'_reanalysed_count_obs_indpendent'])
+    sst = np.array(c.variables[sst_name+'_reanalysed_sst_indpendent'])
+    c.close()
+
+    c = Dataset(province_file,'r')
+    provs = np.array(c.variables[province_var])
+    uni = np.unique(provs[~np.isnan(provs)])
+    c.close()
+    print(provs.shape)
+    provs = np.repeat(provs[:, :, np.newaxis], fco2.shape[2], axis=2)
+    print(provs.shape)
+
+    col = 6 # 6 columns on the figure
+    row = int(np.ceil(len(uni)/col)) # Calculate the rows based on number of provinces
+    font = {'weight' : 'normal',
+            'size'   : 25}
+    matplotlib.rc('font', **font)
+    #Setting up the figure for the per province validation
+    fig2 = plt.figure(figsize=(col*9,row*9))
+    gs = GridSpec(row,col, figure=fig2, wspace=0.25,hspace=0.25,bottom=0.05,top=0.98,left=0.05,right=0.98)
+    axs = [[fig2.add_subplot(gs[i, j]) for j in range(col)] for i in range(row)]
+    flatList = [element for innerList in axs for element in innerList]
+    axs = flatList
+
+    for i in range(len(uni)):
+        axs[i].hist(fco2[provs == uni[i]],bins = 50)
+        axs[i].set_title('Province: ' + str(uni[i]))
+
+    fig2.savefig(os.path.join(model_save_loc,'plots','independent_test_histogram.png'),dpi=300)
+    plt.close(fig2)

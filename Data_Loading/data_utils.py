@@ -235,6 +235,44 @@ def insitu_grid(file,lon,lat,start_yr,end_yr,out_file,format='.csv',sep=',',
     c[out_var_name].file_input = file
     c.close()
 
+def output_binned_insitu(data_file,in_var,nn_file,nn_var,output_file,name,unit):
+    header = 'Year, Month, Day, Latitude (deg N), Longitude (deg E), in situ '+name+' ('+unit+'), in situ '+name+' standard_deviation ('+unit+'), UExP-FNN-U '+name+' ('+unit+'), UExP-FNN-U total uncertainty ('+unit+'), UExP-FNN-U region (unitless)'
+
+    c = Dataset(data_file,'r')
+    time = c.variables['time'][:]
+    time_unit = c.variables['time'].units
+    lat = c.variables['latitude'][:]
+    lon = c.variables['longitude'][:]
+    lat,lon = np.meshgrid(lat,lon)
+    lat = np.repeat(lat[:, :, np.newaxis], time.shape[0], axis=2); lon = np.repeat(lon[:, :, np.newaxis], time.shape[0], axis=2);
+    ins_data = c.variables[in_var][:]
+    ins_unc = np.zeros((ins_data.shape))
+    c.close()
+    c = Dataset(nn_file,'r')
+    nn_data = c.variables[nn_var][:]
+    nn_unc = c.variables[nn_var+'_tot_unc'][:]
+    c.close()
+
+    time2 = np.zeros((lat.shape))
+    for i in range(len(time)):
+        time2[:,:,i] = time[i]
+
+    time2 = np.reshape(time2,(-1,1)); lat = np.reshape(lat,(-1,1)); lon = np.reshape(lon,(-1,1)); ins_data = np.reshape(ins_data,(-1,1))
+    ins_unc = np.reshape(ins_unc,(-1,1)); nn_data = np.reshape(nn_data,(-1,1)); nn_unc = np.reshape(nn_unc,(-1,1))
+
+    f = np.where((np.isnan(ins_data) == False) & (np.isnan(nn_data) == False))
+    time2 = time2[f]; lat = lat[f]; lon = lon[f]; ins_data = ins_data[f]; ins_unc = ins_unc[f]; nn_data=  nn_data[f]; nn_unc = nn_unc[f]
+
+    year = np.zeros((time2.shape));month = np.zeros((time2.shape));day = np.zeros((time2.shape)); prov = np.zeros((time2.shape))
+    for i in range(len(time2)):
+        date = datetime.datetime.strptime(time_unit.split(' ')[-1],'%Y-%m-%d') + datetime.timedelta(days = int(time2[i]))
+        year[i] = date.year
+        month[i] = date.month
+        day[i] = date.day
+
+    out = np.transpose(np.stack((year,month,day,lat,lon,ins_data,ins_unc,nn_data,nn_unc,prov)))
+    np.savetxt(output_file, out,header = header,delimiter = ',')
+
 def load_grid(file,latv = 'latitude',lonv = 'longitude'):
     c = Dataset(file,'r')
     lat = np.array(c.variables[latv][:])

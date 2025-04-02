@@ -68,6 +68,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     # Where the std_dev is 0 but an fCO2 value exists indicates a single cruise. So we input a stddev of 0 for
     # these values, so then we can combine the measurement unc (assumed to be ~5uatm from Bakker et al. 2016) later.
     tabl[vars[1]][((np.isnan(tabl[vars[0]]) == 0) & (np.isnan(tabl[vars[1]]) == 1))] = 0
+    tabl[vars[2]][tabl[vars[2]]<0] = 0
     # Only keep rows where we have all the data, i.e no gaps
     tabl = tabl[(np.isnan(tabl) == 0).all(axis=1)]
     #print(tabl)
@@ -135,8 +136,8 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
 def daily_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_var=[],mapping_prov = [],unc = None, model_save_loc = None,
     bath = None, bath_cutoff = None, cutoff_low = None, cutoff_high = None,sea_ice=None,tot_lut_val=6000,mapping_file=[],ktoc = None,epochs=200,node_in = range(6,31,3),
     sep = '\t',name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm',c = [0,1500],learning_rate=0.01,plot_unit = '$\mu$atm',plot_parameter = 'fCO$_{2 (sw)}$',
-    lat_v = '',lon_v='',ens=10):
-    vars = [fco2_sst,fco2_sst+'_std',lat_v,lon_v]
+    lat_v = '',lon_v='',year_v='',mon_v='',day_v='',ens=10):
+    vars = [fco2_sst,fco2_sst+'_std',lat_v,lon_v,year_v,mon_v,day_v]
     vars.append(prov)
     if not bath_cutoff == None:
         vars.append(bath)
@@ -165,29 +166,30 @@ def daily_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_
         print(str(v) + ' : '+str(np.argwhere(np.array(data[prov]) == v).shape))
 
     run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,epochs=epochs,node_in = node_in,learning_rate = learning_rate,ens=ens)
-    plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov,daily=True,var=var,fco2_cutoff_low = cutoff_low,fco2_cutoff_high=cutoff_high,c_plot=np.array(c),unit = plot_unit,parameter = plot_parameter)
-    print(mapping_var)
-    map_vars = mapping_var.copy()
-    map_vars.append(mapping_prov)
-    tabl,output_size,lon,lat,time = load_data(mapping_file,map_vars,model_save_loc,outp=False)
-    if ktoc:
-        tabl[ktoc] = tabl[ktoc] - 273.15
-    print(tabl)
-    print(mapping_var)
-    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc)
-
-    save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,name = name,longname=longname,unit = unit)
-    add_validation_unc(model_save_loc,mapping_file,prov,name = name,longname=longname,unit = unit)
-    add_total_unc(model_save_loc,name = name,longname=longname,unit = unit)
-
-    c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
-    c.variables[name].predictor_parameters = str(var)
-    c.variables[name].ensemble_size = str(ens)
-    c.variables[name].province_variable = str(prov)
-    c.variables[name+'_para_unc'].uncertainty_vals_lut = str(unc)
-    c.variables[name+'_para_unc'].uncertainty_vals_lut_parameters = str(var)
-    c.variables[name+'_para_unc'].lut_table_max_size = str(tot_lut_val)
-    c.close()
+    plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov,daily=True,var=var,fco2_cutoff_low = cutoff_low,fco2_cutoff_high=cutoff_high,c_plot=np.array(c),unit = plot_unit,parameter = plot_parameter,
+        year_col = year_v,month_col=mon_v,day_col=day_v, lat_col = lat_v,lon_col=lon_v)
+    # print(mapping_var)
+    # map_vars = mapping_var.copy()
+    # map_vars.append(mapping_prov)
+    # tabl,output_size,lon,lat,time = load_data(mapping_file,map_vars,model_save_loc,outp=False)
+    # if ktoc:
+    #     tabl[ktoc] = tabl[ktoc] - 273.15
+    # print(tabl)
+    # print(mapping_var)
+    # mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc)
+    #
+    # save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,name = name,longname=longname,unit = unit)
+    # add_validation_unc(model_save_loc,mapping_file,prov,name = name,longname=longname,unit = unit)
+    # add_total_unc(model_save_loc,name = name,longname=longname,unit = unit)
+    #
+    # c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
+    # c.variables[name].predictor_parameters = str(var)
+    # c.variables[name].ensemble_size = str(ens)
+    # c.variables[name].province_variable = str(prov)
+    # c.variables[name+'_para_unc'].uncertainty_vals_lut = str(unc)
+    # c.variables[name+'_para_unc'].uncertainty_vals_lut_parameters = str(var)
+    # c.variables[name+'_para_unc'].lut_table_max_size = str(tot_lut_val)
+    # c.close()
 
 """
 Flag E valdiation needs updating to the new construct. Treat this as a independent test dataset (29/07/2023).
@@ -719,13 +721,14 @@ def neural_val_run(data,model_save_loc,var,provs,ens=10,unc=True,name='fco2'):
 
 
 def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=False,fco2_cutoff_low = 50,fco2_cutoff_high = 750,ice = None,per_prov=True,prov = None,daily = False,var = [],
-    c_plot = np.array([0,800]),name='fco2',unit = '$\mu$atm',parameter = 'fCO$_{2 (sw)}$'):
+    c_plot = np.array([0,800]),name='fco2',unit = '$\mu$atm',parameter = 'fCO$_{2 (sw)}$',year_col='',month_col='',day_col='',lat_col='',lon_col=''):
     """
     Function to produce validation statistics with respect to the train/validation/test datasets. This step is extremely sensitive to the indexes used, see note below as to
     a change needed in the code to stop issues.
     DJF - need to save all the input parameters used in the neural network within the neural network folder so that issue of mismatched inputs in the construct_input_netcdf netcdf file,
     don't propagate through to the validaiton step.
     """
+    header = 'Year, Month, Day, Latitude (deg N), Longitude (deg E), in situ '+name+' ('+unit+'), in situ '+name+' standard_deviation ('+unit+'), UExP-FNN-U '+name+' ('+unit+'), UExP-FNN-U network+parameter uncertainty ('+unit+'), UExP-FNN-U region (unitless)'
     if not save_file:
         save_file = os.path.join(model_save_loc,'plots','total_validation.png')
         if per_prov:
@@ -742,6 +745,11 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         fco2_unc = np.array(np.sqrt(data[name+'_net_unc']**2 + data[name+'_para_unc']**2))
         soc = np.array(data[fco2_sst])
         soc_s = np.array(data[fco2_sst+'_std'])
+        year = np.array(data[year_col])
+        month = np.array(data[month_col])
+        day = np.array(data[day_col])
+        longitude = np.array(data[lon_col])
+        latitude = np.array(data[lat_col])
 
     else:
         input_file = os.path.join(model_save_loc,'inputs','neural_network_train_input_values.nc')
@@ -751,6 +759,17 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
 
         # Here we load the output arrays from the neural network
         c = Dataset(os.path.join(model_save_loc,'output.nc'),'r')
+        latitude = c.variables['latitude'][:]
+        longitude = c.variables['longitude'][:]
+        latitude,longitude = np.meshgrid(latitude,longitude)
+        time = c.variables['time'][:]
+        time_units = c.variables['time'].units
+        latitude = np.repeat(latitude[:, :, np.newaxis], time.shape[0], axis=2); longitude = np.repeat(longitude[:, :, np.newaxis], time.shape[0], axis=2);
+        print(latitude.shape)
+        time2 = np.zeros((latitude.shape))
+        for i in range(len(time)):
+            time2[:,:,i] = time[i]
+
         fco2 = c.variables['fco2'][:]
         fco2_unc = np.sqrt(c.variables['fco2_net_unc'][:]**2 + c.variables['fco2_para_unc'][:]**2) # Combining the network unc, and input parameter unc so we have a single uncertainty values
         # Reshape these into a single column array.
@@ -781,10 +800,19 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         prov = c.variables[prov][:]
         prov = np.reshape(prov,(-1,1))
         c.close()
-
+        latitude = np.reshape(latitude,(-1,1)); longitude = np.reshape(longitude,(-1,1)); time2 = np.reshape(time2,(-1,1))
         # Find where we have values for the SOCAT data, neural network data, and the province.
         f = np.where((np.isnan(soc) == False) & (np.isnan(prov) == False) & (np.isnan(fco2) == False))
-        fco2 = fco2[f]; soc = soc[f]; prov=prov[f]; soc_s = soc_s[f]; fco2_unc = fco2_unc[f] # Trim the arrays.
+        fco2 = fco2[f]; soc = soc[f]; prov=prov[f]; soc_s = soc_s[f]; fco2_unc = fco2_unc[f]; latitude = latitude[f]; longitude = longitude[f]; time2 = time2[f] # Trim the arrays.
+        year = np.zeros((time2.shape));month = np.zeros((time2.shape));day = np.zeros((time2.shape))
+
+        for i in range(len(time2)):
+            date = datetime.datetime.strptime(time_units.split(' ')[-1],'%Y-%m-%d') + datetime.timedelta(days = int(time2[i]))
+            year[i] = date.year
+            month[i] = date.month
+            day[i] = date.day
+
+        #Convert the time to year, month, day
 
     """
     Plotting time!
@@ -804,10 +832,12 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         if t == 0: # Start the combination array
             tot_s = np.stack((soc[ind_trval],soc_s[ind_trval]),axis=1)
             tot_n = np.stack((fco2[ind_trval],fco2_unc[ind_trval]),axis=1)
+            ind_trval_all = ind_trval
             t = 1
         else: # Append the values to the array produced when t = 0
             tot_s = np.concatenate((tot_s,np.stack((soc[ind_trval],soc_s[ind_trval]),axis=1)))
             tot_n = np.concatenate((tot_n,np.stack((fco2[ind_trval],fco2_unc[ind_trval]),axis=1)))
+            ind_trval_all = np.concatenate((ind_trval_all,ind_trval))
     ax[0].scatter(tot_s[:,0],tot_n[:,0],s=2) # Scatter the data onto the plot
     # Produce the scatter validation text and put onto the plot (both weighted and unweighted versions)
     h2 = unweight(tot_s[:,0],tot_n[:,0],ax[0],c_plot,unit=unit)
@@ -815,6 +845,9 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
     stats_temp = ws.weighted_stats(tot_s[:,0],tot_n[:,0],1/np.sqrt(tot_s[:,1]**2 + tot_n[:,1]**2),'b')
     ax[0].fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6)
     ax[0].fill_between(c_plot,c_plot-(stats_temp['rmsd']*2),c_plot+(stats_temp['rmsd']*2),color='k',alpha=0.4)
+
+    ind_trval_all_out = np.transpose(np.stack((year[ind_trval_all],month[ind_trval_all],day[ind_trval_all],latitude[ind_trval_all],longitude[ind_trval_all],soc[ind_trval_all],soc_s[ind_trval_all],fco2[ind_trval_all],fco2_unc[ind_trval_all],prov[ind_trval_all])))
+    np.savetxt(os.path.join(model_save_loc,'validation','train_val_data.csv'), ind_trval_all_out,header = header,delimiter = ',')
     # Start independent test plotting
     # Here we have an additional step to do per province test dataset plots so we have the validation uncertainty for the mapping.
     t=0 # Counter so we can properly concatenate the arrays from each province (i.e we load each provinces validation index then we can append the values to the array correctly)
@@ -851,14 +884,19 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         if t == 0: # Start the combination array
             tot_ts = np.stack((soc[ind_test],soc_s[ind_test]),axis=1)
             tot_tn = np.stack((fco2[ind_test],fco2_unc[ind_test]),axis=1)
+            ind_test_all = ind_test
             rmsd = np.array([v,w['rmsd']]) # Attach RMSD to province number
             #print(rmsd)
             t = 1
         else: # Append the values to the array produced when t = 0
             tot_ts = np.concatenate((tot_ts,np.stack((soc[ind_test],soc_s[ind_test]),axis=1)))
             tot_tn = np.concatenate((tot_tn,np.stack((fco2[ind_test],fco2_unc[ind_test]),axis=1)))
+            ind_test_all = np.concatenate((ind_test_all,ind_test))
             rmsd = np.vstack((rmsd,np.array([v,w['rmsd']]))) # Append further rmsd values with its province number
             #print(rmsd)
+    ind_test_all_out = np.transpose(np.stack((year[ind_test_all],month[ind_test_all],day[ind_test_all],latitude[ind_test_all],longitude[ind_test_all],soc[ind_test_all],soc_s[ind_test_all],fco2[ind_test_all],fco2_unc[ind_test_all],prov[ind_test_all])))
+    np.savetxt(os.path.join(model_save_loc,'validation','independent_test_data.csv'), ind_test_all_out,header = header,delimiter = ',')
+
     font = {'weight' : 'normal',
             'size'   : 19}
     matplotlib.rc('font', **font)

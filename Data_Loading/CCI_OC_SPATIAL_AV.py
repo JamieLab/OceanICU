@@ -36,6 +36,19 @@ def oc_cci_average(loc,out_folder = '',start_yr = 1993,end_yr = 2020,log='',lag=
             chl_rmsd = np.transpose(np.array(c.variables['chlor_a_log10_rmsd'][0,:,:]))
             chl_bias = np.transpose(np.array(c.variables['chlor_a_log10_bias'][0,:,:]))
             chl[chl>2000] = np.nan; chl_rmsd[chl_rmsd>2000] = np.nan; chl_bias[chl_bias>2000] = np.nan;
+            try:
+                chl_name = c.variables['chlor_a'].long_name
+            except:
+                print('Cant load chl-a longname')
+            try:
+                chl_rmsd_name = c.variables['chlor_a_log10_rmsd'].long_name
+            except:
+                print('Cant load chl-a rmsd longname')
+            try:
+                chl_bias_name = c.variables['chlor_a_log10_bias'].long_name
+            except:
+                print('Cant load chl-a bias longname')
+
             c.close()
             # Averaging done in log10 space due to log normal distribution of chl-a values.
             chl = np.log10(chl)
@@ -48,6 +61,42 @@ def oc_cci_average(loc,out_folder = '',start_yr = 1993,end_yr = 2020,log='',lag=
             du.netcdf_create_basic(file_o,chl_o,'chlor_a',lag,log)
             du.netcdf_append_basic(file_o,chl_rmsd_o,'chlor_a_log10_rmsd')
             du.netcdf_append_basic(file_o,chl_bias_o,'chlor_a_log10_bias')
+
+            c = Dataset(file_o,'a')
+            if area_wei:
+                c.variables['chlor_a'].area_weighted_average = 'True'
+                c.variables['chlor_a_log10_rmsd'].area_weighted_average = 'True'
+                c.variables['chlor_a_log10_bias'].area_weighted_average = 'True'
+
+            if conv:
+                c.variables['chlor_a'].units = 'mg m-3'
+            else:
+                c.variables['chlor_a'].units = 'log10(mg m-3)'
+            c.variables['chlor_a_log10_rmsd'].units = 'log10(mg m-3)'
+            c.variables['chlor_a_log10_bias'].units = 'log10(mg m-3)'
+            c.monthly_file_loc = file
+            c.output_loc = out_folder
+            c.start_yr = start_yr
+            c.end_yr = end_yr
+            if area_wei:
+                c.area_weighting = 'True'
+            else:
+                c.area_weighting = 'False'
+            c.created_with = 'CCI_OC_SPATIAL_AV.oc_cci_average'
+
+            try:
+                c.variables['chlor_a'].long_name = chl_name
+            except:
+                print('Cant place chl-a longname')
+            try:
+                c.variables['chlor_a_log10_rmsd'].long_name = chl_rmsd_name
+            except:
+                print('Cant place chl-a rmsd longname')
+            try:
+                c.variables['chlor_a_log10_bias'].long_name = chl_bias_name
+            except:
+                print('Cant place chl-a bias longname')
+            c.close()
 
         mon = mon+1
         if mon == 13:

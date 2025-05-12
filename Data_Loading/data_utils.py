@@ -11,6 +11,7 @@ from netCDF4 import Dataset
 import numpy as np
 import scipy.interpolate as interp
 from pathlib import Path
+from dateutil.relativedelta import relativedelta
 
 def load_netcdf_var(file, variable):
     """
@@ -306,6 +307,14 @@ def numstr3(num):
         return '0'+str(num)
     else:
         return str(num)
+
+def time_con_str(date,units):
+    uni = datetime.datetime.strptime(units.split(' ')[-1],'%Y-%m-%d')
+    time2 = []
+    for i in range(len(date)):
+        time2.append([(uni + relativedelta(days=date[i])).year,(uni + relativedelta(days=date[i])).month])
+    time2=np.array(time2)
+    return time2
 
 def netcdf_create_basic(file,var,var_name,lat,lon,flip=False,units=''):
     #copts={"zlib":True,"complevel":5} # Compression variables to save space :-)

@@ -168,28 +168,28 @@ def daily_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_
     run_neural_network(data,fco2 = vars[0], prov = prov, var = var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,epochs=epochs,node_in = node_in,learning_rate = learning_rate,ens=ens)
     plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov,daily=True,var=var,fco2_cutoff_low = cutoff_low,fco2_cutoff_high=cutoff_high,c_plot=np.array(c),unit = plot_unit,parameter = plot_parameter,
         year_col = year_v,month_col=mon_v,day_col=day_v, lat_col = lat_v,lon_col=lon_v)
-    # print(mapping_var)
-    # map_vars = mapping_var.copy()
-    # map_vars.append(mapping_prov)
-    # tabl,output_size,lon,lat,time = load_data(mapping_file,map_vars,model_save_loc,outp=False)
-    # if ktoc:
-    #     tabl[ktoc] = tabl[ktoc] - 273.15
-    # print(tabl)
-    # print(mapping_var)
-    # mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc)
-    #
-    # save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,name = name,longname=longname,unit = unit)
-    # add_validation_unc(model_save_loc,mapping_file,prov,name = name,longname=longname,unit = unit)
-    # add_total_unc(model_save_loc,name = name,longname=longname,unit = unit)
-    #
-    # c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
-    # c.variables[name].predictor_parameters = str(var)
-    # c.variables[name].ensemble_size = str(ens)
-    # c.variables[name].province_variable = str(prov)
-    # c.variables[name+'_para_unc'].uncertainty_vals_lut = str(unc)
-    # c.variables[name+'_para_unc'].uncertainty_vals_lut_parameters = str(var)
-    # c.variables[name+'_para_unc'].lut_table_max_size = str(tot_lut_val)
-    # c.close()
+    print(mapping_var)
+    map_vars = mapping_var.copy()
+    map_vars.append(mapping_prov)
+    tabl,output_size,lon,lat,time = load_data(mapping_file,map_vars,model_save_loc,outp=False)
+    if ktoc:
+        tabl[ktoc] = tabl[ktoc] - 273.15
+    print(tabl)
+    print(mapping_var)
+    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc)
+
+    save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,name = name,longname=longname,unit = unit)
+    add_validation_unc(model_save_loc,mapping_file,prov,name = name,longname=longname,unit = unit)
+    add_total_unc(model_save_loc,name = name,longname=longname,unit = unit)
+
+    c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
+    c.variables[name].predictor_parameters = str(var)
+    c.variables[name].ensemble_size = str(ens)
+    c.variables[name].province_variable = str(prov)
+    c.variables[name+'_para_unc'].uncertainty_vals_lut = str(unc)
+    c.variables[name+'_para_unc'].uncertainty_vals_lut_parameters = str(var)
+    c.variables[name+'_para_unc'].lut_table_max_size = str(tot_lut_val)
+    c.close()
 
 """
 Flag E valdiation needs updating to the new construct. Treat this as a independent test dataset (29/07/2023).
@@ -944,7 +944,7 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         fig2.savefig(save_file_p,format='png',dpi=300)
         plt.close(fig2)
 
-def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm'):
+def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm',file = 'independent_test_rmsd.csv'):
     """
     Function to take the independent test rmsd values produced in plot_total_validation_unc and produce a array within the output netcdf
     with the validation uncertainity for each province mapped
@@ -956,7 +956,7 @@ def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugac
     prov = np.reshape(prov,(-1,1))
     c.close()
     # Load the test validation RMSD.
-    val = np.loadtxt(os.path.join(model_save_loc,'validation','independent_test_rmsd.csv'),delimiter=',')
+    val = np.loadtxt(os.path.join(model_save_loc,'validation',file),delimiter=',')
 
     val_unc = np.zeros((prov.shape))
     val_unc[:] = np.nan
@@ -1178,3 +1178,65 @@ def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_la
 
     fig.savefig(os.path.join(model_save_loc,'plots',plot_file),dpi=300)
     plt.close(fig)
+
+def OC4C_calc_independent_test_rmsd(model_save_loc,input_file,sst_name,fco2_file,province_file,prov_var,output_file = 'OC4C_independent_test.csv',name='fco2',unit = '$\mu$atm',parameter = 'fCO$_{2 (sw)}$',
+    c_plot = np.array([0,800])):
+    c = Dataset(province_file,'r')
+    prov = np.array(c.variables[prov_var])
+    c.close()
+
+    c = Dataset(input_file,'r')
+    fco2 = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw_indpendent'])
+    fco2_std = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw_std_indpendent'])
+    fco2_count = np.array(c.variables[sst_name+'_reanalysed_count_obs_indpendent'])
+    c.close()
+    fco2_std[(np.isnan(fco2)==0) & (np.isnan(fco2_std)==1)] = 0
+    fco2_std = np.sqrt((fco2_std/np.sqrt(fco2_count))**2 + 5**2)
+
+    c = Dataset(fco2_file,'r')
+    fco2_nn = np.array(c.variables['fco2'])
+    c.close()
+    print(prov.shape)
+    if len(prov.shape) == 2:
+        prov2 = np.repeat(prov[:, :, np.newaxis], fco2.shape[2], axis=2)
+    else:
+        prov2 = prov
+    print(prov2.shape)
+    uniq = np.unique(prov2).tolist()
+    print(uniq[-1])
+    uniq.remove(uniq[-1])
+
+    col = 6 # 6 columns on the figure
+    row = int(np.ceil(len(uniq)/col)) # Calculate the rows based on number of provinces
+    font = {'weight' : 'normal',
+            'size'   : 25}
+    matplotlib.rc('font', **font)
+    #Setting up the figure for the per province validation
+    fig2 = plt.figure(figsize=(col*9,row*9))
+    gs = GridSpec(row,col, figure=fig2, wspace=0.25,hspace=0.25,bottom=0.05,top=0.98,left=0.05,right=0.98)
+    axs = [[fig2.add_subplot(gs[i, j]) for j in range(col)] for i in range(row)]
+    flatList = [element for innerList in axs for element in innerList]
+    axs = flatList
+    tp = 0
+    for i in uniq:
+        f = np.where((prov2 == i) & (np.isnan(fco2) == 0))
+        axs[tp].scatter(fco2[f],fco2_nn[f])
+        w = ws.weighted_stats(fco2[f],fco2_nn[f],1/np.sqrt(fco2_std[f]**2),'b') # Weighted stats so we can extract the RMSD for each province and save it.
+        unweight(fco2[f],fco2_nn[f],axs[tp],c_plot,unit=unit)
+        weighted(fco2[f],fco2_nn[f],1/np.sqrt(fco2_std[f]**2),axs[tp],c_plot,unit=unit)
+        axs[tp].set_title(f'Province {i}')
+        axs[tp].set_xlim(c_plot); axs[tp].set_ylim(c_plot); axs[tp].plot(c_plot,c_plot,'k-');
+
+        stats_temp = ws.weighted_stats(fco2[f],fco2_nn[f],1/np.sqrt(fco2_std[f]**2),'b')
+        axs[tp].fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6,zorder=-1)
+        axs[tp].fill_between(c_plot,c_plot-(stats_temp['rmsd']*2),c_plot+(stats_temp['rmsd']*2),color='k',alpha=0.4,zorder=-2)
+        axs[tp].set_xlabel('in situ '+parameter+' ('+ unit+')')
+        axs[tp].set_ylabel('Neural Network '+parameter+' ('+unit+')')
+        if tp == 0:
+            rmsd = np.array([i,w['rmsd']])
+        else:
+            rmsd = np.vstack((rmsd,np.array([i,w['rmsd']]))) # Append further rmsd values with its province number
+        tp = tp+1
+    fig2.savefig(os.path.join(model_save_loc,'plots','per_prov_validation.png'),format='png',dpi=300)
+    plt.close(fig2)
+    np.savetxt(os.path.join(model_save_loc,'validation',output_file), rmsd, delimiter=",")

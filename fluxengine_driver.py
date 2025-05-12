@@ -9,7 +9,7 @@ from netCDF4 import Dataset
 import datetime
 import numpy as np
 import os
-from construct_input_netcdf import save_netcdf
+from construct_input_netcdf import save_netcdf,append_netcdf
 import Data_Loading.data_utils as du
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -917,7 +917,7 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
     #     file = os.path.join(model_save_loc,'annual_flux.csv')
     # np.savetxt(file,out_f,delimiter=',',fmt='%.5f',header=head)
 
-def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False,output_file = 'annual_flux.csv'):
+def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False,output_file = 'annual_flux.csv',mask_file = False,mask_var = '',flux_file = False):
     fix = ['k','ph2o_fixed','schmidt_fixed','solskin_unc_fixed','solsubskin_unc_fixed']
     res = np.abs(lon[0]-lon[1])
     area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
@@ -926,8 +926,14 @@ def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False,output_f
     if bath_cutoff:
         elev=  np.transpose(np.squeeze(np.array(c.variables['elevation'])))
     c.close()
-
-    c = Dataset(model_save_loc+'/output.nc','r')
+    if mask_file:
+        c = Dataset(mask_file,'r')
+        mask = np.transpose(np.array(c.variables[mask_var]),(1,0,2))
+        c.close()
+    if flux_file:
+        c=Dataset(flux_file)
+    else:
+        c = Dataset(model_save_loc+'/output.nc','r')
     flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
     print(flux.shape)
     flux_components = {}
@@ -939,6 +945,9 @@ def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False,output_f
             flux_components[j][:,:,i] = (flux_components[j][:,:,i] * area * land * 30.5) /1e15
             if bath_cutoff:
                 flu = flux_components[j][:,:,i]  ; flu[elev<=bath_cutoff] = np.nan; flux_components[j][:,:,i] = flu
+    for j in fix:
+        if mask_file:
+            flu = flux_components[j][:]; flu[mask!=1] = np.nan; flux_components[j] = flu
     comp = {}
     for j in fix:
         comp[j] = []
@@ -1288,7 +1297,7 @@ def plot_absolute_contribution(model_save_loc,model_plot=False,model_plot_label=
     # ax2.plot(year,np.sum(gross,axis=1),'k-',linewidth=3)
 
 def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[2000,200],flux_var = '',flux_variable='flux',seaice = False,seaice_var='',
-    inp_file=False,single_output=False,ens=100,bath_cutoff=False,output_file = 'annual_flux.csv'):
+    inp_file=False,single_output=False,ens=100,bath_cutoff=False,output_file = 'annual_flux.csv',mask_file=False,mask_var = '',fluxloc = False):
     """
     Code to evaluate the effect of uncertainties that decorrelate over a specified length scale.
     The pre-calculated flux uncertainties are loaded from the framework output, and then a random grid
@@ -1307,7 +1316,8 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
     """
     import scipy.interpolate as interp
     import random
-    fluxloc = os.path.join(model_save_loc,'flux')
+    if not fluxloc:
+        fluxloc = os.path.join(model_save_loc,'flux')
     # We have our default location for the output file (i.e where all the output data from the Nerual network and flux uncertainty computation per pixel)
     # but we can specify here if this file is different
     if inp_file:
@@ -1367,13 +1377,18 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
         elev=  np.squeeze(np.array(c.variables['elevation']))
     print(land.shape)
     c.close()
-
+    if mask_file:
+        c = Dataset(mask_file,'r')
+        mask = np.array(c.variables[mask_var])
+        c.close()
     # Here we cycle through the time dimension (third dimension) and set the areas where the water is deeper than the bathymetry cutoff to nan
     # then save back to the flux array.
     # Only applied if bath_cutoff is specified
     if bath_cutoff:
         for i in range(c_flux.shape[2]):
             flu = c_flux[:,:,i]  ; flu[elev<=bath_cutoff] = np.nan; c_flux[:,:,i] = flu
+    if mask_file:
+        flu = c_flux; flu[mask!=1.0] = np.nan; c_flux = flu
     #fco2_tot_unc =  fco2_tot_unc[:,:,:,np.newaxis]
     # Get a list of the years we are computing the fluxes for
     a = list(range(start_yr,end_yr+1))
@@ -1404,10 +1419,16 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
             decor_loaded = np.loadtxt(os.path.join(model_save_loc,'decorrelation',decor),delimiter=',') # Seems ive hardcoded the location (where we'd expect the file)
         except:
             print('Bad file... trying a second attempt')
-            decor_loaded = np.loadtxt(decor,delimiter=',') # And then if a actual path is specified the first call will fail and then load it from the absolute path supplied
-        decors[:,0] = decor_loaded[:,1] # Median decorrelation length loaded
+            decor_loaded = np.loadtxt(decor,delimiter=',') # And then if a actual path is specified the first call will fail and then load it from the absolute path supplied#
 
-        decors[:,1] = decor_loaded[:,2] # IQR is left as is - we want 2 sigma equivalent, so I'd divide by 2 to get the IQR as a +-, then times by 2 to get 2 sigma equivalent.
+        #Extracts the decorrelation lenght between the start and end years (so allows a decorrelation file with a longer time frame to be used)
+        f = np.where(decor_loaded[:,0] == start_yr)[0]
+        g = np.where(decor_loaded[:,0] == end_yr)[0]
+        print(f)
+        print(g)
+        decors[:,0] = decor_loaded[f[0]:g[0]+1,1] # Median decorrelation length loaded
+
+        decors[:,1] = decor_loaded[f[0]:g[0]+1,2] # IQR is left as is - we want 2 sigma equivalent, so I'd divide by 2 to get the IQR as a +-, then times by 2 to get 2 sigma equivalent.
 
         # If we have nans then the decorrelation length analysis failed for this year (likely due to no data) so we set the decorrelation length to the maximum of all
         # avaiable years
@@ -1827,3 +1848,24 @@ def getDistanceByHaversine(loc1, loc2):
     km = EARTHRADIUS * c
     #print(km)
     return km
+
+def generate_mask_reccap(output_file,input_file,mask_var,mask_number,mask_output_var,flip_lon=False):
+    c = Dataset(output_file,'r')
+    time = np.array(c.variables['time'])
+    lon = np.array(c.variables['longitude'])
+    lat = np.array(c.variables['latitude'])
+    c.close()
+
+    c = Dataset(input_file,'r')
+    mask = np.array(c.variables[mask_var])
+    c.close()
+
+    mask_out = np.zeros((mask.shape))
+    mask_out[mask == mask_number] = 1.0
+
+    mask_out_final = np.repeat(mask_out[:, :, np.newaxis], len(time), axis=2)
+
+    direct = {}
+    direct[mask_output_var] = mask_out_final
+
+    append_netcdf(output_file,direct,1,1,1)

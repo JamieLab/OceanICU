@@ -587,6 +587,51 @@ def extract_independent_test(output_file,sst_name,province_file,province_var,per
     c.variables[sst_name+'_reanalysed_sst_indpendent'].random_seed = seed
     c.close()
 
+def append_independent_test(input_file,output_file,sst_name):
+    c = Dataset(output_file,'r')
+    out_time = np.array(c.variables['time'])
+    units = c.variables['time'].units
+    c.close()
+    out_time = du.time_con_str(out_time,units)[:,0]
+
+
+    c = Dataset(input_file,'r')
+    in_time = np.array(c.variables['time'])
+    in_units = c.variables['time'].units
+    fco2_ind = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw_indpendent'])
+    fco2_std_ind = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw_std_indpendent'])
+    fco2_count_ind = np.array(c.variables[sst_name+'_reanalysed_count_obs_indpendent'])
+    sst_ind = np.array(c.variables[sst_name+'_reanalysed_sst_indpendent'])
+
+    fco2 = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw'])
+    fco2_std = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw_std'])
+    fco2_count = np.array(c.variables[sst_name+'_reanalysed_count_obs'])
+    sst = np.array(c.variables[sst_name+'_reanalysed_sst'])
+    c.close()
+    in_time = du.time_con_str(in_time,in_units)[:,0]
+
+    f = np.where(out_time[0] == in_time)[0]
+    g = np.where(out_time[-1] == in_time)[0]
+    print(f)
+    print(g)
+    fco2 = fco2[:,:,f[0]:g[-1]+1];fco2_std = fco2_std[:,:,f[0]:g[-1]+1];
+    fco2_count = fco2_count[:,:,f[0]:g[-1]+1];sst = sst[:,:,f[0]:g[-1]+1];
+
+    fco2_ind = fco2_ind[:,:,f[0]:g[-1]+1];fco2_std_ind = fco2_std_ind[:,:,f[0]:g[-1]+1];
+    fco2_count_ind = fco2_count_ind[:,:,f[0]:g[-1]+1];sst_ind = sst_ind[:,:,f[0]:g[-1]+1];
+
+    direct = {}
+    direct[sst_name+'_reanalysed_fCO2_sw_indpendent'] = fco2_ind
+    direct[sst_name+'_reanalysed_fCO2_sw_std_indpendent'] = fco2_std_ind
+    direct[sst_name+'_reanalysed_count_obs_indpendent'] = fco2_count_ind
+    direct[sst_name+'_reanalysed_sst_indpendent'] = sst_ind
+
+    direct[sst_name+'_reanalysed_fCO2_sw'] = fco2
+    direct[sst_name+'_reanalysed_fCO2_sw_std'] = fco2_std
+    direct[sst_name+'_reanalysed_count_obs'] = fco2_count
+    direct[sst_name+'_reanalysed_sst'] = sst
+
+    append_netcdf(output_file,direct,1,1,1)
 
 def plot_indpendent(output_file,model_save_loc,sst_name,province_file,province_var):
     c = Dataset(output_file,'r')

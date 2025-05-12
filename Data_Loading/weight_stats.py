@@ -50,12 +50,12 @@ def unweighted_stats(x,y,meth):
         su = np.sum(weights)
         weights = weights/su
         #print(weights)
-        bi = rel_bias(y,x,weights)
-        bi_m = med_rel_bias(y,x,weights)
-        abi = abs_bias(y,x,weights)
-        rms = rmsd(y,x,weights)
-        ap = apd(y,x,weights)
-        rp = rpd(y,x,weights)
+        bi = rel_bias(x,y,weights)
+        bi_m = med_rel_bias(x,y,weights)
+        abi = abs_bias(x,y,weights)
+        rms = rmsd(x,y,weights)
+        ap = apd(x,y,weights)
+        rp = rpd(x,y,weights)
         if f.size > 1:
             #weights = weights*su
             #print(weights)

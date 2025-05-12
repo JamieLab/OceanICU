@@ -11,7 +11,8 @@ import os
 from netCDF4 import Dataset
 import numpy as np
 
-def bicep_pp_log_average(loc,outloc,filename_struct='',start_yr=1990,end_yr=2023,res=1,netcdf_var = 'npp',make_month_folder = True,log='',lag=''):
+def bicep_pp_log_average(loc,outloc,filename_struct='',start_yr=1990,end_yr=2023,res=1,netcdf_var = 'npp',make_month_folder = True,log='',lag='',area_wei=False,
+    gebco_file = False,gebco_out=False,land_mask=False):
     du.makefolder(outloc)
     # log,lag = du.reg_grid(lon=res,lat=res)
     res = np.abs(log[0] - log[1])
@@ -43,8 +44,20 @@ def bicep_pp_log_average(loc,outloc,filename_struct='',start_yr=1990,end_yr=2023
             if t == 0:
                 lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
                 t = 1
-            va_da_out = du.grid_average(va_da,lo_grid,la_grid)
+            va_da_out = du.grid_average(va_da,lo_grid,la_grid,lon=lon,lat=lat,area_wei = area_wei,gebco_file=gebco_file,gebco_out=gebco_out,land_mask=land_mask)
             du.netcdf_create_basic(outfile,va_da_out,netcdf_var,lag,log)
+            c = Dataset(outfile,'a')
+            c.monthly_file_loc = loc
+            c.output_loc = outloc
+            c.start_yr = start_yr
+            c.end_yr = end_yr
+            if area_wei:
+                c.area_weighting = 'True'
+                c.variables[netcdf_var].area_weighted_average = 'True'
+            else:
+                c.area_weighting = 'False'
+            c.created_with = 'bicep_average.bicep_pp_log_average'
+            c.close()
         mon = mon+1
         if mon == 13:
             yr = yr+1

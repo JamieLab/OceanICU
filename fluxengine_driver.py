@@ -1568,7 +1568,7 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
         ax.fill_between(a,decors[:,0] - (decors[:,1]/2), decors[:,0]+ (decors[:,1]/2),alpha=0.4,color='k')
         ax.set_ylabel('Decorrelation length (km)')
         # We load the precomputed annual fluxes from the fixed_uncertainty_append function
-        ann = np.loadtxt(os.path.join(model_save_loc,'annual_flux.csv'),delimiter=',',skiprows=1)
+        ann = np.loadtxt(os.path.join(model_save_loc,output_file),delimiter=',',skiprows=1)
         ax = fig.add_subplot(gs[0,1])
         ax.plot(a,ann[:,1],'k-',linewidth=3,zorder=6)# We plot this flux
         st = np.std(out,axis=1)#Calculate the standard deviation of the ensemble

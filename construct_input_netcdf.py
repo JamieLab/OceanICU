@@ -304,7 +304,7 @@ def single_province(save_loc,var,lon,lat,start_yr,end_yr):
     direct[var] = prov
     append_netcdf(save_loc,direct,lon,lat,timesteps)
 
-def province_shape(save_loc,var,lon,lat,start_yr,end_yr,shp_lon,shp_lat):
+def province_shape(save_loc,var,lon,lat,start_yr,end_yr,shp_lon,shp_lat,fill=False):
 
     timesteps =((end_yr-start_yr)+1)*12
 
@@ -315,7 +315,8 @@ def province_shape(save_loc,var,lon,lat,start_yr,end_yr,shp_lon,shp_lat):
     print(vals)
     vals = np.reshape(vals,(lat.shape[0],lon.shape[0]))
     vals = np.transpose(vals)
-    vals[vals ==0.0] = np.nan
+    if fill:
+        vals[vals ==0.0] = np.nan
 
     prov = np.repeat(vals[:,:,np.newaxis],timesteps,axis=2)
     direct = {}

@@ -28,7 +28,7 @@ def interpolate_noaa(file,lat=1,lon=1,grid_lat=[],grid_lon=[],grid_time=[],out_d
     noaa_time = np.ascontiguousarray(data2[:,0])
     data = data2[:,1:-1:2]
     data_unc = data2[:,2::2]
-    print(data_unc)
+    print(noaa_time)
 
     # plt.pcolor(noaa_grid,noaa_time,data)
     # plt.show()
@@ -63,8 +63,8 @@ def interpolate_noaa(file,lat=1,lon=1,grid_lat=[],grid_lon=[],grid_time=[],out_d
             du.netcdf_create_basic(file_o,out,'xCO2',grid_lat_vec,grid_lon)
             du.netcdf_append_basic(file_o,out_unc,'xCO2_unc')
     if (end_yr != []):
-        # print(date_ti[-1].year)
-        # print(end_yr)
+        print(date_ti[-1].year)
+        print(end_yr)
         if (end_yr > date_ti[-1].year):
             print('Extending data beyond NOAA ERSL end year! End year = ' + date_ti[-1].strftime('%Y'))
             yr = int(date_ti[-1].strftime('%Y')) + 1

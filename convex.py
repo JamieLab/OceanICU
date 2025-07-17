@@ -42,6 +42,15 @@ def load_LME_file(sh_file):
     ind = np.array(ind)
     return LME,ind
 
+def load_shape(file,part=True):
+    sh = shp.Reader(file)
+    if part:
+        parts = sh.shape(0).parts
+        o = np.array(sh.shape(0).points[parts[0]:parts[1]])
+    else:
+        o = np.array(sh.shape(0).points)
+    return o[:,0],o[:,1]
+
 def socat_append_prov(socat_file,shp_lon,shp_lat,prov_no):
     import pandas as pd
     data = pd.read_table(socat_file,sep='\t')

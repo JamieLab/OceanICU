@@ -262,7 +262,7 @@ def calc_nstar(file,delimiter,nitrate_var,phosphate_var,gridded=False,prefix='')
         data[prefix+'n*_Calculated'] = nstar(nit,phos)
         data.to_csv(file,sep=delimiter,index=False)
 
-def load_DIVA_glodap(file,delimiter,out_file,log,lag,var_name='ta'):
+def load_DIVA_glodap(file,delimiter,out_file,log,lag,var_name='ta',inp_name = 'Estimated G2talk @ G2talk=first'):
     """
     This functions loads a DIVA interpolation of total alkalinity data that represents a quasi-annual grid - This
     DIVA interpolation must be manually done in Ocean Data Viewer, with the input glodap file for the nerual network.
@@ -287,7 +287,7 @@ def load_DIVA_glodap(file,delimiter,out_file,log,lag,var_name='ta'):
     f = data[data['Latitude']==-90.0]
     g = data[data['Longitude']==-180.0]
 
-    var = np.transpose(np.array(data['Estimated G2talk @ G2talk=first']).reshape((len(g),len(f))))
+    var = np.transpose(np.array(data[inp_name]).reshape((len(g),len(f))))
     var[var==-1.000000e+10] = np.nan
     print(np.nanmin(var))
     print(var.shape)

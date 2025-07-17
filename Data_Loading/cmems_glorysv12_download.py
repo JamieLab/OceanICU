@@ -25,7 +25,7 @@ def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
 
     yr = start_yr
     mon = 1
-    while yr < end_yr:
+    while yr <= end_yr:
         date_min_v = datetime.datetime(yr,mon,1,0,0,0);
         date_max = datetime.datetime(yr,mon,27,23,59,59); date_max = date_max.strftime('%Y-%m-%d %H:%M:%S')
         OUTPUT_TEMP = os.path.join(OUTPUT_DIRECTORY,str(yr))
@@ -52,7 +52,7 @@ def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
               maximum_depth=0.49402499198913574,
               output_filename=OUTPUT_FILENAME,
               output_directory=OUTPUT_TEMP,
-              force_download=True
+              #force_download=True
             )
             # if yr > transition_yr:
             #     script_template,product = script_aft_daily(variable)
@@ -172,6 +172,77 @@ def cmems_average(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable=''
         if mon == 13:
             yr = yr+1
             mon=1
+
+def cmems_average_daily(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],variable='',log_av=False,area_wei = True):
+    du.makefolder(outloc)
+    res = np.round(np.abs(log[0]-log[1]),2)
+    #log,lag = du.reg_grid(lon=res,lat=res)
+    d = datetime.datetime(start_yr,1,1)
+    t = 0
+    while d.year <= end_yr:
+        if d.month == 1:
+            du.makefolder(os.path.join(outloc,str(d.year)))
+        if type(variable) == list:
+            file = os.path.join(loc,str(d.year),str(d.year)+'_'+du.numstr(d.month)+f'_CMEMS_GLORYSV12.nc')
+            outfile = os.path.join(outloc,str(d.year),str(d.year)+'_'+du.numstr(d.month)+'_'+du.numstr(d.day)+f'_CMEMS_GLORYSV12'+str(res)+'_deg.nc')
+        else:
+            file = os.path.join(loc,str(d.year),str(d.year)+'_'+du.numstr(d.month)+f'_CMEMS_GLORYSV12_{variable}.nc')
+            outfile = os.path.join(outloc,str(d.year),str(d.year)+'_'+du.numstr(d.month)+'_'+du.numstr(d.day)+f'_CMEMS_GLORYSV12_{variable}_'+str(res)+'_deg.nc')
+        print(file)
+        print(outfile)
+        if du.checkfileexist(file) and not du.checkfileexist(outfile):
+            if t == 0:
+                lon,lat = du.load_grid(file)
+
+            c = Dataset(file,'r')
+            if type(variable) == list:
+                tp2 = 0
+                for v in variable:
+                    va_da = np.transpose(np.squeeze(np.array(c.variables[v][:]))[d.day-1,:,:])
+                    va_da[va_da<-100] = np.nan
+                    va_da[va_da>5000] = np.nan
+                    if log_av:
+                        va_da = np.log10(va_da)
+                    if t == 0:
+                        lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
+                        t = 1
+                    va_da_out = du.grid_average(va_da,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei)
+                    if tp2 == 0:
+                        du.netcdf_create_basic(outfile,va_da_out,v,lag,log)
+                        tp2=1
+                    else:
+                        du.netcdf_append_basic(outfile,va_da_out,v)
+                    if area_wei:
+                        dp = Dataset(outfile,'a')
+                        dp.variables[v].area_weighted_average = 'True'
+                        dp.close()
+                c.close()
+
+
+            else:
+                va_da = np.transpose(np.squeeze(np.array(c.variables[variable][d.day-1,0,:,:])))
+                va_da[va_da<-100] = np.nan
+                va_da[va_da>5000] = np.nan
+                if log_av:
+                    va_da = np.log10(va_da)
+                # va_da[va_da < 0.0] = np.nan
+                # va_da[va_da > 60.0] = np.nan
+                #print(va_da)
+                c.close()
+                #lon,va_da=du.grid_switch(lon,va_da)
+
+                if t == 0:
+                    lo_grid,la_grid = du.determine_grid_average(lon,lat,log,lag)
+                    t = 1
+                va_da_out = du.grid_average(va_da,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei)
+                du.netcdf_create_basic(outfile,va_da_out,variable,lag,log)
+                if area_wei:
+                    dp = Dataset(outfile,'a')
+                    dp.variables[variable].area_weighted_average = 'True'
+                    dp.close()
+
+        d = d + datetime.timedelta(days=1)
+        break
 
 def cmems_socat_append(file,data_loc=[],variable = [],plot=False,log=False):
     import pandas as pd

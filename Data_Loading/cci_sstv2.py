@@ -62,20 +62,30 @@ def cci_sst_v3(loc,start_yr=1990,end_yr=2023):
     from urllib.request import urlretrieve
     du.makefolder(loc)
     htt = 'https://dap.ceda.ac.uk/neodc/eocis/data/global_and_regional/sea_surface_temperature/CDR_v3/Analysis/L4/v3.0.1/'
+    htt2 = 'https://gws-access.jasmin.ac.uk/public/cds_c3s_sst/data/ICDR_v3/Analysis/L4/v3.0.1/'
     d = datetime.datetime(start_yr,1,1)
     # t = 1
     while d.year <= end_yr:
         if d.day == 1:
             du.makefolder(os.path.join(loc,str(d.year)))
             du.makefolder(os.path.join(loc,str(d.year),du.numstr(d.month)))
+        du.makefolder(os.path.join(loc,str(d.year),du.numstr(d.month),du.numstr(d.day)))
         if d.year >=2022:
-            file = os.path.join(loc,str(d.year),du.numstr(d.month),d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR3.0-v02.0-fv01.0.nc'))
+            file = os.path.join(loc,str(d.year),du.numstr(d.month),du.numstr(d.day),d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_ICDR3.0-v02.0-fv01.0.nc'))
             htt_file = htt+'/'+d.strftime('%Y/%m/%d')+'/'+d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_ICDR3.0-v02.0-fv01.0.nc')
         else:
-            file = os.path.join(loc,str(d.year),du.numstr(d.month),d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR3.0-v02.0-fv01.0.nc'))
+            file = os.path.join(loc,str(d.year),du.numstr(d.month),du.numstr(d.day),d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR3.0-v02.0-fv01.0.nc'))
             htt_file = htt+'/'+d.strftime('%Y/%m/%d')+'/'+d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR3.0-v02.0-fv01.0.nc')
+
+        if d > datetime.datetime(2024,6,22):
+            print("############################################################")
+            print("Using Jasmin server for ICDR - please check these data are on CEDA.")
+            print("If avaiable on CEDA update script cci_sstv2.cci_sst_v3")
+            print("############################################################")
+            htt_file = htt2+'/'+d.strftime('%Y/%m/%d')+'/'+d.strftime('%Y%m%d120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_ICDR3.0-v02.0-fv01.0.nc')
         print(file)
         #print(htt_file)
+        print(du.checkfileexist(file))
         if not du.checkfileexist(file):
             print('Downloading... ' + file)
             urlretrieve(htt_file,file)

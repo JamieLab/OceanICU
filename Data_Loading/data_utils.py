@@ -316,6 +316,21 @@ def time_con_str(date,units):
     time2=np.array(time2)
     return time2
 
+def output_individual_netcdf(file,var,output_filestruct):
+
+    c = Dataset(file,'r')
+    lat = np.array(c['latitude'])
+    lon = np.array(c['longitude'])
+    time = np.array(c['time'])
+    units = c['time'].units
+    data = np.array(c[var])
+    c.close()
+
+    time2 = time_con_str(time,units)
+    for i in range(len(time2)):
+        netcdf_create_basic(output_filestruct.replace('%m',numstr(time2[i,1])).replace('%Y',str(time2[i,0])),data[:,:,i],var,lat,lon)
+
+
 def netcdf_create_basic(file,var,var_name,lat,lon,flip=False,units=''):
     #copts={"zlib":True,"complevel":5} # Compression variables to save space :-)
     outp = Dataset(file,'w',format='NETCDF4_CLASSIC')

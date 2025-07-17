@@ -26,7 +26,7 @@ def OSISAF_monthly_av(inp='D:/Data/OSISAF',start_yr = 1978,end_yr = 2023,time_co
         i = 0 # Variable for loading lat and lon grid once (set to 1 once loaded for the first time)
 
         du.makefolder(os.path.join(inp,'monthly',str(ye)))
-        while ye < end_yr:
+        while ye <= end_yr:
             print(os.path.join(inp,'monthly',str(ye),'OSISAF_MONTHLY_'+hemi+'_'+str(ye)+du.numstr(mon)+'.nc'))
             outfile = os.path.join(inp,'monthly',str(ye),'OSISAF_MONTHLY_'+hemi+'_'+str(ye)+du.numstr(mon)+'.nc')
             if os.path.exists(outfile) == 0:

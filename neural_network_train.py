@@ -1180,7 +1180,12 @@ def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_la
     plt.close(fig)
 
 def OC4C_calc_independent_test_rmsd(model_save_loc,input_file,sst_name,fco2_file,province_file,prov_var,output_file = 'OC4C_independent_test.csv',name='fco2',unit = '$\mu$atm',parameter = 'fCO$_{2 (sw)}$',
-    c_plot = np.array([0,800])):
+    c_plot = np.array([0,800]),area_file = '',area_var = '',ocean_var = ''):
+    c = Dataset(area_file,'r')
+    area = np.array(c.variables[area_var])
+    ocean = np.array(c.variables[ocean_var])
+    area = area*ocean
+    c.close()
     c = Dataset(province_file,'r')
     prov = np.array(c.variables[prov_var])
     c.close()
@@ -1197,10 +1202,16 @@ def OC4C_calc_independent_test_rmsd(model_save_loc,input_file,sst_name,fco2_file
     fco2_nn = np.array(c.variables['fco2'])
     c.close()
     print(prov.shape)
+
     if len(prov.shape) == 2:
         prov2 = np.repeat(prov[:, :, np.newaxis], fco2.shape[2], axis=2)
     else:
         prov2 = prov
+
+    if len(area.shape) == 2:
+        area2 = np.repeat(prov[:, :, np.newaxis], fco2.shape[2], axis=2)
+    else:
+        area2 = area
     print(prov2.shape)
     uniq = np.unique(prov2).tolist()
     print(uniq[-1])
@@ -1219,24 +1230,42 @@ def OC4C_calc_independent_test_rmsd(model_save_loc,input_file,sst_name,fco2_file
     axs = flatList
     tp = 0
     for i in uniq:
-        f = np.where((prov2 == i) & (np.isnan(fco2) == 0))
+        f = np.where((prov2 == i) & (np.isnan(fco2) == 0) & (np.isnan(fco2_nn) == 0))
         axs[tp].scatter(fco2[f],fco2_nn[f])
-        w = ws.weighted_stats(fco2[f],fco2_nn[f],1/np.sqrt(fco2_std[f]**2),'b') # Weighted stats so we can extract the RMSD for each province and save it.
+        w = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b') # Weighted stats so we can extract the RMSD for each province and save it.
         unweight(fco2[f],fco2_nn[f],axs[tp],c_plot,unit=unit)
-        weighted(fco2[f],fco2_nn[f],1/np.sqrt(fco2_std[f]**2),axs[tp],c_plot,unit=unit)
+        weighted(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],axs[tp],c_plot,unit=unit)
         axs[tp].set_title(f'Province {i}')
         axs[tp].set_xlim(c_plot); axs[tp].set_ylim(c_plot); axs[tp].plot(c_plot,c_plot,'k-');
 
-        stats_temp = ws.weighted_stats(fco2[f],fco2_nn[f],1/np.sqrt(fco2_std[f]**2),'b')
+        stats_temp = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b')
         axs[tp].fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6,zorder=-1)
         axs[tp].fill_between(c_plot,c_plot-(stats_temp['rmsd']*2),c_plot+(stats_temp['rmsd']*2),color='k',alpha=0.4,zorder=-2)
         axs[tp].set_xlabel('in situ '+parameter+' ('+ unit+')')
         axs[tp].set_ylabel('Neural Network '+parameter+' ('+unit+')')
         if tp == 0:
-            rmsd = np.array([i,w['rmsd']])
+            rmsd = np.array([i,w['rmsd'],w['rel_bias']])
         else:
-            rmsd = np.vstack((rmsd,np.array([i,w['rmsd']]))) # Append further rmsd values with its province number
+            rmsd = np.vstack((rmsd,np.array([i,w['rmsd'],w['rel_bias']]))) # Append further rmsd values with its province number
         tp = tp+1
     fig2.savefig(os.path.join(model_save_loc,'plots','per_prov_validation.png'),format='png',dpi=300)
     plt.close(fig2)
     np.savetxt(os.path.join(model_save_loc,'validation',output_file), rmsd, delimiter=",")
+
+    fig = plt.figure(figsize=(7,7))
+    gs = GridSpec(1,1, figure=fig, wspace=0.25,hspace=0.25,bottom=0.05,top=0.98,left=0.05,right=0.98)
+    ax = fig.add_subplot(gs[0,0])
+    f = np.where((np.isnan(fco2) == 0) & (np.isnan(fco2_nn) == 0))
+    ax.scatter(fco2[f],fco2_nn[f])
+    w = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b') # Weighted stats so we can extract the RMSD for each province and save it.
+    unweight(fco2[f],fco2_nn[f],ax,c_plot,unit=unit)
+    weighted(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],ax,c_plot,unit=unit)
+    ax.set_xlim(c_plot); ax.set_ylim(c_plot); ax.plot(c_plot,c_plot,'k-');
+    stats_temp = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b')
+    ax.fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6,zorder=-1)
+    ax.fill_between(c_plot,c_plot-(stats_temp['rmsd']*2),c_plot+(stats_temp['rmsd']*2),color='k',alpha=0.4,zorder=-2)
+    ax.set_xlabel('in situ '+parameter+' ('+ unit+')')
+    ax.set_ylabel('Neural Network '+parameter+' ('+unit+')')
+    fig.savefig(os.path.join(model_save_loc,'plots','validation.png'),format='png',dpi=300)
+    plt.close(fig)
+    np.savetxt(os.path.join(model_save_loc,'validation','total_'+output_file), np.array([0,w['rmsd'],w['rel_bias']]), delimiter=",")

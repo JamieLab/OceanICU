@@ -40,10 +40,10 @@ def reanalyse(socat_dir=None,socat_files=None,sst_dir=None,sst_tail=None,out_dir
                           endyr=2023,socatversion=2020,regions=["GL"],customsst=True,
                           customsstvar=var,customsstlat='latitude',customsstlon='longitude'
                           ,output=out_dir)
-    fco2,fco2_std,fco2_sst = retrieve_fco2(out_dir,start_yr = start_yr,end_yr=end_yr,prefix=prefix)
+    fco2,fco2_std,fco2_sst,fco2_nobs = retrieve_fco2(out_dir,start_yr = start_yr,end_yr=end_yr,prefix=prefix)
     if kelvin:
         fco2_sst = fco2_sst+273.15
-    append_to_file(outfile,fco2,fco2_std,fco2_sst,name,socat_files[0])
+    append_to_file(outfile,fco2,fco2_std,fco2_sst,fco2_nobs,name,socat_files[0])
 
 def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name='',kelvin=True,socat_notreanalysed=False):
     """
@@ -74,8 +74,14 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
         #Extracting the reanalysed fCO2 data
         fco2 = np.array(c.variables['fco2_reanalysed_ave_weighted'])
         fco2_std = np.array(c.variables['fco2_reanalysed_std_weighted'])
-        fco2_nobs = np.array(c.variables['count_nobs_reanalysed'])
-        sst = np.array(c.variables['sst_subskin_weighted'])
+        try:
+            fco2_nobs = np.array(c.variables['count_nobs_reanalysed'])
+        except:
+            fco2_nobs = np.array(c.variables['count_nobs'])
+        try:
+            sst = np.array(c.variables['sst_subskin_weighted'])
+        except:
+            sst = np.zeros((fco2.shape)); sst[:] = np.nan
     fco2[fco2<0] = np.nan
     fco2_nobs[fco2_nobs<0] = np.nan
     fco2_std[fco2_std<0] = np.nan
@@ -268,16 +274,23 @@ def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GL
             fco2_sst_temp = np.transpose(fco2_sst_temp)
             if flip:
                 fco2_sst_temp = np.fliplr(fco2_sst_temp)
+
+            fco2_nobs_temp = np.squeeze(c.variables['count_nobs'])
+            fco2_nobs_temp = np.transpose(fco2_nobs_temp)
+            if flip:
+                fco2_nobs_temp = np.fliplr(fco2_nobs_temp)
             c.close()
             if inits == 0: # On first avaiable file we create the output arrays
                 fco2 = np.empty((fco2_temp.shape[0],fco2_temp.shape[1],months))
                 fco2[:] = np.nan
                 fco2_std = np.copy(fco2)
                 fco2_sst = np.copy(fco2)
+                fco2_nobs = np.copy(fco2)
                 inits = 1 # Set toggle to 1 so we don't create recreating the output arrays
             fco2[:,:,t] = fco2_temp # Putting the data into the array
             fco2_std[:,:,t] = fco2_std_temp
             fco2_sst[:,:,t] = fco2_sst_temp
+            fco2_nobs[:,:,t] = fco2_nobs_temp
         t += 1 # Add to counting
         mon += 1 # Add another month
         if mon == 13: # If month gets to 13 we need to increment the year and set month to 1
@@ -289,7 +302,7 @@ def retrieve_fco2(rean_dir,start_yr=1990,end_yr=2020,prefix = '%Y%m01-OCF-CO2-GL
     fco2[fco2<0] = np.nan
     fco2_std[fco2_std<0] = np.nan
     fco2_sst[fco2_sst<-5] = np.nan
-    return fco2,fco2_std,fco2_sst
+    return fco2,fco2_std,fco2_sst,fco2_nobs
 
 def read_socat(file,pad=7302):
     """
@@ -326,7 +339,7 @@ def find_socat(data,lat,lon):
     d = data[(soclat > mlat[0]) & (soclat < mlat[1]) & (soclon > mlon[0]) & (soclon < mlon[1])]
     return d
 
-def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = [],grid=True,fco2var = 'fCO2_reanalysed [uatm]',pco2var = 'pCO2_reanalysed [uatm]',sstvar = 'T_reynolds [C]',
+def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = [],grid=True,fco2var = 'fCO2_reanalysed [uatm]',pco2var = 'pCO2_reanalysed [uatm]',sstvar = 'T_subskin [C]',
     save_file ='socat.tsv',save_fold = False,pad = 7302):
     """
     Function to regrid the SOCAT tsv into a gridded file consistent to that produced by SOCAT and JamieLab, but with additional extras

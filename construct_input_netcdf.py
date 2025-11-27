@@ -455,9 +455,12 @@ def clear_on_prov(data_file,var_p,val):
 
     for var in v:
         print(var)
-        data = c.variables[var][:]
-        data[var_p != val] = np.nan
-        c.variables[var][:] = data
+        if '_clim' in var:
+            print('Not processing... Climatology')
+        else:
+            data = c.variables[var][:]
+            data[var_p != val] = np.nan
+            c.variables[var][:] = data
     c.close()
 
 def replace_socat_with_model(input_data_file,start_yr,end_yr,socat_var = False,gcb_model=None,mod_ref_year = 1959,plot=False,mod_variable='model_fco2'):

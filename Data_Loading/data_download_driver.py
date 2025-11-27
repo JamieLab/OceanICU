@@ -9,13 +9,13 @@ noaa = False
 era5 = False
 era5_daily = False
 cmems = False
-cmems_daily=False
+cmems_daily=True
 bicep = False
 ccmp = False
 oisst = False
 cci = False
 gebco = False
-osisaf = True
+osisaf = False
 lon,lat = du.reg_grid()
 if gebco:
     import gebco_resample as ge
@@ -32,8 +32,9 @@ if era5:
 
 if cmems_daily:
     import cmems_glorysv12_download as cm
-    cm.load_glorysv12_daily('D:\Data\CMEMS\SSS\DAILY',end_yr = end_yr,variable = 'so')
-    cm.load_glorysv12_daily('D:\Data\CMEMS\MLD\DAILY',end_yr = end_yr,variable = 'mlotst')
+    cm.load_glorysv12_daily('F:\Data\CMEMS\SSS\DAILY',end_yr = end_yr,variable = 'so')
+    # cm.load_glorysv12_daily('F:\Data\CMEMS\SSS\DAILY_5m',end_yr = end_yr,variable = 'so',depth=5.078224182128906)
+    # cm.load_glorysv12_daily('F:\Data\CMEMS\MLD\DAILY',end_yr = end_yr,variable = 'mlotst')
 
 if cmems:
     import cmems_glorysv12_download as cm

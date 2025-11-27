@@ -328,6 +328,14 @@ def make_save_tree(model_save_loc):
     if not os.path.isdir(decor):
         os.mkdir(decor)
 
+def model_setup(v,var,activ,opt,min_n):
+    model = tf.keras.models.Sequential(name='PROV_'+str(v)) # Setup the model
+    model.add(tf.keras.layers.Dense(min_n, input_dim=len(var), activation=activ)) # Add Hidden layer
+    #model.add(tf.keras.layers.Dense(n, activation='sigmoid'))
+    model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
+    model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
+    return model
+
 def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10,tot_lut_val=6000,epochs=200,node_in = range(6,31,3),activ = 'sigmoid',
     learning_rate =0.01):
     """
@@ -412,12 +420,13 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
         for n in node_increments:
             print(n)
             # Here we setup the Tensor Flow Model (Thanks to Josh Blannin for example code)
-            model = tf.keras.models.Sequential(name='PROV_'+str(v)) # Setup the model
-            model.add(tf.keras.layers.Dense(n, input_dim=len(var),activation=activ)) # Add Hidden layer - changed from relu to sigmoid as seems to produce better results.
-            #model.add(tf.keras.layers.Dense(n, activation='sigmoid')) # Add Hidden layer - changed from relu to sigmoid as seems to produce better results.
-            model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
-            model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
-            # Here we train the neural network.
+            model = model_setup(v,var,activ,opt,n)
+            # model = tf.keras.models.Sequential(name='PROV_'+str(v)) # Setup the model
+            # model.add(tf.keras.layers.Dense(n, input_dim=len(var),activation=activ)) # Add Hidden layer - changed from relu to sigmoid as seems to produce better results.
+            # #model.add(tf.keras.layers.Dense(n, activation='sigmoid')) # Add Hidden layer - changed from relu to sigmoid as seems to produce better results.
+            # model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
+            # model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
+            # # Here we train the neural network.
             history = model.fit(X_train, y_train[:,0], epochs=epochs, validation_data=[X_val,y_val[:,0]], verbose=0, callbacks=[es],shuffle=False, batch_size=int(len(X_train)/50))
 
             # Calculate the independent test dataset loss function
@@ -452,12 +461,12 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
                 """
                 Neural network setup and training.
                 """
-
-                model = tf.keras.models.Sequential(name='PROV_'+str(v)) # Setup the model
-                model.add(tf.keras.layers.Dense(min_n, input_dim=len(var), activation=activ)) # Add Hidden layer
-                #model.add(tf.keras.layers.Dense(n, activation='sigmoid'))
-                model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
-                model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
+                model = model_setup(v,var,activ,opt,min_n)
+                # model = tf.keras.models.Sequential(name='PROV_'+str(v)) # Setup the model
+                # model.add(tf.keras.layers.Dense(min_n, input_dim=len(var), activation=activ)) # Add Hidden layer
+                # #model.add(tf.keras.layers.Dense(n, activation='sigmoid'))
+                # model.add(tf.keras.layers.Dense(1, activation='linear')) # Add Output layer
+                # model.compile(optimizer=opt, loss='mse') # Set the loss function and metric to determine the training results
                 # Here we train the neural network.
                 history = model.fit(X_train, y_train[:,0], epochs=epochs, validation_data=[X_val,y_val[:,0]], verbose=0, callbacks=[es],shuffle=False, batch_size=int(len(X_train)/50))
                 loss = history.history['loss'][-1]
@@ -664,8 +673,9 @@ def unweight(x,y,ax,c,unit = '$\mu$atm',plot=False,loc = [0.52,0.35]):
     bias = '%.2f' %np.round(stats_un['rel_bias'],2)
     sl = '%.2f' %np.round(stats_un['slope'],2)
     ip = '%.2f' %np.round(stats_un['intercept'],2)
+    ma = '%.2f' %np.round(stats_un['mad'],2)
     n = stats_un['n']
-    ax.text(loc[0],loc[1],f'Unweighted Stats\nRMSD = {rmsd} {unit}\nBias = {bias} {unit}\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
+    ax.text(loc[0],loc[1],f'Unweighted Stats\nRMSD = {rmsd} {unit}\nBias = {bias} {unit}\nSlope = {sl}\nIntercept = {ip}\nMAD = {ma} {unit}\nN = {n}',transform=ax.transAxes,va='top')
     #return h2
 
 def weighted(x,y,weights,ax,c,unit = '$\mu$atm'):
@@ -679,8 +689,9 @@ def weighted(x,y,weights,ax,c,unit = '$\mu$atm'):
     bias = '%.2f' %np.round(stats['rel_bias'],2)
     sl = '%.2f' %np.round(stats['slope'],2)
     ip = '%.2f' %np.round(stats['intercept'],2)
+    ma = '%.2f' %np.round(stats['mad'],2)
     n = stats['n']
-    ax.text(0.02,0.95,f'Weighted Stats\nRMSD = {rmsd} {unit}\nBias = {bias} {unit}\nSlope = {sl}\nIntercept = {ip}\nN = {n}',transform=ax.transAxes,va='top')
+    ax.text(0.02,0.95,f'Weighted Stats\nRMSD = {rmsd} {unit}\nBias = {bias} {unit}\nSlope = {sl}\nIntercept = {ip}\nMAD = {ma} {unit}\nN = {n}',transform=ax.transAxes,va='top')
     return h1
 
 def neural_val_run(data,model_save_loc,var,provs,ens=10,unc=True,name='fco2'):
@@ -944,7 +955,7 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         fig2.savefig(save_file_p,format='png',dpi=300)
         plt.close(fig2)
 
-def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm',file = 'independent_test_rmsd.csv'):
+def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm',file = 'independent_test_rmsd.csv',extra = ''):
     """
     Function to take the independent test rmsd values produced in plot_total_validation_unc and produce a array within the output netcdf
     with the validation uncertainity for each province mapped
@@ -954,6 +965,9 @@ def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugac
     prov = c.variables[prov][:]
     s = prov.shape
     prov = np.reshape(prov,(-1,1))
+    c.close()
+    c = Dataset(os.path.join(model_save_loc,'output.nc'))
+    fco2 = np.array(c.variables['fco2'])
     c.close()
     # Load the test validation RMSD.
     val = np.loadtxt(os.path.join(model_save_loc,'validation',file),delimiter=',')
@@ -967,24 +981,25 @@ def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugac
     else: #Single province must be handled differently
         val_unc[prov == val[0]] = val[1]*2 # val[0] is the province number, and val[1] is the RMSD
     val_unc = np.reshape(val_unc,s)
+    val_unc[np.isnan(fco2) == 1] = np.nan
 
     # Need to add a check if the fCO2_val_unc variable has been created already - if it has we just overwrite with the new data...
     c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
     keys = c.variables.keys()
-    if name+'_val_unc' in keys:
-        c.variables[name+'_val_unc'][:] = val_unc
-        c.variables[name+'_val_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    if name+'_val_unc'+extra in keys:
+        c.variables[name+'_val_unc'+extra][:] = val_unc
+        c.variables[name+'_val_unc'+extra].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
     else:
 
-        var_o = c.createVariable(name+'_val_unc','f4',('longitude','latitude','time'))
+        var_o = c.createVariable(name+'_val_unc'+extra,'f4',('longitude','latitude','time'))
         var_o[:] = val_unc
-    c.variables[name+'_val_unc'].long_name = longname+' evaluation uncertainty'
-    c.variables[name+'_val_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
-    c.variables[name+'_val_unc'].units = unit
-    c.variables[name+'_val_unc'].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
+    c.variables[name+'_val_unc'+extra].long_name = longname+' evaluation uncertainty'
+    c.variables[name+'_val_unc'+extra].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables[name+'_val_unc'+extra].units = unit
+    c.variables[name+'_val_unc'+extra].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
     c.close()
 
-def add_total_unc(model_save_loc,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm'):
+def add_total_unc(model_save_loc,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm',val_extra=''):
     """
     Function to produce the total fCO2 uncertainity by combining the uncertainity components in quadrature.
     """
@@ -993,7 +1008,7 @@ def add_total_unc(model_save_loc,name='fco2',longname='Fugacity of CO2 in seawat
     keys = c.variables.keys()
     ne = c.variables[name+'_net_unc'][:]
     pa = c.variables[name+'_para_unc'][:]
-    va = c.variables[name+'_val_unc'][:]
+    va = c.variables[name+'_val_unc'+val_extra][:]
 
     tot = np.sqrt(ne**2 + pa**2 + va**2) # Combine these in quadrature
     # Need to add a check if the fCO2_tot_unc variable has been created already - if it has we just overwrite with the new data...
@@ -1180,26 +1195,28 @@ def plot_residuals(model_save_loc,latv,lonv,var,out_var,zoom_lon = False,zoom_la
     plt.close(fig)
 
 def OC4C_calc_independent_test_rmsd(model_save_loc,input_file,sst_name,fco2_file,province_file,prov_var,output_file = 'OC4C_independent_test.csv',name='fco2',unit = '$\mu$atm',parameter = 'fCO$_{2 (sw)}$',
-    c_plot = np.array([0,800]),area_file = '',area_var = '',ocean_var = ''):
-    c = Dataset(area_file,'r')
-    area = np.array(c.variables[area_var])
-    ocean = np.array(c.variables[ocean_var])
-    area = area*ocean
-    c.close()
+    c_plot = np.array([0,800]),area_file = '',area_var = '',ocean_var = '',area_account=False,mask_account=False,mask_file='',mask_var='',extra = '_independent'):
+    if area_account:
+        c = Dataset(area_file,'r')
+        area = np.array(c.variables[area_var])
+        ocean = np.array(c.variables[ocean_var])
+        area = area*ocean
+        c.close()
     c = Dataset(province_file,'r')
     prov = np.array(c.variables[prov_var])
     c.close()
 
     c = Dataset(input_file,'r')
-    fco2 = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw_indpendent'])
-    fco2_std = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw_std_indpendent'])
-    fco2_count = np.array(c.variables[sst_name+'_reanalysed_count_obs_indpendent'])
+    fco2 = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw'+extra])
+    fco2_std = np.array(c.variables[sst_name+'_reanalysed_fCO2_sw_std'+extra])
+    fco2_count = np.array(c.variables[sst_name+'_reanalysed_count_obs'+extra])
     c.close()
     fco2_std[(np.isnan(fco2)==0) & (np.isnan(fco2_std)==1)] = 0
     fco2_std = np.sqrt((fco2_std/np.sqrt(fco2_count))**2 + 5**2)
 
     c = Dataset(fco2_file,'r')
     fco2_nn = np.array(c.variables['fco2'])
+    time = np.array(c.variables['time'])
     c.close()
     print(prov.shape)
 
@@ -1207,11 +1224,27 @@ def OC4C_calc_independent_test_rmsd(model_save_loc,input_file,sst_name,fco2_file
         prov2 = np.repeat(prov[:, :, np.newaxis], fco2.shape[2], axis=2)
     else:
         prov2 = prov
-
-    if len(area.shape) == 2:
-        area2 = np.repeat(prov[:, :, np.newaxis], fco2.shape[2], axis=2)
+    if area_account:
+        if len(area.shape) == 2:
+            area2 = np.repeat(prov[:, :, np.newaxis], fco2.shape[2], axis=2)
+        else:
+            area2 = area
     else:
-        area2 = area
+        area2 = np.ones((prov2.shape))
+
+    if mask_account:
+        c = Dataset(mask_file,'r')
+        mask = np.array(c.variables[mask_var])
+        print(mask.shape)
+        time_mask = np.array(c.variables['time'])
+        c.close()
+        print()
+        f = np.where(time[0] == time_mask)[0]
+        f2 = np.where(time[-1] == time_mask)[0]
+        print(f)
+        print(f2)
+        mask = mask[:,:,int(f):int(f2+1)]
+        fco2[mask==0] = np.nan
     print(prov2.shape)
     uniq = np.unique(prov2).tolist()
     print(uniq[-1])
@@ -1232,40 +1265,44 @@ def OC4C_calc_independent_test_rmsd(model_save_loc,input_file,sst_name,fco2_file
     for i in uniq:
         f = np.where((prov2 == i) & (np.isnan(fco2) == 0) & (np.isnan(fco2_nn) == 0))
         axs[tp].scatter(fco2[f],fco2_nn[f])
-        w = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b') # Weighted stats so we can extract the RMSD for each province and save it.
+        w = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b',bootstraping=True) # Weighted stats so we can extract the RMSD for each province and save it.
+        #print(w)
         unweight(fco2[f],fco2_nn[f],axs[tp],c_plot,unit=unit)
         weighted(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],axs[tp],c_plot,unit=unit)
         axs[tp].set_title(f'Province {i}')
         axs[tp].set_xlim(c_plot); axs[tp].set_ylim(c_plot); axs[tp].plot(c_plot,c_plot,'k-');
 
-        stats_temp = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b')
+        stats_temp = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b',bootstraping=True)
         axs[tp].fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6,zorder=-1)
         axs[tp].fill_between(c_plot,c_plot-(stats_temp['rmsd']*2),c_plot+(stats_temp['rmsd']*2),color='k',alpha=0.4,zorder=-2)
         axs[tp].set_xlabel('in situ '+parameter+' ('+ unit+')')
         axs[tp].set_ylabel('Neural Network '+parameter+' ('+unit+')')
         if tp == 0:
-            rmsd = np.array([i,w['rmsd'],w['rel_bias']])
+            rmsd = np.array([i,w['rmsd'],w['rel_bias'],w['n'],w['slope'],w['intercept'],w['pearson_corr'],w['rel_bias_err'],w['rmsd_err'],w['slope_err'],w['intercept_err']])
         else:
-            rmsd = np.vstack((rmsd,np.array([i,w['rmsd'],w['rel_bias']]))) # Append further rmsd values with its province number
+            rmsd = np.vstack((rmsd,np.array([i,w['rmsd'],w['rel_bias'],w['n'],w['slope'],w['intercept'],w['pearson_corr'],w['rel_bias_err'],w['rmsd_err'],w['slope_err'],w['intercept_err']]))) # Append further rmsd values with its province number
         tp = tp+1
-    fig2.savefig(os.path.join(model_save_loc,'plots','per_prov_validation.png'),format='png',dpi=300)
+    fig2.savefig(os.path.join(model_save_loc,'plots','per_prov_'+output_file.split('.')[0]+'.png'),format='png',dpi=300)
     plt.close(fig2)
-    np.savetxt(os.path.join(model_save_loc,'validation',output_file), rmsd, delimiter=",")
+    np.savetxt(os.path.join(model_save_loc,'validation',output_file), rmsd, delimiter=",",header='Province, RMSD, Bias, Number of samples, Slope of Type II regression, Intercept of Type II regression, Pearson Correlation,Bias Error,RMSD Error,Slope Error,Intercept Error')
 
     fig = plt.figure(figsize=(7,7))
-    gs = GridSpec(1,1, figure=fig, wspace=0.25,hspace=0.25,bottom=0.05,top=0.98,left=0.05,right=0.98)
+    font = {'weight' : 'normal',
+            'size'   :14}
+    matplotlib.rc('font', **font)
+    gs = GridSpec(1,1, figure=fig, wspace=0.25,hspace=0.25,bottom=0.1,top=0.98,left=0.15,right=0.95)
     ax = fig.add_subplot(gs[0,0])
     f = np.where((np.isnan(fco2) == 0) & (np.isnan(fco2_nn) == 0))
-    ax.scatter(fco2[f],fco2_nn[f])
-    w = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b') # Weighted stats so we can extract the RMSD for each province and save it.
-    unweight(fco2[f],fco2_nn[f],ax,c_plot,unit=unit)
+    ax.scatter(fco2[f],fco2_nn[f],s=2)
+    w = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b',bootstraping=True) # Weighted stats so we can extract the RMSD for each province and save it.
+    unweight(fco2[f],fco2_nn[f],ax,c_plot,unit=unit,loc = [0.65,0.25])
     weighted(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],ax,c_plot,unit=unit)
     ax.set_xlim(c_plot); ax.set_ylim(c_plot); ax.plot(c_plot,c_plot,'k-');
-    stats_temp = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b')
+    stats_temp = ws.weighted_stats(fco2[f],fco2_nn[f],(1/np.sqrt(fco2_std[f]**2))*area2[f],'b',bootstraping=True)
     ax.fill_between(c_plot,c_plot-stats_temp['rmsd'],c_plot+stats_temp['rmsd'],color='k',alpha=0.6,zorder=-1)
     ax.fill_between(c_plot,c_plot-(stats_temp['rmsd']*2),c_plot+(stats_temp['rmsd']*2),color='k',alpha=0.4,zorder=-2)
     ax.set_xlabel('in situ '+parameter+' ('+ unit+')')
     ax.set_ylabel('Neural Network '+parameter+' ('+unit+')')
-    fig.savefig(os.path.join(model_save_loc,'plots','validation.png'),format='png',dpi=300)
+    fig.savefig(os.path.join(model_save_loc,'plots','total_'+output_file.split('.')[0]+'.png'),format='png',dpi=300)
     plt.close(fig)
-    np.savetxt(os.path.join(model_save_loc,'validation','total_'+output_file), np.array([0,w['rmsd'],w['rel_bias']]), delimiter=",")
+    np.savetxt(os.path.join(model_save_loc,'validation','total_'+output_file), np.array([0,w['rmsd'],w['rel_bias'],w['n'],w['slope'],w['intercept'],w['pearson_corr'],w['rel_bias_err'],w['rmsd_err'],w['slope_err'],w['intercept_err']]), delimiter=",",header='Province, RMSD, Bias, Number of samples, Slope of Type II regression, Intercept of Type II regression, Pearson Correlation,Bias Error,RMSD Error,Slope Error,Intercept Error')

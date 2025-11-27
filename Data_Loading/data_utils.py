@@ -358,21 +358,21 @@ def netcdf_create_basic(file,var,var_name,lat,lon,flip=False,units=''):
     lon_o[:] = lon
     outp.close()
 
-def netcdf_append_basic(file,var,var_name,flip=False,units=''):
+def netcdf_append_basic(file,var,var_name,flip=False,units='',lon_dim='lon',lat_dim='lat'):
     outp = Dataset(file,'a',format='NETCDF4_CLASSIC')
     if flip:
         if var_name in outp.variables.keys():
             sst_o = outp[var_name]
             sst_o[:] = np.tranpose(var)
         else:
-            sst_o = outp.createVariable(var_name,'f4',('lat','lon'),zlib=True)
+            sst_o = outp.createVariable(var_name,'f4',(lat_dim,lon_dim),zlib=True)
             sst_o[:] = np.transpose(var)
     else:
         if var_name in outp.variables.keys():
             sst_o = outp[var_name]
             sst_o[:] = var
         else:
-            sst_o = outp.createVariable(var_name,'f4',('lon','lat'),zlib=True)
+            sst_o = outp.createVariable(var_name,'f4',(lon_dim,lat_dim),zlib=True)
             sst_o[:] = var
     sst_o.units = units
     sst_o.time_generated = datetime.datetime.now().strftime(('%d/%m/%Y'))

@@ -5,6 +5,7 @@ import os
 import data_utils as du
 from netCDF4 import Dataset
 import numpy as np
+import zipfile
 
 def download_era5(loc,start_yr=1990,end_yr=2023):
     import cdsapi
@@ -13,7 +14,7 @@ def download_era5(loc,start_yr=1990,end_yr=2023):
     ye = start_yr
     mon = 1
 
-    while ye < end_year:
+    while ye <= end_year:
         d = datetime.datetime(ye,mon,1)
         mo = d.strftime("%m")
         p = os.path.join(loc,str(ye))
@@ -30,13 +31,36 @@ def download_era5(loc,start_yr=1990,end_yr=2023):
                         'boundary_layer_height', 'mean_sea_level_pressure', 'mean_surface_downward_long_wave_radiation_flux',
                         'mean_surface_downward_short_wave_radiation_flux',
                     ],
-                    'year': str(ye),
-                    'month': mo,
-                    'time': '00:00',
-                    'format': 'netcdf',
+                    'year': [str(ye)],
+                    'month': [mo],
+                    'time': ['00:00'],
+                    'data_format': 'netcdf',
                 },
-                os.path.join(p,str(ye)+'_'+mo+'_ERA5.nc'))
+                os.path.join(p,str(ye)+'_'+mo+'_ERA5.zip'))
 
+            with zipfile.ZipFile(os.path.join(p,str(ye)+'_'+mo+'_ERA5.zip'), 'r') as zip_ref:
+                # Extract the specific file
+                zip_ref.extractall(os.path.join(loc,str(ye)))
+            os.rename(os.path.join(loc,str(ye),'data_stream-moda_stepType-avgua.nc'), os.path.join(p,str(ye)+'_'+mo+'_ERA5.nc'))
+            variable_dict = {
+                'avg_sdswrf': 'msdwswrf',
+                'avg_sdlwrf': 'msdwlwrf'
+            }
+            c = Dataset(os.path.join(p,str(ye)+'_'+mo+'_ERA5.nc'),'a')
+            d = Dataset(os.path.join(loc,str(ye),'data_stream-moda_stepType-avgad.nc'),'r')
+            for i in variable_dict.keys():
+                var = c.createVariable(variable_dict[i],'f4',('valid_time','latitude','longitude'),fill_value=np.nan)
+                data = np.array(d.variables[i])
+                data[data>200000] = np.nan
+
+                var.setncatts(d[i].__dict__)
+                var[:] = data
+
+                #var._FillValue = np.nan
+            c.close()
+            d.close()
+            os.remove(os.path.join(loc,str(ye),'data_stream-moda_stepType-avgad.nc'))
+            os.remove(os.path.join(p,str(ye)+'_'+mo+'_ERA5.zip'))
         mon = mon+1
         if mon == 13:
             ye = ye+1

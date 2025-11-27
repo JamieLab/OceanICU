@@ -22,7 +22,7 @@ matplotlib.rc('font', **font)
 let = ['a','b','c','d','e','f','g','h']
 
 def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws2=None,ws3=None,seaice=None,sal=None,msl=None,xCO2=None,coolskin='Donlon02',start_yr=1990, end_yr = 2020,
-    coare_out=None,tair=None,dewair=None,rs=None,rl=None,zi=None):
+    coare_out=None,tair=None,dewair=None,rs=None,rl=None,zi=None,t_skin_in=None):
     """
     Function to create a netcdf file with all variables required for the Fluxengine calculations using
     standard names.
@@ -55,6 +55,10 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws
 
     for i in range(len(vars)):
         direct[vars_name[i]] = du.load_netcdf_var(input_file,vars[i])
+
+    if t_skin_in != None:
+        direct['t_skin'] = du.load_netcdf_var(input_file,t_skin_in)
+        comment['t_skin'] = 'Varibale = ' + t_skin_in
 
     if coolskin == 'Donlon02':
         coolskin_dt = (-0.14 - 0.30 * np.exp(- (direct['wind_speed'] / 3.7)))
@@ -114,7 +118,7 @@ def fluxengine_individual_netcdf(model_save_loc,direct,lon,lat,start_yr = 1990,e
             yr = yr+1
             mon = 1
 
-def fluxengine_run(model_save_loc,config_file = None,start_yr = 1990, end_yr = 2020,output_ov = False):
+def fluxengine_run(model_save_loc,config_file = None,start_yr = 1990, end_yr = 2020,output_ov = False,custom_gtv = False):
     """
     Function to run fluxengine for a particular neural network.
     """
@@ -124,9 +128,15 @@ def fluxengine_run(model_save_loc,config_file = None,start_yr = 1990, end_yr = 2
     if output_ov:
         out_dir = os.path.join(model_save_loc,output_ov)
         du.makefolder(out_dir)
-        returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True,outputDirOverride=out_dir)
+        if custom_gtv:
+            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True,outputDirOverride=out_dir,customGTVPath=custom_gtv)
+        else:
+            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True,outputDirOverride=out_dir)
     else:
-        returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True)
+        if custom_gtv:
+            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True,customGTVPath=custom_gtv)
+        else:
+            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True)
     os.chdir(return_path)
 
 def solubility_wannink2014(sst,sal):
@@ -134,7 +144,7 @@ def solubility_wannink2014(sst,sal):
     sol = np.exp(sol)
     return sol
 
-def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1,sst_unc = 0.3,wind_unc=1.8,sal_unc =0.2,ens=100,unc_input_file=None,single_run = False,flux_loc = False,override_output=False):
+def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc=0.2,atm_unc = 1, fco2_tot_unc = -1,sst_unc = 0.3,wind_unc=1.8,sal_unc =0.2,ens=100,unc_input_file=None,single_run = False,flux_loc = False,override_output=False,val_extra=''):
     """
     Function to calculate the time and space varying air-sea CO2 flux uncertainties
     """
@@ -169,7 +179,7 @@ def flux_uncertainty_calc(model_save_loc,start_yr = 1990,end_yr = 2020, k_perunc
     fco2_net_unc[fco2_net_unc>1000] = np.nan
     fco2_para_unc = np.array(c.variables['fco2_para_unc'])
     fco2_para_unc[fco2_para_unc>1000] = np.nan
-    fco2_val_unc = np.array(c.variables['fco2_val_unc'])
+    fco2_val_unc = np.array(c.variables['fco2_val_unc'+val_extra])
     fco2_val_unc[fco2_val_unc>1000] = np.nan
 
     fco2sw_perunc = fco2_tot_unc / fco2_sw
@@ -715,8 +725,8 @@ def flux_split(flux,flux_unc,f,g):
 
     return np.array(out),np.array(out_unc)
 
-def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,bath_file=False,flux_file=False,save_file=False,mask_file=False,flux_var = 'flux',ice_var = 'ice',bath_var = 'ocean_proportion',mask_var='mask',
-    area_file = False,area_var = 'area',gcbformat=False):
+def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,bath_file=False,flux_file=False,save_file=False,mask_file=False,flux_var = 'flux',ice_var = 'ice',land_var = 'ocean_proportion',mask_var='mask',
+    area_file = False,area_var = 'area',gcbformat=False,bath_var='elevation',land_file=False):
     """
     OceanICU version of the fluxengine budgets tool that allows for the uncertainities to be propagated...
     """
@@ -734,14 +744,16 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
         c.close()
     else:
         area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
-    if bath_file:
-        c = Dataset(bath_file,'r')
+    if land_file:
+        c = Dataset(land_file,'r')
     else:
         c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
-    land = np.transpose(np.squeeze(np.array(c.variables[bath_var])))
-    if bath_cutoff:
-        elev=  np.transpose(np.squeeze(np.array(c.variables['elevation'])))
+    land = np.transpose(np.squeeze(np.array(c.variables[land_var])))
     c.close()
+    if bath_cutoff:
+        c = Dataset(bath_file,'r')
+        elev=  np.transpose(np.squeeze(np.array(c.variables[bath_var])))
+        c.close()
 
     if flux_file:
         c = Dataset(flux_file,'r')
@@ -868,6 +880,7 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
         out_year[count,4] = np.mean(out_month[f,4])
         out_year[count,5] = np.mean(out_month[f,5])
         count=count+1
+    # out_year[np.isnan(out_year)==1] = -99999
     if save_file:
         file = save_file
     else:
@@ -917,29 +930,42 @@ def calc_annual_flux(model_save_loc,lon,lat,start_yr,end_yr,bath_cutoff = False,
     #     file = os.path.join(model_save_loc,'annual_flux.csv')
     # np.savetxt(file,out_f,delimiter=',',fmt='%.5f',header=head)
 
-def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False,output_file = 'annual_flux.csv',mask_file = False,mask_var = '',flux_file = False):
+def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False,output_file = 'annual_flux.csv',mask_file = False,mask_var = '',flux_file = False,bath_file = False,bath_var = ''):
     fix = ['k','ph2o_fixed','schmidt_fixed','solskin_unc_fixed','solsubskin_unc_fixed']
     res = np.abs(lon[0]-lon[1])
     area = du.area_grid(lat = lat,lon = lon,res=res) * 1e6
     c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
     land = np.transpose(np.squeeze(np.array(c.variables['ocean_proportion'])))
-    if bath_cutoff:
-        elev=  np.transpose(np.squeeze(np.array(c.variables['elevation'])))
+
     c.close()
-    if mask_file:
-        c = Dataset(mask_file,'r')
-        mask = np.transpose(np.array(c.variables[mask_var]),(1,0,2))
+    if bath_cutoff:
+        c=Dataset(bath_file,'r')
+        elev=  np.transpose(np.squeeze(np.array(c.variables[bath_var])))
         c.close()
+    print(flux_file)
     if flux_file:
         c=Dataset(flux_file)
     else:
         c = Dataset(model_save_loc+'/output.nc','r')
     flux = np.transpose(np.array(c.variables['flux']),(1,0,2))
+    time = np.array(c.variables['time'])
     print(flux.shape)
+    if mask_file:
+        d = Dataset(mask_file,'r')
+        mask = np.transpose(np.array(d.variables[mask_var]),(1,0,2))
+        time_mask = np.array(d.variables['time'])
+        d.close()
+        f = np.where(time[0] == time_mask)[0]
+        f2 = np.where(time[-1] == time_mask)[0]
+        print(f)
+        print(f2)
+        mask = mask[:,:,int(f):int(f2+1)]
+
     flux_components = {}
     for i in fix:
         flux_components[i] = np.transpose(np.array(c.variables['flux_unc_'+i]),(1,0,2)) * np.abs(flux)
         flux_components[i][flux_components[i]>1000] = np.nan
+
     for i in range(0,flux.shape[2]):
         for j in fix:
             flux_components[j][:,:,i] = (flux_components[j][:,:,i] * area * land * 30.5) /1e15
@@ -957,7 +983,8 @@ def fixed_uncertainty_append(model_save_loc,lon,lat,bath_cutoff = False,output_f
     data = pd.read_table(os.path.join(model_save_loc,output_file),delimiter=',')
     for j in fix:
         data['flux_unc_'+j+' (Pg C yr-1)'] = comp[j]
-    data.to_csv(os.path.join(model_save_loc,output_file),index=False)
+
+    data.to_csv(os.path.join(model_save_loc,output_file),index=False,na_rep='nan')
 
 def plot_example_flux(model_save_loc):
     import geopandas as gpd
@@ -1297,7 +1324,7 @@ def plot_absolute_contribution(model_save_loc,model_plot=False,model_plot_label=
     # ax2.plot(year,np.sum(gross,axis=1),'k-',linewidth=3)
 
 def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[2000,200],flux_var = '',flux_variable='flux',seaice = False,seaice_var='',
-    inp_file=False,single_output=False,ens=100,bath_cutoff=False,output_file = 'annual_flux.csv',mask_file=False,mask_var = '',fluxloc = False):
+    inp_file=False,single_output=False,ens=100,bath_cutoff=False,output_file = 'annual_flux.csv',mask_file=False,mask_var = '',fluxloc = False,bath_file = False,bath_var = ''):
     """
     Code to evaluate the effect of uncertainties that decorrelate over a specified length scale.
     The pre-calculated flux uncertainties are loaded from the framework output, and then a random grid
@@ -1373,14 +1400,23 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
     # We also load the elevation (i.e depth) if the bath_cutoff is specified (so we can trim the data to only the water depth required)
     c = Dataset(os.path.join(model_save_loc,'inputs','bath.nc'),'r')
     land = np.squeeze(np.array(c.variables['ocean_proportion']))
-    if bath_cutoff:
-        elev=  np.squeeze(np.array(c.variables['elevation']))
-    print(land.shape)
     c.close()
+    if bath_cutoff:
+        c=Dataset(bath_file,'r')
+        elev=  np.squeeze(np.array(c.variables[bath_var]))
+        c.close()
+    print(land.shape)
+
     if mask_file:
         c = Dataset(mask_file,'r')
         mask = np.array(c.variables[mask_var])
+        time_mask = np.array(c.variables['time'])
         c.close()
+        f = np.where(time[0] == time_mask)[0]
+        f2 = np.where(time[-1] == time_mask)[0]
+        print(f)
+        print(f2)
+        mask = mask[:,:,int(f):int(f2+1)]
     # Here we cycle through the time dimension (third dimension) and set the areas where the water is deeper than the bathymetry cutoff to nan
     # then save back to the flux array.
     # Only applied if bath_cutoff is specified
@@ -1556,7 +1592,7 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
         # ax.plot(a,out2,'k--',linewidth=3)
         fig.savefig(single_output+'.png',format='png',dpi=300) #Save the figure
         plt.close(fig)
-        data.to_csv(single_output+'.csv',index=False) # Save the year, flux, standard deviation of the ensemble.
+        data.to_csv(single_output+'.csv',index=False,na_rep='nan') # Save the year, flux, standard deviation of the ensemble.
     else:
         # If multiple uncertainty components will be calculated then we do this
         # So we plot some debug information
@@ -1585,7 +1621,7 @@ def montecarlo_flux_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
             data['flux_unc_seaice (Pg C yr-1)'] = st
         else: # If were using a precomputed value, then we name it as such.
             data[flux_var+' (Pg C yr-1)'] = st
-        data.to_csv(os.path.join(model_save_loc,output_file),index=False) # save the data back on to the file.
+        data.to_csv(os.path.join(model_save_loc,output_file),index=False,na_rep='nan') # save the data back on to the file.
         #np.savetxt(os.path.join(model_save_loc,'unc_monte_revised.csv'),np.stack((np.array(a),st)),delimiter=',',fmt='%.5f')
         #plt.show()
 
@@ -1753,7 +1789,7 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
     vals = scipy.stats.iqr(a)
     print(f'Median: {np.median(a)}')
     print(f'IQR: {vals}')
-    np.savetxt(os.path.join(model_save_loc,'decorrelation',output_file+'.csv'),out,delimiter=',',fmt='%.5f')
+    np.savetxt(os.path.join(model_save_loc,'decorrelation',output_file+'.csv'),out,delimiter=',',fmt='%.5f',header='Year, Median Decorrelation Length (km),IQR (km),Mean Decorrelation Length (km), Standard Deviation (km)')
 
 def plot_decorrelation(model_save_loc,start_yr = 1985,end_yr = 2022):
     c = Dataset(model_save_loc+'/input_values.nc','r')

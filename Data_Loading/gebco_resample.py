@@ -12,8 +12,10 @@ def gebco_resample(file,log,lag,save_loc = False,save_loc_fluxengine=False):
         file_o = save_loc
 
     print(file_o)
-
-    [lon,lat] = du.load_grid(file,latv = 'lat',lonv='lon')
+    try:
+        [lon,lat] = du.load_grid(file,latv = 'lat',lonv='lon')
+    except:
+        [lon,lat] = du.load_grid(file,latv = 'latitude',lonv='longitude')
     [lo_grid,la_grid] = du.determine_grid_average(lon,lat,log,lag)
     area = np.transpose(du.area_grid(lat = lag,lon = log,res=res) * 1e6)
 

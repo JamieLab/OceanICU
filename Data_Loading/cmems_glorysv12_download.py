@@ -34,10 +34,7 @@ def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
         date_min = date_min_v.strftime('%Y-%m-%dT%H:%M:%S')
         print(OUTPUT_FILENAME)
         if not du.checkfileexist(os.path.join(OUTPUT_TEMP,OUTPUT_FILENAME)):
-            if datetime.datetime(2021,6,30) < date_min_v:
-                id = "cmems_mod_glo_phy_myint_0.083deg_P1M-m"
-            else:
-                id = "cmems_mod_glo_phy_my_0.083deg_P1M-m"
+            id = "cmems_mod_glo_phy_my_0.083deg_P1M-m"
             cmmarine.subset(
               dataset_id=id,
               #dataset_version="202311",
@@ -54,25 +51,20 @@ def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
               output_directory=OUTPUT_TEMP,
               #force_download=True
             )
-            # if yr > transition_yr:
-            #     script_template,product = script_aft_daily(variable)
-            # else:
-            #     script_template,product = script_fore_daily()
-            # data_request_options_dict_automated = motu_option_parser(script_template, USERNAME, PASSWORD, OUTPUT_FILENAME,OUTPUT_TEMP,date_min,date_max,variable,product)
-            # #print(data_request_options_dict_automated)
-            # motuclient.motu_api.execute_request(MotuOptions(data_request_options_dict_automated))
+            
         mon = mon+1
         if mon == 13:
             yr = yr+1
             mon=1
 
-def load_glorysv12_daily(loc,start_yr = 1993,end_yr = 2020,variable=None):
+def load_glorysv12_daily(loc,start_yr = 1993,end_yr = 2020,variable=None,depth = 0.49402499198913574):
     """
     Reanalysis Dataset DOI: https://doi.org/10.48670/moi-00021
     Renalaysis/Forecast Dataset DOI: https://doi.org/10.48670/moi-00016
     """
     import calendar
     OUTPUT_DIRECTORY = loc
+    du.makefolder(OUTPUT_DIRECTORY)
     # Year reanalysis ends - check https://doi.org/10.48670/moi-00021 for year
     # After this year we use the forecast dataset from: https://doi.org/10.48670/moi-00016
     transition_yr = 2020
@@ -84,16 +76,45 @@ def load_glorysv12_daily(loc,start_yr = 1993,end_yr = 2020,variable=None):
         OUTPUT_TEMP = os.path.join(OUTPUT_DIRECTORY,str(yr))
         du.makefolder(OUTPUT_TEMP)
         OUTPUT_FILENAME = date_min.strftime(f'%Y_%m_CMEMS_GLORYSV12_{variable}.nc')
-        date_min = date_min.strftime('%Y-%m-%d %H:%M:%S')
+        date_min = date_min.strftime('%Y-%m-%dT%H:%M:%S')
         print(OUTPUT_FILENAME)
         if not du.checkfileexist(os.path.join(OUTPUT_TEMP,OUTPUT_FILENAME)):
-            if yr > transition_yr:
-                script_template,product = script_aft_daily(variable)
-            else:
-                script_template,product = script_fore_daily()
-            data_request_options_dict_automated = motu_option_parser(script_template, USERNAME, PASSWORD, OUTPUT_FILENAME,OUTPUT_TEMP,date_min,date_max,variable,product)
-            #print(data_request_options_dict_automated)
-            motuclient.motu_api.execute_request(MotuOptions(data_request_options_dict_automated))
+            # if datetime.datetime(2021,6,30) < date_min_v:
+            #     id = "cmems_mod_glo_phy_myint_0.083deg_P1M-m"
+            # else:
+            #     id = "cmems_mod_glo_phy_my_0.083deg_P1M-m"
+            id = 'cmems_mod_glo_phy_my_0.083deg_P1D-m'
+            cmmarine.subset(
+              dataset_id=id,
+              #dataset_version="202311",
+              variables=[variable],
+              minimum_longitude=-180,
+              maximum_longitude=180,
+              minimum_latitude=-90,
+              maximum_latitude=90,
+              start_datetime=date_min,
+              end_datetime=date_max,
+              minimum_depth=depth,
+              maximum_depth=depth,
+              output_filename=OUTPUT_FILENAME,
+              output_directory=OUTPUT_TEMP,
+              #force_download=True
+            )
+        # date_min = datetime.datetime(yr,mon,1,0,0,0);
+        # date_max = datetime.datetime(yr,mon,calendar.monthrange(yr,mon)[1],23,59,59); date_max = date_max.strftime('%Y-%m-%d %H:%M:%S')
+        # OUTPUT_TEMP = os.path.join(OUTPUT_DIRECTORY,str(yr))
+        # du.makefolder(OUTPUT_TEMP)
+        # OUTPUT_FILENAME = date_min.strftime(f'%Y_%m_CMEMS_GLORYSV12_{variable}.nc')
+        # date_min = date_min.strftime('%Y-%m-%d %H:%M:%S')
+        # print(OUTPUT_FILENAME)
+        # if not du.checkfileexist(os.path.join(OUTPUT_TEMP,OUTPUT_FILENAME)):
+        #     if yr > transition_yr:
+        #         script_template,product = script_aft_daily(variable)
+        #     else:
+        #         script_template,product = script_fore_daily()
+        #     data_request_options_dict_automated = motu_option_parser(script_template, USERNAME, PASSWORD, OUTPUT_FILENAME,OUTPUT_TEMP,date_min,date_max,variable,product)
+        #     #print(data_request_options_dict_automated)
+        #     motuclient.motu_api.execute_request(MotuOptions(data_request_options_dict_automated))
         mon = mon+1
         if mon == 13:
             yr = yr+1
@@ -244,16 +265,19 @@ def cmems_average_daily(loc,outloc,start_yr=1990,end_yr=2023,log=[],lag=[],varia
         d = d + datetime.timedelta(days=1)
         break
 
-def cmems_socat_append(file,data_loc=[],variable = [],plot=False,log=False):
+def cmems_socat_append(file,data_loc=[],variable = [],plot=False,log=False,extra=''):
     import pandas as pd
     import calendar
     import glob
     import matplotlib.pyplot as plt
+    from scipy.ndimage import generic_filter
     data = pd.read_table(file,sep='\t')
     cmems = np.zeros((len(data)))
     cmems[:] = np.nan
 
     yr = [np.min(data['yr']),np.max(data['yr'])]
+    if yr[0] < 1993:
+        yr[0] = 1993
     t = 0
     for yrs in range(yr[0],yr[1]+1):
         for mon in range(1,13):
@@ -270,29 +294,63 @@ def cmems_socat_append(file,data_loc=[],variable = [],plot=False,log=False):
                             [lon,lat] = du.load_grid(cmems_file[0],latv = 'latitude',lonv='longitude')
                             res = np.abs(lon[0] - lon[1]) * 2
                             t = 1
-                        lat_b = [np.min(data['latitude [dec.deg.N]'][f]),np.max(data['latitude [dec.deg.N]'][f])]
-                        lon_b = [np.min(data['longitude [dec.deg.E]'][f]),np.max(data['longitude [dec.deg.E]'][f])]
-                        lat_b = np.where((lat < lat_b[1]+res) & (lat > lat_b[0]-res))[0]
-                        lon_b = np.where((lon < lon_b[1]+res) & (lon > lon_b[0]-res))[0]
-                        c = Dataset(cmems_file[0],'r')
-                        if variable == 'mlotst':
-                            sst_data = np.squeeze(c[variable][day-1,lat_b,lon_b])
-                        else:
-                            sst_data = np.squeeze(c[variable][day-1,0,lat_b,lon_b])
-                        sst_data[sst_data<-100] = np.nan
-                        sst_data[sst_data>3000] = np.nan
-                        #sst_data = sst_data
-                        c.close()
 
-                        cmems[f] = du.point_interp(lon[lon_b],lat[lat_b],sst_data,data['longitude [dec.deg.E]'][f],data['latitude [dec.deg.N]'][f])
-                        if plot:
-                            plt.figure()
-                            a=plt.pcolor(lon[lon_b],lat[lat_b],sst_data)
-                            plt.colorbar(a)
-                            plt.scatter(data['longitude [dec.deg.E]'][f],data['latitude [dec.deg.N]'][f],c = cmems[f],vmin=np.nanmin(sst_data),vmax=np.nanmax(sst_data),edgecolors='k')
-                            plt.show()
+                        for expo in set(data['Expocode'][f]):
+                            print(expo)
+                            g = np.where(data['Expocode'][f] == expo)[0]
+                            #print(g)
+                            lat_b = [np.min(data['latitude [dec.deg.N]'][f[g]]),np.max(data['latitude [dec.deg.N]'][f[g]])]
+                            lon_b = [np.min(data['longitude [dec.deg.E]'][f[g]]),np.max(data['longitude [dec.deg.E]'][f[g]])]
+                            #print(lat_b)
+                            #print(lon_b)
+                            lat_b = np.where((lat < lat_b[1]+res) & (lat > lat_b[0]-res))[0]
+                            lon_b = np.where((lon < lon_b[1]+res) & (lon > lon_b[0]-res))[0]
+                            c = Dataset(cmems_file[0],'r')
+                            if variable == 'mlotst':
+                                sst_data = np.squeeze(c[variable][day-1,lat_b,lon_b])
+                            else:
+                                sst_data = np.squeeze(c[variable][day-1,0,lat_b,lon_b])
+                            sst_data[sst_data<-100] = np.nan
+                            sst_data[sst_data>3000] = np.nan
+                            #sst_data = sst_data
+
+                            if (0 in list(lon_b)) or (len(lon)-1 in list(lon_b)):
+                                #plot = True
+                                print('Full lon grid loaded')
+                                sst_data = np.column_stack((np.squeeze(c[variable][day-1,0,lat_b,len(lon)-1])[:,None],np.squeeze(c[variable][day-1,0,lat_b,:]),np.squeeze(c[variable][day-1,0,lat_b,0])[:,None]))
+                            if (len(lat)-1 in list(lat_b)):
+                                #plot=True
+                                sst_data = np.vstack((sst_data,sst_data[-1,:]))
+
+                            if (0 in list(lon_b)) or (len(lon)-1 in list(lon_b)):
+                                lon_g = np.hstack((lon[-1]-360,lon,lon[0]+360))
+                            else:
+                                lon_g = lon[lon_b]
+
+                            if (len(lat)-1 in list(lat_b)):
+                                lat_g = np.hstack((lat[lat_b],lat[-1]+(res/2)))
+                            else:
+                                lat_g = lat[lat_b]
+                            c.close()
+                            a = du.point_interp(lon_g,lat_g,sst_data,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]])
+
+                            if np.sum(np.isnan(a)==1) > 0:
+                                print('NaNs present in output - attempting second approach')
+                                data_filt = generic_filter(sst_data,np.nanmean,[3,3])
+
+                                ap = du.point_interp(lon_g,lat_g,data_filt,data['longitude [dec.deg.E]'][f[g]],data['latitude [dec.deg.N]'][f[g]],plot=plot)
+                                a[np.isnan(a) == 1] = ap[np.isnan(a) == 1]
+                                print('NaN left: '+str(np.sum(np.isnan(a)==1)))
+                            cmems[f[g]] = a
+
+                            if plot:
+                                plt.figure()
+                                a=plt.pcolor(lon[lon_b],lat[lat_b],sst_data)
+                                plt.colorbar(a)
+                                plt.scatter(data['longitude [dec.deg.E]'][f],data['latitude [dec.deg.N]'][f],c = cmems[f],vmin=np.nanmin(sst_data),vmax=np.nanmax(sst_data),edgecolors='k')
+                                plt.show()
     if log:
         cmems = np.log10(cmems)
-    data['cmems_'+variable] = cmems
+    data['cmems_'+variable+'_'+extra] = cmems
     st = file.split('.')
     data.to_csv(file,sep='\t',index = False)

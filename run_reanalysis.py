@@ -188,7 +188,7 @@ def append_to_file(output_file,fco2,fco2_std,sst,obs,name,socat_files,not_reanal
     var_o.created_from = socat_files
     c.close()
 
-def model_fco2_append(input_file,output_file,start_yr=1990, end_yr = 2020,name='',ref_yr = 1970,var_name='sfco2'):
+def model_fco2_append(input_file,output_file,start_yr=1990, end_yr = 2020,name='',ref_yr = 1970,var_name='sfco2',transposing=True):
     """
     Function to append GCB model fCO2 into the neural network framework input file
     """
@@ -200,7 +200,11 @@ def model_fco2_append(input_file,output_file,start_yr=1990, end_yr = 2020,name='
     time = []
     yr = ref_yr
     mon = 1
-    for ti in range(data.shape[0]):
+    if transposing:
+        sh=data.shape[0]
+    else:
+        sh=data.shape[2]
+    for ti in range(sh):
         time.append(yr)
         mon = mon+1
         if mon == 13:
@@ -210,9 +214,12 @@ def model_fco2_append(input_file,output_file,start_yr=1990, end_yr = 2020,name='
     print(time)
 
     f = np.where((time <= end_yr) & (time >= start_yr))[0]
-    data = data[f,:,:]
-    data = du.lon_switch(data)
-    data = np.transpose(data,[2,1,0])
+    if transposing:
+        data = data[f,:,:]
+        data = du.lon_switch(data)
+        data = np.transpose(data,[2,1,0])
+    else:
+        data = data[:,:,f]
     fco2_std = np.zeros((data.shape))
     data[data>10000] = np.nan
 

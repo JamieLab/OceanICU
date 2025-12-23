@@ -536,6 +536,23 @@ def netcdf_var_bias(file,var,bias, nvar=0):
     c.close()
     append_netcdf(file,direct,1,1,1)
 
+def netcdf_clim_save(file,var,outloc):
+    """
+    Function to save out a climatology generated in the anomaly generation process to individual files for later ingestion.
+    
+    file = the netCDF file that contains the climatology
+    var = the netCDF variable for the climatology
+    outloc = the output folder.
+    """
+    c = Dataset(file,'r')
+    clim = np.array(c[var])
+    lat = np.array(c['latitude'])
+    lon = np.array(c['longitude'])
+    c.close()
+
+    for i in range(12):
+        du.netcdf_create_basic(os.path.join(outloc,'%m_'+var+'_climatology.nc').replace('%m',du.numstr(i+1)),clim[:,:,i],var,lat,lon)
+
 def extract_independent_test(output_file,sst_name,province_file,province_var,percent=0.05,seed=42):
     """
     """

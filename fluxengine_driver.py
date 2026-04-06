@@ -74,6 +74,13 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws
         direct['t_skin'] = direct['t_subskin'] - dt_coare
         comment['t_skin'] = 'Variable generated from "' + tsub + '" with the NOAA-COARE3.5 cool skin. NOAA-COARE 3.5 inputs; wind speed: ' + ws + '; temperature air = ' + tair + '; dewpoint temperature = ' + dewair +'; sea surface temperature = ' + tsub +'; sea level pressure: ' + msl + '; downward shortwave radiation = ' + rs + '; downward longwave radiation = ' + rl + '; boundary layer height = ' + zi
         #direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
+    elif coolskin == 'COARE3.6':
+        import coare_cool_skin as ccs
+        dt_coare = ccs.calc_coare_36(input_file,coare_out,ws = ws,tair = tair, dewair = dewair, sst = tsub, msl = msl,
+            rs = rs, rl = rl, zi = zi,sal=sal,start_yr=start_yr,end_yr=end_yr)
+        direct['t_skin'] = direct['t_subskin'] - dt_coare
+        comment['t_skin'] = 'Variable generated from "' + tsub + '" with the NOAA-COARE3.6 cool skin. NOAA-COARE 3.6 inputs; wind speed: ' + ws + '; temperature air = ' + tair + '; dewpoint temperature = ' + dewair +'; sea surface temperature = ' + tsub +'; sea level pressure: ' + msl + '; downward shortwave radiation = ' + rs + '; downward longwave radiation = ' + rl + '; boundary layer height = ' + zi+'; salinity = '+sal
+        #direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
     elif coolskin == 'None':
         # No coolskin effect applied (so Tskin == Tsubskin)
         direct['t_skin'] = direct['t_subskin']
@@ -118,7 +125,7 @@ def fluxengine_individual_netcdf(model_save_loc,direct,lon,lat,start_yr = 1990,e
             yr = yr+1
             mon = 1
 
-def fluxengine_run(model_save_loc,config_file = None,start_yr = 1990, end_yr = 2020,output_ov = False,custom_gtv = False):
+def fluxengine_run(model_save_loc,config_file = None,start_yr = 1990, end_yr = 2020,output_ov = False,custom_gtv = False,verbose=False):
     """
     Function to run fluxengine for a particular neural network.
     """
@@ -129,14 +136,14 @@ def fluxengine_run(model_save_loc,config_file = None,start_yr = 1990, end_yr = 2
         out_dir = os.path.join(model_save_loc,output_ov)
         du.makefolder(out_dir)
         if custom_gtv:
-            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True,outputDirOverride=out_dir,customGTVPath=custom_gtv)
+            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=verbose,outputDirOverride=out_dir,customGTVPath=custom_gtv)
         else:
-            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True,outputDirOverride=out_dir)
+            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=verbose,outputDirOverride=out_dir)
     else:
         if custom_gtv:
-            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True,customGTVPath=custom_gtv)
+            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=verbose,customGTVPath=custom_gtv)
         else:
-            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=True)
+            returnCode, fe = fluxengine.run_fluxengine(config_file, start_yr, end_yr, singleRun=False,verbose=verbose)
     os.chdir(return_path)
 
 def solubility_wannink2014(sst,sal):
@@ -1645,8 +1652,9 @@ def plot_net_flux_unc(model_save_loc):
     plt.close(fig)
 
 def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_array = False,input_datafile = False,ens=100,hemisphere=False,
-    start_yr=1985,end_yr=2022,estimator='dowd'):
-    def variogram_run(a,values,coords,ens,estimator):
+    start_yr=1985,end_yr=2022,estimator='dowd',max_decorrelation = 10000):
+    from scipy.stats import skewnorm,norm
+    def variogram_run(a,values,coords,ens,estimator,max_decorrelation=10000):
         for j in range(ens):
             if len(values.shape) == 0:
                 print('Empty')
@@ -1669,7 +1677,7 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
 
                     ra = des['effective_range']
                     print(des['effective_range'])
-                    if (ra > 100) & (ra < 12000) & (np.isnan(ra) == 0):
+                    if (ra > 100) & (ra < max_decorrelation) & (np.isnan(ra) == 0):
                         a.append(ra)
                     del V
                 except:
@@ -1725,7 +1733,7 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
 
     lon_g,lat_g = np.meshgrid(lon,lat); lon_g = np.transpose(lon_g); lat_g = np.transpose(lat_g);
     a = []
-    out = np.zeros((end_yr-start_yr+1,5))
+    out = np.zeros((end_yr-start_yr+1,7))
     out[:] = np.nan
     yr =start_yr
     t = 0
@@ -1739,12 +1747,24 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
         print(f'Current step = {i} out of {len(time)}')
         if yr != time_2[i]:
             out[t,0] = yr
-            axs[t].hist(a,50)
+            axs[t].hist(a,50,density=True)
             axs[t].set_title(out[t,0]); axs[t].set_xlabel('Decorrelation (km)'); axs[t].set_ylabel('Frequency')
-            axs[t].set_xlim([0,8000])
+            axs[t].set_xlim([0,max_decorrelation])
             yr = time_2[i]
             out[t,1] = np.median(a); out[t,2] = scipy.stats.iqr(a); out[t,3] = np.mean(a); out[t,4] = np.std(a)
-
+            ske = skewnorm.fit(a)
+            nor = norm.fit(a)
+            xp = np.arange(0,max_decorrelation,200)
+            axs[t].plot(xp, skewnorm.pdf(xp, *ske))
+            axs[t].plot(xp, norm.pdf(xp, *nor))
+            out[t,5] = ske[1]
+            out[t,6] = nor[0]
+            lims = axs[t].get_ylim()
+            axs[t].plot([out[t,1],out[t,1]],lims)
+            axs[t].plot([out[t,5],out[t,5]],lims)
+            axs[t].plot([out[t,6],out[t,6]],lims)
+            mea = np.mean([ske[1],out[t,1]])
+            axs[t].plot([mea,mea],lims)
             a = []
             t = t+1
         if not input_array:
@@ -1767,29 +1787,42 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
             coords2 = coords[f,:]
             #print(coords2)
             values2 = values[f]
-            a = variogram_run(a,values2,coords2,int(ens/2),estimator)
+            a = variogram_run(a,values2,coords2,int(ens/2),estimator,max_decorrelation=max_decorrelation)
 
             f = np.where(coords[:,1] > 0)[0]
             coords2 = coords[f,:]
             values2 = values[f]
-            a = variogram_run(a,values2,coords2,int(ens/2),estimator)
+            a = variogram_run(a,values2,coords2,int(ens/2),estimator,max_decorrelation=max_decorrelation)
         else:
-            a = variogram_run(a,values,coords,ens,estimator)
+            a = variogram_run(a,values,coords,ens,estimator,max_decorrelation=max_decorrelation)
 
 
     out[t,0] = yr
-    axs[t].hist(a,50)
+    axs[t].hist(a,50,density=True)
     axs[t].set_title(out[t,0]); axs[t].set_xlabel('Decorrelation (km)'); axs[t].set_ylabel('Frequency')
-    axs[t].set_xlim([0,12000])
+    axs[t].set_xlim([0,max_decorrelation])
+    ske = skewnorm.fit(a)
+    nor = norm.fit(a)
+    print(ske)
+    xp = np.arange(0,max_decorrelation,200)
+    axs[t].plot(xp, skewnorm.pdf(xp, *ske))
+    axs[t].plot(xp, norm.pdf(xp, *nor))
     yr = time_2[i]
     out[t,1] = np.median(a); out[t,2] = scipy.stats.iqr(a); out[t,3] = np.mean(a); out[t,4] = np.std(a)
-
+    out[t,5] = ske[1]
+    out[t,6] = nor[0]
+    lims = axs[t].get_ylim()
+    axs[t].plot([out[t,1],out[t,1]],lims)
+    axs[t].plot([out[t,5],out[t,5]],lims)
+    axs[t].plot([out[t,6],out[t,6]],lims)
+    mea = np.mean([ske[1],out[t,1]])
+    axs[t].plot([mea,mea],lims)
     fig.savefig(os.path.join(model_save_loc,'plots',output_file+'.png'),format='png',dpi=300)
     plt.close(fig)
     vals = scipy.stats.iqr(a)
     print(f'Median: {np.median(a)}')
     print(f'IQR: {vals}')
-    np.savetxt(os.path.join(model_save_loc,'decorrelation',output_file+'.csv'),out,delimiter=',',fmt='%.5f',header='Year, Median Decorrelation Length (km),IQR (km),Mean Decorrelation Length (km), Standard Deviation (km)')
+    np.savetxt(os.path.join(model_save_loc,'decorrelation',output_file+'.csv'),out,delimiter=',',fmt='%.5f',header='Year, Median Decorrelation Length (km),IQR (km),Mean Decorrelation Length (km), Standard Deviation (km),[Experimental] Skewed Guassian Decorrelation Length (km)')
 
 def plot_decorrelation(model_save_loc,start_yr = 1985,end_yr = 2022):
     c = Dataset(model_save_loc+'/input_values.nc','r')

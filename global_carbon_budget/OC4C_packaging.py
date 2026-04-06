@@ -37,7 +37,7 @@ def lon_switch(var,axis=1):
 # start_yr = 1985
 # end_yr = 2023
 
-def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,version = 'v0-1'):
+def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,version = 'v0-1',var_dict = False):
 
     # Loading the fco2_sw_subskin output from the neural network
     # Secondary function to get time variable length
@@ -113,30 +113,33 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
     ##################
     ##################
     ##################
-    variable_dict = {
-        'fco2': 'sfco2',
-        'fco2_net_unc': 'sfco2_net_unc',
-        'fco2_para_unc': 'sfco2_para_unc',
-        'fco2_val_unc_OC4C': 'sfco2_val_unc',
-        'fco2_tot_unc': 'sfco2_tot_unc',
-        #'flux': 'fgco2',
-        'flux_unc': 'fgco2_tot_unc',
-        'flux_unc_fco2sw': 'fgco2_sfco2_unc',
-        'flux_unc_fco2sw_net': 'fgco2_sfco2_net_unc',
-        'flux_unc_fco2sw_para': 'fgco2_sfco2_para_unc',
-        'flux_unc_fco2sw_val': 'fgco2_sfco2_val_unc',
-        'flux_unc_k': 'fgco2_k_unc',
-        'flux_unc_ph2o': 'fgco2_ph2o_unc',
-        'flux_unc_ph2o_fixed': 'fgco2_ph2o_fixed_unc',
-        'flux_unc_schmidt': 'fgco2_schmidt_unc',
-        'flux_unc_schmidt_fixed': 'fgco2_schmidt_fixed_unc',
-        'flux_unc_solskin_unc': 'fgco2_solskin_unc',
-        'flux_unc_solskin_unc_fixed': 'fgco2_solskin_fixed_unc',
-        'flux_unc_solsubskin_unc': 'fgco2_solsubskin_unc',
-        'flux_unc_solsubskin_unc_fixed': 'fgco2_solsubskin_fixed_unc',
-        'flux_unc_wind': 'fgco2_wind_unc',
-        'flux_unc_xco2atm': 'fgco2_xco2atm_unc',
-    }
+    if var_dict:
+        variable_dict = var_dict
+    else:
+        variable_dict = {
+            'fco2': 'sfco2',
+            'fco2_net_unc': 'sfco2_net_unc',
+            'fco2_para_unc': 'sfco2_para_unc',
+            'fco2_val_unc_OC4C': 'sfco2_val_unc',
+            'fco2_tot_unc': 'sfco2_tot_unc',
+            #'flux': 'fgco2',
+            'flux_unc': 'fgco2_tot_unc',
+            'flux_unc_fco2sw': 'fgco2_sfco2_unc',
+            'flux_unc_fco2sw_net': 'fgco2_sfco2_net_unc',
+            'flux_unc_fco2sw_para': 'fgco2_sfco2_para_unc',
+            'flux_unc_fco2sw_val': 'fgco2_sfco2_val_unc',
+            'flux_unc_k': 'fgco2_k_unc',
+            'flux_unc_ph2o': 'fgco2_ph2o_unc',
+            'flux_unc_ph2o_fixed': 'fgco2_ph2o_fixed_unc',
+            'flux_unc_schmidt': 'fgco2_schmidt_unc',
+            'flux_unc_schmidt_fixed': 'fgco2_schmidt_fixed_unc',
+            'flux_unc_solskin_unc': 'fgco2_solskin_unc',
+            'flux_unc_solskin_unc_fixed': 'fgco2_solskin_fixed_unc',
+            'flux_unc_solsubskin_unc': 'fgco2_solsubskin_unc',
+            'flux_unc_solsubskin_unc_fixed': 'fgco2_solsubskin_fixed_unc',
+            'flux_unc_wind': 'fgco2_wind_unc',
+            'flux_unc_xco2atm': 'fgco2_xco2atm_unc',
+        }
     c = Dataset(model_save_loc+'/output.nc','r')
     for i in variable_dict.keys():
         var = outs.createVariable(variable_dict[i],'f4',('time','lat','lon'),fill_value=np.nan)

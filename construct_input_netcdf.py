@@ -206,7 +206,7 @@ def construct_climatology(data,month_track):
             clim[:,:,i] = np.squeeze(data[:,:,f])
     return clim
 
-def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=[],ref_year = 1970,units=False,long_name=False,comment=False):
+def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=[],ref_year = 1970,units=False,long_name=False,comment=False,copts={}):
     """
     Function to save the final netcdf output for use in the neural network training.
     For each variable in the direct dictionary a netcdf variable is generated - this
@@ -226,10 +226,10 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=[],ref_y
     #c.createDimension('time_static',1)
     for var in list(direct.keys()):
         if flip:
-            var_o = c.createVariable(var,'f4',('latitude','longitude','time'))#,**copts)
+            var_o = c.createVariable(var,'f4',('latitude','longitude','time'),fill_value=np.nan,**copts)
             var_o[:] = direct[var].transpose(1,0,2)
         else:
-            var_o = c.createVariable(var,'f4',('longitude','latitude','time'))#,**copts)
+            var_o = c.createVariable(var,'f4',('longitude','latitude','time'),fill_value=np.nan,**copts)
             var_o[:] = direct[var]
         if units:
             var_o.units = units[var]
@@ -255,7 +255,7 @@ def save_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,time_track=[],ref_y
         time_o.standard_name = 'Time of observations'
     c.close()
 
-def save_climatology(save_loc,direct,flip=False):
+def save_climatology(save_loc,direct,flip=False,copts={}):
     c = Dataset(save_loc,'a')
     try:
         c.createDimension('clim_time',12)
@@ -263,15 +263,15 @@ def save_climatology(save_loc,direct,flip=False):
         print('Dimension exists?')
     for var in list(direct.keys()):
         if flip:
-            var_o = c.createVariable(var,'f4',('latitude','longitude','clim_time'))#,**copts)
+            var_o = c.createVariable(var,'f4',('latitude','longitude','clim_time'),fill_value=np.nan)#,**copts)
             var_o[:] = direct[var].transpose(1,0,2)
         else:
-            var_o = c.createVariable(var,'f4',('longitude','latitude','clim_time'))#,**copts)
+            var_o = c.createVariable(var,'f4',('longitude','latitude','clim_time'),fill_value=np.nan)#,**copts)
             var_o[:] = direct[var]
         var_o.date_variable = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
     c.close()
 
-def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False,longname =False,comment=False):
+def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False,longname =False,comment=False,copts={}):
     c = Dataset(save_loc,'a',format='NETCDF4_CLASSIC')
     v = c.variables.keys()
     for var in list(direct.keys()):
@@ -279,13 +279,13 @@ def append_netcdf(save_loc,direct,lon,lat,timesteps,flip=False,units=False,longn
             if var in v:
                 c.variables[var][:] = direct[var]
             else:
-                var_o = c.createVariable(var,'f4',('latitude','longitude','time'))#,**copts)
+                var_o = c.createVariable(var,'f4',('latitude','longitude','time'),fill_value=np.nan,**copts)
                 var_o[:] = direct[var].transpose(1,0,2)
         else:
             if var in v:
                 c.variables[var][:] = direct[var]
             else:
-                var_o = c.createVariable(var,'f4',('longitude','latitude','time'))#,**copts)
+                var_o = c.createVariable(var,'f4',('longitude','latitude','time'),fill_value=np.nan,**copts)
                 var_o[:] = direct[var]
         var_o = c.variables[var]
         if units:
@@ -514,7 +514,8 @@ def copy_netcdf_vars(file,vars,outfile):
     longname={}
     comment = {}
     for v in vars:
-        direct[v] = np.array(c[v])
+        direct[v] = np.array(c[v][:])
+        direct[v][direct[v]>1000000] = np.nan
         units[v] = c[v].units
         longname[v] = c[v].long_name
         try:
@@ -539,7 +540,7 @@ def netcdf_var_bias(file,var,bias, nvar=0):
 def netcdf_clim_save(file,var,outloc):
     """
     Function to save out a climatology generated in the anomaly generation process to individual files for later ingestion.
-    
+
     file = the netCDF file that contains the climatology
     var = the netCDF variable for the climatology
     outloc = the output folder.

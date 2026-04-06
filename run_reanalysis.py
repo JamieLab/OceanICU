@@ -72,16 +72,29 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
         sst = np.array(c.variables['sst_ave_weighted'])
     else:
         #Extracting the reanalysed fCO2 data
-        fco2 = np.array(c.variables['fco2_reanalysed_ave_weighted'])
-        fco2_std = np.array(c.variables['fco2_reanalysed_std_weighted'])
         try:
-            fco2_nobs = np.array(c.variables['count_nobs_reanalysed'])
+            fco2 = np.array(c.variables['fco2_reanalysed_ave_weighted'])
+            fco2_std = np.array(c.variables['fco2_reanalysed_std_weighted'])
+            try:
+                fco2_nobs = np.array(c.variables['count_nobs_reanalysed'])
+            except:
+                fco2_nobs = np.array(c.variables['count_nobs'])
+            try:
+                sst = np.array(c.variables['sst_subskin_weighted'])
+            except:
+                sst = np.zeros((fco2.shape)); sst[:] = np.nan
         except:
-            fco2_nobs = np.array(c.variables['count_nobs'])
-        try:
-            sst = np.array(c.variables['sst_subskin_weighted'])
-        except:
-            sst = np.zeros((fco2.shape)); sst[:] = np.nan
+            # Adding the new naming of the reanalysed SOCAT files into the framework.
+            fco2 = np.array(c.variables['fco2_recalculated_ave_weighted'])
+            fco2_std = np.array(c.variables['fco2_recalculated_std_weighted'])
+            try:
+                fco2_nobs = np.array(c.variables['count_nobs_recalculated'])
+            except:
+                fco2_nobs = np.array(c.variables['count_nobs'])
+            try:
+                sst = np.array(c.variables['sst_reference_weighted'])
+            except:
+                sst = np.zeros((fco2.shape)); sst[:] = np.nan
     fco2[fco2<0] = np.nan
     fco2_nobs[fco2_nobs<0] = np.nan
     fco2_std[fco2_std<0] = np.nan
@@ -347,7 +360,7 @@ def find_socat(data,lat,lon):
     return d
 
 def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = [],grid=True,fco2var = 'fCO2_reanalysed [uatm]',pco2var = 'pCO2_reanalysed [uatm]',sstvar = 'T_subskin [C]',
-    save_file ='socat.tsv',save_fold = False,pad = 7302):
+    save_file ='socat.tsv',save_fold = False,pad = 7302,pco2socatvar='pCO2_SST [uatm]'):
     """
     Function to regrid the SOCAT tsv into a gridded file consistent to that produced by SOCAT and JamieLab, but with additional extras
     to allow daily data, different spatial resolutions or other data to also be appended.
@@ -409,7 +422,7 @@ def regrid_fco2_data(file,latg,long,start_yr=1990,end_yr=2022,save_loc = [],grid
         result['Tcl_C']=data[sstvar]
         result['fCO2_SST']=data['fCO2rec [uatm]']
         result['fCO2_Tym']=data[fco2var]
-        result['pCO2_SST']=data['pCO2_SST [uatm]']
+        result['pCO2_SST']=data[pco2socatvar]
         result['pCO2_Tym']=data[pco2var]
         result['expocode'] = data['Expocode']
 

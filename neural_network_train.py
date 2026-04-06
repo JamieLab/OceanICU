@@ -38,7 +38,7 @@ matplotlib.rc('font', **font)
 tf.autograph.set_verbosity(0)
 
 def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_save_loc = None,
-    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,activ = 'sigmoid',socat_sst=False,ens=10,name='fco2'):
+    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,activ = 'sigmoid',socat_sst=False,ens=10,name='fco2',prob_ensemble=None,run_network_training=True):
     """
     This is the driver function to load the data from the input file, trim the data extremes(?) and then call
     the neural network package.
@@ -107,18 +107,25 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     else:
         net_train_var = var
     print(net_train_var)
-    run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,activ = activ,ens=ens)
+    if run_network_training:
+        run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,activ = activ,ens=ens)
 
     # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
     # (propagated input parameter uncertainties)
-    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc,ens=ens)
+    if prob_ensemble == None:
+        mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc,ens=ens)
+    else:
+        mapped,mapped_net_unc,mapped_para_unc = neural_network_map_prob(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc,ens=ens,prob_ensemble=prob_ensemble,data_file=data_file)
     # Then we save the fCO2 data
     save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,time = time)
     # Once saved the validation can be extracted, and used to determine the validation uncertainty for each province,
     # which can then be mapped. This function produces validation statistics for the training/validation, test and all data together
     # using both weighted and unweighted statistics.
     plot_total_validation_unc(fco2_sst = fco2_sst,model_save_loc = model_save_loc,ice = sea_ice,prov = prov)
-    add_validation_unc(model_save_loc,data_file=data_file,prov=prov)
+    if prob_ensemble == None:
+        add_validation_unc(model_save_loc,data_file=data_file,prov=prov)
+    else:
+        add_validation_unc_prob(model_save_loc,data_file=data_file,prov=prov,prob_var = prob_ensemble)
     # This then produces the total uncertainty (combine parameter, network and validation uncertainties in quadrature)
     add_total_unc(model_save_loc)
     # Plot the mean of the last year of the timeseries for a sanity check.
@@ -136,7 +143,7 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
 def daily_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_var=[],mapping_prov = [],unc = None, model_save_loc = None,
     bath = None, bath_cutoff = None, cutoff_low = None, cutoff_high = None,sea_ice=None,tot_lut_val=6000,mapping_file=[],ktoc = None,epochs=200,node_in = range(6,31,3),
     sep = '\t',name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm',c = [0,1500],learning_rate=0.01,plot_unit = '$\mu$atm',plot_parameter = 'fCO$_{2 (sw)}$',
-    lat_v = '',lon_v='',year_v='',mon_v='',day_v='',ens=10):
+    lat_v = '',lon_v='',year_v='',mon_v='',day_v='',ens=10,prob_ensemble=None,run_network_training=True):
     vars = [fco2_sst,fco2_sst+'_std',lat_v,lon_v,year_v,mon_v,day_v]
     vars.append(prov)
     if not bath_cutoff == None:
@@ -176,10 +183,17 @@ def daily_neural_driver(data_file,fco2_sst = None, prov = None,var = [],mapping_
         tabl[ktoc] = tabl[ktoc] - 273.15
     print(tabl)
     print(mapping_var)
-    mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc)
+    # mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc)
+    if prob_ensemble == None:
+        mapped,mapped_net_unc,mapped_para_unc = neural_network_map(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc,ens=ens)
+    else:
+        mapped,mapped_net_unc,mapped_para_unc = neural_network_map_prob(tabl,var=mapping_var,model_save_loc=model_save_loc,prov = mapping_prov,output_size=output_size,unc = unc,ens=ens,prob_ensemble=prob_ensemble,data_file=mapping_file)
 
     save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,name = name,longname=longname,unit = unit)
-    add_validation_unc(model_save_loc,mapping_file,prov,name = name,longname=longname,unit = unit)
+    if prob_ensemble==None:
+        add_validation_unc(model_save_loc,mapping_file,prov,name = name,longname=longname,unit = unit)
+    else:
+        add_validation_unc_prob(model_save_loc,mapping_file,prov,name = name,longname=longname,unit = unit,prob_var = prob_ensemble)
     add_total_unc(model_save_loc,name = name,longname=longname,unit = unit)
 
     c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
@@ -262,7 +276,7 @@ Need to work out why reanalysis script currently doesn't work for SOCAT2023...
 #             # print(y_test_preds)
 #             dump([y_test,y_test_preds], open(os.path.join(model_save_loc,'validation',f'prov_{v}_validation_Eflag.pkl'), 'wb'))
 
-def load_data(load_loc,vars,output_loc=[],outp=True):
+def load_data(load_loc,vars,output_loc=[],outp=True,load_single=False,timestep=0):
     """
     Function to load the data variables into a pandas dataframe for use in the neural
     network training.
@@ -272,18 +286,27 @@ def load_data(load_loc,vars,output_loc=[],outp=True):
     c = Dataset(load_loc,'r')
     lon = np.array(c.variables['longitude'][:])
     lat = np.array(c.variables['latitude'][:])
-    time = list(c.variables['time'][:])
+    if load_single:
+        time = c.variables['time'][timestep]
+    else:
+        time = list(c.variables['time'][:])
     t = 0
     # This loop cycles through the netcdf variables and loads the ones defined in vars
     ins_save = {}
     for v in vars:
-        data = np.squeeze(np.array(c.variables[v][:]))
+        if load_single:
+            data = np.squeeze(np.array(c.variables[v][:,:,timestep]))
+        else:
+            data = np.squeeze(np.array(c.variables[v][:]))
         if t == 0:
             # Create the output array with the correct size (allows the inputs to be any shape size etc.)
             d = np.append(data.shape,len(vars))
             output = np.empty((d))
             output[:] = np.nan
-        output[:,:,:,t] = data
+        if load_single:
+            output[:,:,t] = data
+        else:
+            output[:,:,:,t] = data
         ins_save[v] = data
         t += 1
     if outp:
@@ -292,13 +315,19 @@ def load_data(load_loc,vars,output_loc=[],outp=True):
     for i in range(0,len(vars)):
         if i == 0:
             tabl = pd.DataFrame()
-        temp = np.squeeze(np.reshape(output[:,:,:,i],(-1,1)))
+        if load_single:
+            temp = np.squeeze(np.reshape(output[:,:,i],(-1,1)))
+        else:
+            temp = np.squeeze(np.reshape(output[:,:,:,i],(-1,1)))
         #print(temp.shape)
         tabl[vars[i]] = temp
     c.close()
     #Returns the loaded data, the size of the data in longitude,latitude,time, the longitude array
     #and the latitude array
-    return tabl,d[0:3],lon,lat,time
+    if load_single:
+        return tabl,d[0:2],lon,lat,time
+    else:
+        return tabl,d[0:3],lon,lat,time
 
 def make_save_tree(model_save_loc):
     """
@@ -999,6 +1028,58 @@ def add_validation_unc(model_save_loc,data_file,prov,name='fco2',longname='Fugac
     c.variables[name+'_val_unc'+extra].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
     c.close()
 
+def add_validation_unc_prob(model_save_loc,data_file,prov,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm',file = 'independent_test_rmsd.csv',extra = '',prob_var = ''):
+    """
+    Function to take the independent test rmsd values produced in plot_total_validation_unc and produce a array within the output netcdf
+    with the validation uncertainity for each province mapped
+    """
+    # Load the province data
+    c = Dataset(data_file)
+    prov = c.variables[prov][:]
+    prob = c.variables[prob_var][:]
+    s = prov.shape
+    prov = np.reshape(prov,(-1,1))
+    prob = np.reshape(prob,(prov.shape[0],prob.shape[-1]))
+    print(prov.shape)
+    print(prob.shape)
+    c.close()
+    c = Dataset(os.path.join(model_save_loc,'output.nc'))
+    fco2 = np.array(c.variables[name])
+    c.close()
+    # Load the test validation RMSD.
+    val = np.loadtxt(os.path.join(model_save_loc,'validation',file),delimiter=',')
+
+    val_unc = np.squeeze(np.zeros((prov.shape)))
+    #val_unc[:] = np.nan
+    if len(val.shape)>1:# So if we have a single province this should be 1, otherwise it should be 2 (i.e 2 dimensions)
+        for v in range(0,val.shape[0]):# Iterate through the provinces and add the validation to the province areas
+            print(v)
+            f = np.where(prob[:,v]>0)[0]
+            print(prob[f,v].shape)
+            print(val_unc[f].shape)
+            val_unc[f] = val_unc[f] + (val[v,1]*2 * prob[f,v]) # For each province we put the validaiton RMSD as the value...
+    else: #Single province must be handled differently
+        val_unc[prov == val[0]] = val[1]*2 # val[0] is the province number, and val[1] is the RMSD
+    val_unc = np.reshape(val_unc,s)
+    val_unc[val_unc == 0] = np.nan
+    val_unc[np.isnan(fco2) == 1] = np.nan
+
+    # Need to add a check if the fCO2_val_unc variable has been created already - if it has we just overwrite with the new data...
+    c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
+    keys = c.variables.keys()
+    if name+'_val_unc'+extra in keys:
+        c.variables[name+'_val_unc'+extra][:] = val_unc
+        c.variables[name+'_val_unc'+extra].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    else:
+
+        var_o = c.createVariable(name+'_val_unc'+extra,'f4',('longitude','latitude','time'),fill_value=np.nan)
+        var_o[:] = val_unc
+    c.variables[name+'_val_unc'+extra].long_name = longname+' evaluation uncertainty'
+    c.variables[name+'_val_unc'+extra].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
+    c.variables[name+'_val_unc'+extra].units = unit
+    c.variables[name+'_val_unc'+extra].uncertainties = 'Uncertainties considered 95% confidence (2 sigma)'
+    c.close()
+
 def add_total_unc(model_save_loc,name='fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm',val_extra=''):
     """
     Function to produce the total fCO2 uncertainity by combining the uncertainity components in quadrature.
@@ -1006,9 +1087,9 @@ def add_total_unc(model_save_loc,name='fco2',longname='Fugacity of CO2 in seawat
     # Load the uncertainity components
     c = Dataset(os.path.join(model_save_loc,'output.nc'),'a')
     keys = c.variables.keys()
-    ne = c.variables[name+'_net_unc'][:]
-    pa = c.variables[name+'_para_unc'][:]
-    va = c.variables[name+'_val_unc'+val_extra][:]
+    ne = np.array(c.variables[name+'_net_unc'][:])
+    pa = np.array(c.variables[name+'_para_unc'][:])
+    va = np.array(c.variables[name+'_val_unc'+val_extra][:])
 
     tot = np.sqrt(ne**2 + pa**2 + va**2) # Combine these in quadrature
     # Need to add a check if the fCO2_tot_unc variable has been created already - if it has we just overwrite with the new data...
@@ -1016,7 +1097,7 @@ def add_total_unc(model_save_loc,name='fco2',longname='Fugacity of CO2 in seawat
         c.variables[name+'_tot_unc'][:] = tot
         c.variables[name+'_tot_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
     else:
-        var_o = c.createVariable(name+'_tot_unc','f4',('longitude','latitude','time'))
+        var_o = c.createVariable(name+'_tot_unc','f4',('longitude','latitude','time'),fill_value=np.nan)
         var_o[:] = tot
     c.variables[name+'_tot_unc'].long_name = longname+' total uncertainty'
     c.variables[name+'_tot_unc'].date_generated = datetime.datetime.now().strftime(('%d/%m/%Y %H:%M'))
@@ -1132,6 +1213,51 @@ def neural_network_map(mapping_data,var=None,model_save_loc=None,prov = None,out
     out = np.reshape(out,(output_size))
     unc_net = np.reshape(unc_net,(output_size))
     unc_para = np.reshape(unc_para,(output_size))
+    return out,unc_net,unc_para
+
+def neural_network_map_prob(mapping_data,var=None,model_save_loc=None,prov = None,output_size=None,unc = None,ens=10,prob_ensemble='prov_ensemble',data_file=''):
+    """
+    Function to apply the trained neural network to the full data to produce global maps of fCO2 sw with the network unc and input parameter unc.
+    """
+    print(var)
+    inp = np.array(mapping_data[var])
+    prov = np.array(mapping_data[prov])
+    c = Dataset(data_file,'r')
+    prob_data = np.array(c.variables[prob_ensemble])
+    c.close()
+    prob_data = np.reshape(prob_data,(inp.shape[0],prob_data.shape[-1]))
+    print(prob_data)
+    print(inp.shape)
+    # Produce the output arrays
+    out = np.zeros((inp.shape[0]))
+    unc_net = np.copy(out)
+    unc_para = np.copy(out)
+    # For each province we run the neural network
+    for v in np.unique(prov[~np.isnan(prov)]):
+        scalar = load(open(os.path.join(model_save_loc,'scalars',f'prov_{v}_scalar.pkl'),'rb')) # Load the scalar
+        f = np.squeeze(np.argwhere(prob_data[:,int(v)] >0)) # Find the data within the province
+        print(f'Number of samples for {v}: {len(f)}')
+        mod_inp = scalar.transform(inp[f,:]) # Transform the data using the scalar
+        #mod_inp = inp[f,:]
+        out_t = np.zeros((len(f),ens))
+        # For each ensemble run the neural network and get the output
+        for i in range(ens):
+            mod = tf.keras.models.load_model(os.path.join(model_save_loc,'networks',f'prov_{v}_model_ens{i}'),compile=False)
+            out_t[:,i] = np.squeeze(mod.predict(mod_inp))
+        out[f] = out[f]+ (np.nanmean(out_t,axis=1)*prob_data[f,int(v)]) # The output fCO2 is the mean of the ensembles
+        unc_net[f] = unc_net[f] + (np.nanstd(out_t,axis=1)*2 *prob_data[f,int(v)]) # The output fCO2 network uncertainity
+        if unc:
+            #Load the parameter uncertainty look up table and apply.
+            lut = load(open(os.path.join(model_save_loc,'unc_lut',f'prov_{v}_lut.pkl'),'rb'))
+            lut = lut[0]
+            unc_para[f] = unc_para[f] + (np.squeeze(lut_retr(lut,mod_inp))*prob_data[f,int(v)])
+    # Reshape the outputs to the correct lon,lat,time dimensions.
+    out = np.reshape(out,(output_size))
+    unc_net = np.reshape(unc_net,(output_size))
+    unc_para = np.reshape(unc_para,(output_size))
+    out[out==0] = np.nan
+    unc_net[unc_net == 0] = np.nan
+    unc_para[unc_para==0] = np.nan
     return out,unc_net,unc_para
 
 def save_mapped_fco2(data,net_unc,para_unc,data_shape = None, model_save_loc = None, lon = None,lat = None,time = [],name = 'fco2',longname='Fugacity of CO2 in seawater',unit = 'uatm'):

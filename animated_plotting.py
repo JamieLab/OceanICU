@@ -22,6 +22,7 @@ mpl.rcParams['animation.ffmpeg_path'] = r'C:\\Users\\df391\\OneDrive - Universit
 def animated_output(model_save_loc,start_yr,gcb_output = 'C:\\Users\\df391\\OneDrive - University of Exeter\\Post_Doc_ESA_Contract\\Submissions\\GCB2023\\GCB-2023_dataprod_UoEX_WATv2_1985-2022.nc'):
     worldmap = gpd.read_file(gpd.datasets.get_path("ne_50m_land"))
     def animate(i):
+        print(str(i) + '/' + str(fco2.shape[2]))
         fig.clear()
         gs = GridSpec(1,2, figure=fig, wspace=0.2,hspace=0.2,bottom=0.1,top=0.95,left=0.1,right=0.98)
         ax = fig.add_subplot(gs[0,1])
@@ -35,8 +36,8 @@ def animated_output(model_save_loc,start_yr,gcb_output = 'C:\\Users\\df391\\OneD
         ax.set_ylim(ylim)
 
 
-        yr = 2012
-        m = 1+i
+        yr = 2015
+        m = 0+i
         g = np.floor(m/12)
         yr = yr+g
         mon = int(np.round(((m/12) - g)*12,0)+1)
@@ -63,11 +64,11 @@ def animated_output(model_save_loc,start_yr,gcb_output = 'C:\\Users\\df391\\OneD
     lon = np.array(c.variables['longitude'])
     c.close()
     c = Dataset(gcb_output,'r')
-    fco2_gcb = np.array(c.variables['sfco2'])
+    fco2_gcb = np.array(c.variables['fco2'])
 
-    fco2_gcb = du.lon_switch(fco2_gcb)
-    fco2_gcb = np.transpose(fco2_gcb,[2,1,0])
-    #fco2_gcb = np.fliplr(fco2_gcb)
+    # fco2_gcb = du.lon_switch(fco2_gcb)
+    # fco2_gcb = np.transpose(fco2_gcb,[2,1,0])
+    # #fco2_gcb = np.fliplr(fco2_gcb)
     lon_gcb,lat_gcb = du.reg_grid()
     c.close()
 

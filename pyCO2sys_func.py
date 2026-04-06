@@ -39,14 +39,14 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
         ['u_dic__salinity','dic_sss_unc','umol/kg','Dissolved Inorganic Carbon in seawater SSS uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ['u_dic__total_phosphate','dic_phos_unc','umol/kg','Dissolved Inorganic Carbon in seawater phosphate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ['u_dic__total_silicate','dic_sili_unc','umol/kg','Dissolved Inorganic Carbon in seawater silicate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
-        ['pH','pH','-log([H+])','pH on total scale',''],
-        ['u_pH','pH_tot_unc','-log([H+])','pH on total scale total uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
-        ['u_pH__par2','pH_ta_unc','-log([H+])','pH on total scale alkalinity uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
-        ['u_pH__par1','pH_fco2_unc','-log([H+])','pH on total scale fCO2(sw) uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
-        ['u_pH__temperature','pH_sst_unc','-log([H+])','pH on total scale SST uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
-        ['u_pH__salinity','pH_sss_unc','-log([H+])','pH on total scale SSS uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
-        ['u_pH__total_phosphate','pH_phos_unc','-log([H+])','pH on total scale phosphate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
-        ['u_pH__total_silicate','pH_sili_unc','-log([H+])','pH on total scale silicate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['pH','pH','-log([H+] + [HSO4-])','pH on total scale',''],
+        ['u_pH','pH_tot_unc','-log([H+] + [HSO4-])','pH on total scale total uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__par2','pH_ta_unc','-log([H+] + [HSO4-])','pH on total scale alkalinity uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__par1','pH_fco2_unc','-log([H+] + [HSO4-])','pH on total scale fCO2(sw) uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__temperature','pH_sst_unc','-log([H+] + [HSO4-])','pH on total scale SST uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__salinity','pH_sss_unc','-log([H+] + [HSO4-])','pH on total scale SSS uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__total_phosphate','pH_phos_unc','-log([H+] + [HSO4-])','pH on total scale phosphate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH__total_silicate','pH_sili_unc','-log([H+] + [HSO4-])','pH on total scale silicate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ['saturation_aragonite','saturation_aragonite','unitless','Saturation state of Aragonite',''],
         ['u_saturation_aragonite','saturation_aragonite_tot_unc','unitless','Saturation state of Aragonite total uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ['u_saturation_aragonite__par2','saturation_aragonite_ta_unc','unitless','Saturation state of Aragonite alkalinity uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
@@ -55,6 +55,14 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
         ['u_saturation_aragonite__salinity','saturation_aragonite_sss_unc','unitless','Saturation state of Aragonite SSS uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ['u_saturation_aragonite__total_phosphate','saturation_aragonite_phos_unc','unitless','Saturation state of Aragonite phosphate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ['u_saturation_aragonite__total_silicate','saturation_aragonite_sili_unc','unitless','Saturation state of Aragonite silicate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['pH_free','pH_free','-log([H+])','pH on free scale',''],
+        ['u_pH_free','pH_free_tot_unc','-log([H+])','pH on free scale total uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH_free__par2','pH_free_ta_unc','-log([H+])','pH on free scale alkalinity uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH_free__par1','pH_free_fco2_unc','-log([H+])','pH on free scale fCO2(sw) uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH_free__temperature','pH_free_sst_unc','-log([H+])','pH on free scale SST uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH_free__salinity','pH_free_sss_unc','-log([H+])','pH on free scale SSS uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH_free__total_phosphate','pH_free_phos_unc','-log([H+])','pH on free scale phosphate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
+        ['u_pH_free__total_silicate','pH_free_sili_unc','-log([H+])','pH on free scale silicate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ]
     # var_out_list = ['dic',
     #     'u_dic',
@@ -167,7 +175,7 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
             salinity = sss[:,:,i],
             total_phosphate=phosphate[:,:,i],
             total_silicate=silicate[:,:,i],
-            uncertainty_into = ['dic','pH','saturation_aragonite'],
+            uncertainty_into = ['dic','pH','saturation_aragonite','pH_free'],
             uncertainty_from = {'par2':ta_unc[:,:,i], 'par1':fco2_unc[:,:,i], 'temperature': sst_unc[:,:,i],'salinity': sss_unc[:,:,i],'total_phosphate': phosphate_unc[:,:,i],
                 'total_silicate':silicate_unc[:,:,i]})
         #print(py_out)
@@ -193,7 +201,7 @@ def plot_pyCO2sys_out(data_file,model_save_loc,geopan = True):
     print(axs.shape)
     if geopan:
         for i in range(len(axs)):
-            worldmap.plot(color="lightgrey", ax=axs[i])
+            worldmap.plot(color="lightgrey", ax=axs[i],zorder=2)
     c = Dataset(data_file,'r')
     lon = np.array(c['longitude'])
     lat = np.array(c['latitude'])
@@ -231,7 +239,71 @@ def plot_pyCO2sys_out(data_file,model_save_loc,geopan = True):
     cbar = fig.colorbar(a); cbar.set_label('pH total\nuncertainty (total scale)',fontsize = label_size)
 
     c.close()
-    fig.savefig(os.path.join(model_save_loc,'plots','carbonate_system.png'),dpi=300)
+    fig.savefig(os.path.join(model_save_loc,'plots','carbonate_system.png'),dpi=150)
+    plt.close(fig)
+
+def plot_pyCO2sys_out_flux(data_file,model_save_loc,geopan = True):
+
+
+    font = {'weight' : 'normal',
+            'size'   :30}
+    matplotlib.rc('font', **font)
+    label_size = 38
+    if geopan:
+        worldmap = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+    fig = plt.figure(figsize=(40,42))
+    row = 5; col=2;
+    gs = GridSpec(row,col, figure=fig, wspace=0.10,hspace=0.15,bottom=0.025,top=0.975,left=0.05,right=0.975)
+    axs = np.array([[fig.add_subplot(gs[i, j]) for j in range(col)] for i in range(row)]).ravel()
+    print(axs.shape)
+    if geopan:
+        for i in range(len(axs)):
+            worldmap.plot(color="lightgrey", ax=axs[i],zorder=2)
+    c = Dataset(data_file,'r')
+    lon = np.array(c['longitude'])
+    lat = np.array(c['latitude'])
+
+    fco2 = np.nanmean(c['fco2'],axis=2)
+    a = axs[0].pcolor(lon,lat,np.transpose(fco2),vmin=280,vmax =500,cmap=cmocean.cm.balance)
+    cbar = fig.colorbar(a); cbar.set_label('fCO$_{2}$ $_{(sw)}$ ($\mu$atm)',fontsize = label_size)
+
+    fco2 = np.nanmean(c['fco2_tot_unc'],axis=2)
+    a = axs[1].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =80,cmap=cmocean.cm.thermal)
+    cbar = fig.colorbar(a); cbar.set_label('fCO$_{2}$ $_{(sw)}$ total\nuncertainty ($\mu$atm)',fontsize = label_size)
+
+    fco2 = np.nanmean(c['ta'],axis=2)
+    a = axs[2].pcolor(lon,lat,np.transpose(fco2),vmin=2000,vmax =2600,cmap=cmocean.cm.haline)
+    cbar = fig.colorbar(a); cbar.set_label('TA ($\mu$mol kg$^{-1}$)',fontsize = label_size)
+
+    fco2 = np.nanmean(c['ta_tot_unc'],axis=2)
+    a = axs[3].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =100,cmap=cmocean.cm.thermal)
+    cbar = fig.colorbar(a); cbar.set_label('TA total\nuncertainty ($\mu$mol kg$^{-1}$)',fontsize = label_size)
+
+    fco2 = np.nanmean(c['dic'],axis=2)
+    a = axs[4].pcolor(lon,lat,np.transpose(fco2),vmin=1900,vmax =2400,cmap=cmocean.cm.deep)
+    cbar = fig.colorbar(a); cbar.set_label('DIC ($\mu$mol kg$^{-1}$)',fontsize = label_size)
+
+    fco2 = np.nanmean(c['dic_tot_unc'],axis=2)
+    a = axs[5].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =100,cmap=cmocean.cm.thermal)
+    cbar = fig.colorbar(a); cbar.set_label('DIC total\nuncertainty ($\mu$mol kg$^{-1}$)',fontsize = label_size)
+
+    fco2 = np.nanmean(c['pH'],axis=2)
+    a = axs[6].pcolor(lon,lat,np.transpose(fco2),vmin=7.9,vmax =8.3,cmap=cmocean.cm.matter)
+    cbar = fig.colorbar(a); cbar.set_label('pH (total scale)',fontsize = label_size)
+
+    fco2 = np.nanmean(c['pH_tot_unc'],axis=2)
+    a = axs[7].pcolor(lon,lat,np.transpose(fco2),vmin=0,vmax =0.2,cmap=cmocean.cm.thermal)
+    cbar = fig.colorbar(a); cbar.set_label('pH total\nuncertainty (total scale)',fontsize = label_size)
+
+    fco2 = np.nanmean(c['flux'],axis=2)
+    a = axs[8].pcolor(lon,lat,np.transpose(fco2),vmin=-0.2,vmax =0.2,cmap=cmocean.cm.balance)
+    cbar = fig.colorbar(a); cbar.set_label('Air-sea CO$_2$ flux\n(g C m$^{-2}$ d$^{-1}$)',fontsize = label_size)
+
+    fco22 = np.nanmean(c['flux_unc'] * np.abs(c['flux']),axis=2)
+    a = axs[9].pcolor(lon,lat,np.transpose(fco22),vmin=0,vmax =0.2,cmap=cmocean.cm.thermal)
+    cbar = fig.colorbar(a); cbar.set_label('Air-sea CO$_2$ flux\n uncertainty (g C m$^{-2}$ d$^{-1}$)',fontsize = label_size)
+    c.close()
+    fig.savefig(os.path.join(model_save_loc,'plots','carbonate_system+flux.png'),dpi=150)
     plt.close(fig)
 
 def calc_nstar(file,delimiter,nitrate_var,phosphate_var,gridded=False,prefix=''):

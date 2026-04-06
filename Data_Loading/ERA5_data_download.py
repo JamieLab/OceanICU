@@ -66,7 +66,7 @@ def download_era5(loc,start_yr=1990,end_yr=2023):
             ye = ye+1
             mon = 1
 
-def era5_daily(loc,start_yr,end_yr):
+def era5_daily(loc,start_yr,end_yr,vars=['10m_u_component_of_wind', '10m_v_component_of_wind'],ext=''):
     import cdsapi
     import calendar
 
@@ -89,14 +89,14 @@ def era5_daily(loc,start_yr,end_yr):
             dataset = "reanalysis-era5-single-levels"
             request = {
                 'product_type': ['reanalysis'],
-                'variable': ['10m_u_component_of_wind', '10m_v_component_of_wind'],
+                'variable': vars,
                 'year': [d.strftime('%Y')],
                 'month': [d.strftime('%m')],
                 'day': day,
                 'time': ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'],
                 'data_format': 'netcdf',
             }
-            target = os.path.join(p,d.strftime("%Y_%m")+'_hourly_ERA5.nc')
+            target = os.path.join(p,d.strftime("%Y_%m")+'_hourly_ERA5'+ext+'.nc')
             client.retrieve(dataset, request, target)
         d = d + datetime.timedelta(days=int(day[-1]))
 

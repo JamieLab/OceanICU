@@ -2,21 +2,22 @@
 """
 """
 import data_utils as du
-start_yr = 1980
-end_yr = 2024
+start_yr = 2025
+end_yr = 2025
 
 noaa = False
 era5 = False
-era5_daily = False
+era5_daily = True
 cmems = False
-cmems_daily=True
+cmems_daily=False
 bicep = False
 ccmp = False
 oisst = False
-cci = False
+cci = True
 gebco = False
 osisaf = False
 lon,lat = du.reg_grid()
+
 if gebco:
     import gebco_resample as ge
     ge.gebco_resample('D:/Data/Bathymetry/GEBCO_2023.nc',lon,lat)
@@ -79,3 +80,5 @@ if era5_daily:
     from ERA5_data_download import era5_average,era5_daily,era5_wind_time_average
     era5_daily(loc = "F:/Data/ERA5/DAILY",start_yr=start_yr,end_yr=end_yr)
     era5_wind_time_average(loc = "F:/Data/ERA5/DAILY",outloc = "F:/Data/ERA5/DAILY/monthly",start_yr=start_yr,end_yr=end_yr)
+
+    # era5_daily(loc = "F:/Data/ERA5/DAILY/PRESSURE",start_yr=2015,end_yr=2015,vars=["mean_sea_level_pressure"],ext='_pressure')

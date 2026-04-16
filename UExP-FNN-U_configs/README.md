@@ -4,6 +4,9 @@ This section of the repository holds the config files used with the OceanICU unc
 
 # Versions
 v2026-pre1: https://doi.org/10.5281/zenodo.19605928
+
 v2025-1: https://doi.org/10.5281/zenodo.15801067
+
 v2025-0: https://doi.org/10.5281/zenodo.15790121
+
 v2024-5: https://doi.org/10.5281/zenodo.15784427

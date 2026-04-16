@@ -1,8 +1,7 @@
 # OceanICU Neural Network and air-sea CO2 flux uncertainty framework
 
 This repository holds the neural network framework developed to extrapolate/interpolate SOCAT fCO2sw observations into globally complete fields, based
-on a feed forward neural network approach.
-The framework has been developed to allow input parameter combinations to be modified whilst keeping the neural network and CO2 flux calculations
+on a feed forward neural network approach. The framework has been developed to allow input parameter combinations to be modified whilst keeping the neural network and CO2 flux calculations
 consistent. The framework also expands on the uncertainty determination approaches, allowing time varying uncertainties to be calculated and then
 propagated through the flux calculations.
 
@@ -10,25 +9,31 @@ propagated through the flux calculations.
 
 # Supporting Manuscript
 
-Ford, D. J., Blannin, J., Watts, J., Watson, A., Landschützer, P., Jersild, A., & Shutler, J. (in review). A comprehensive analysis of air-sea CO2 flux uncertainties constructed from surface ocean data products. https://doi.org/10.22541/essoar.171199280.05732707/v1
+Ford, D. J., Blannin, J., Watts, J., Watson, A. J., Landschützer, P., Jersild, A., & Shutler, J. D. (2024). A comprehensive analysis of air-sea CO2 flux uncertainties constructed from surface ocean data products. Global Biogeochemical Cycles, 38, e2024GB008188. https://doi.org/10.1029/2024GB008188
 
 # Developed by
 Daniel J. Ford (d.ford@exeter.ac.uk) - Main contact  
 Jamie D. Shutler  
 Josh Blannin  
-Andy Watson  
+Andrew Watson 
+Gemma Kulk 
+Shubha Sathyendranath 
 
 # Funding
 This work was funded by the European Union under grant agreement no. 101083922 (OceanICU; https://ocean-icu.eu/) and UK Research and Innovation (UKRI) under the UK government’s Horizon Europe funding guarantee [grant number 10054454, 10063673, 10064020, 10059241, 10079684, 10059012, 10048179]. The views, opinions and practices used to produce this dataset/software are however those of the author(s) only and do not necessarily reflect those of the European Union or European Research Executive Agency. Neither the European Union nor the granting authority can be held responsible for them.
 
 Further updates to the framework to allow spatial resolution variations was funded by the Convex Seascape Survey (https://convexseascapesurvey.com/).
 
-Further updates to the framework for the generation of Total Alkalinity data, and the extension to full surface ocean carbonate system funded by the ESA Scope project ()
+Further updates to the framework for the generation of Total Alkalinity data, and the extension to full surface ocean carbonate system funded by the ESA Satellite-based observations of Carbon in the Ocean: Pools, Fluxes and Exchanges project (SCOPE; 4000142532/23/I-DT; https://oceancarbon-scope.org/).
+
+Further updates to the framework were developed with the ESA Ocean Carbon for Climate project (OC4C; 3-18399/24/I-NB; https://oceancarbon4climate.org/).
 
 # References
-**Implementation of the NOAA COARE for cool skin estimation**
+**Implementation of the NOAA COARE for cool skin estimation (3.5 and 3.6)**
 
-Bariteau Ludovic, Blomquist Byron, Fairall Christopher, Thompson Elizabeth, Edson Jim, & Pincus Robert. (2021). Python implementation of the COARE 3.5 Bulk Air-Sea Flux algorithm (v1.1). Zenodo. https://doi.org/10.5281/zenodo.5110991
+COARE 3.5: Bariteau Ludovic, Blomquist Byron, Fairall Christopher, Thompson Elizabeth, Edson Jim, & Pincus Robert. (2021). Python implementation of the COARE 3.5 Bulk Air-Sea Flux algorithm (v1.1). Zenodo. https://doi.org/10.5281/zenodo.5110991
+
+COARE 3.6 https://github.com/NOAA-PSL/COARE-algorithm/tree/master/Python/COARE3.6
 
 **Implementation of semi-variogram analysis in Python**
 
@@ -40,7 +45,7 @@ Shutler, J. D., Land, P. E., Piolle, J. F., Woolf, D. K., Goddijn-Murphy, L., Pa
 
 Holding, T., Ashton, I. G., Shutler, J. D., Land, P. E., Nightingale, P. D., Rees, A. P., et al. (2019). The FluxEngine air–sea gas flux toolbox: simplified interface and extensions for in situ analyses and multiple sparingly soluble gases. Ocean Science, 15(6), 1707–1728. https://doi.org/10.5194/os-15-1707-2019
 
-**PyCO2sys implementation for calculating the full ocean carbonate system**
+**PyCO2SYS implementation for calculating the full ocean carbonate system**
 
 Humphreys, M. P., Lewis, E. R., Sharp, J. D., and Pierrot, D. (2022). PyCO2SYS v1.8: marine carbonate system calculations in Python. Geoscientific Model Development 15, 15-43. doi:10.5194/gmd-15-15-2022.
 

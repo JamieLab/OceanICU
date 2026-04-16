@@ -1752,18 +1752,19 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
             axs[t].set_xlim([0,max_decorrelation])
             yr = time_2[i]
             out[t,1] = np.median(a); out[t,2] = scipy.stats.iqr(a); out[t,3] = np.mean(a); out[t,4] = np.std(a)
-            ske = skewnorm.fit(a)
-            nor = norm.fit(a)
-            xp = np.arange(0,max_decorrelation,200)
-            axs[t].plot(xp, skewnorm.pdf(xp, *ske))
-            axs[t].plot(xp, norm.pdf(xp, *nor))
-            out[t,5] = ske[1]
-            out[t,6] = nor[0]
+            if len(a)>2:
+                ske = skewnorm.fit(a)
+                nor = norm.fit(a)
+                xp = np.arange(0,max_decorrelation,200)
+                axs[t].plot(xp, skewnorm.pdf(xp, *ske))
+                axs[t].plot(xp, norm.pdf(xp, *nor))
+                out[t,5] = ske[1]
+                out[t,6] = nor[0]
             lims = axs[t].get_ylim()
             axs[t].plot([out[t,1],out[t,1]],lims)
             axs[t].plot([out[t,5],out[t,5]],lims)
             axs[t].plot([out[t,6],out[t,6]],lims)
-            mea = np.mean([ske[1],out[t,1]])
+            mea = np.mean([out[t,5],out[t,1]])
             axs[t].plot([mea,mea],lims)
             a = []
             t = t+1
@@ -1801,12 +1802,13 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
     axs[t].hist(a,50,density=True)
     axs[t].set_title(out[t,0]); axs[t].set_xlabel('Decorrelation (km)'); axs[t].set_ylabel('Frequency')
     axs[t].set_xlim([0,max_decorrelation])
-    ske = skewnorm.fit(a)
-    nor = norm.fit(a)
-    print(ske)
-    xp = np.arange(0,max_decorrelation,200)
-    axs[t].plot(xp, skewnorm.pdf(xp, *ske))
-    axs[t].plot(xp, norm.pdf(xp, *nor))
+    if len(a)>2:
+        ske = skewnorm.fit(a)
+        nor = norm.fit(a)
+        print(ske)
+        xp = np.arange(0,max_decorrelation,200)
+        axs[t].plot(xp, skewnorm.pdf(xp, *ske))
+        axs[t].plot(xp, norm.pdf(xp, *nor))
     yr = time_2[i]
     out[t,1] = np.median(a); out[t,2] = scipy.stats.iqr(a); out[t,3] = np.mean(a); out[t,4] = np.std(a)
     out[t,5] = ske[1]
@@ -1815,7 +1817,7 @@ def variogram_evaluation(model_save_loc,output_file = 'decorrelation',input_arra
     axs[t].plot([out[t,1],out[t,1]],lims)
     axs[t].plot([out[t,5],out[t,5]],lims)
     axs[t].plot([out[t,6],out[t,6]],lims)
-    mea = np.mean([ske[1],out[t,1]])
+    mea = np.mean([out[t,5],out[t,1]])
     axs[t].plot([mea,mea],lims)
     fig.savefig(os.path.join(model_save_loc,'plots',output_file+'.png'),format='png',dpi=300)
     plt.close(fig)

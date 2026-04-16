@@ -37,7 +37,7 @@ def lon_switch(var,axis=1):
 # start_yr = 1985
 # end_yr = 2023
 
-def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,version = 'v0-1',var_dict = False):
+def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,version = 'v0-1',var_dict = False,copts={}):
 
     # Loading the fco2_sw_subskin output from the neural network
     # Secondary function to get time variable length
@@ -83,11 +83,11 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
     outs.method_citation_updates = 'Ford, D. J., Blannin, J., Watts, J., Watson, A. J., Landschützer, P., Jersild, A., & Shutler, J. D. (2024). A comprehensive analysis of air-sea CO2 flux uncertainties constructed from surface ocean data products. Global Biogeochemical Cycles, 38, e2024GB008188. https://doi.org/10.1029/2024GB008188'
 
     outs.socat_version = 'v2025; https://doi.org/10.25921/r7xa-bt92'
-    outs.reanalysis_data = 'Ford, D. J., Shutler, J. D., Ashton, I., Sims, R. P., & Holding, T. (2025). Recalculated (depth and temperature consistent) surface ocean CO₂ atlas (SOCAT) version 2025 (v0-1) [Data set]. Zenodo. https://doi.org/10.5281/zenodo.15656803'
+    outs.reanalysis_data = 'Ford, D. J., Shutler, J. D., Ashton, I., Sims, R. P., & Holding, T. (2025). Recalculated (depth and temperature consistent) surface ocean CO₂ atlas (SOCAT) version 2025 (v0-2) [Data set]. Zenodo. https://doi.org/10.5281/zenodo.15656803'
 
-    outs.coolskin = 'Cool Skin calculated using NOAA COARE 3.5, with ERA5 monthly inputs - to get cool skin deviation, compute tos_skin - tos'
+    outs.coolskin = 'Cool Skin calculated using NOAA COARE 3.6, with ERA5 monthly inputs - to get cool skin deviation, compute tos_skin - tos'
     outs.era5_data_location = 'https://doi.org/10.24381/cds.f17050d7'
-    outs.noaa_coare_35_code = 'https://doi.org/10.5281/zenodo.5110991'
+    outs.noaa_coare_36_code = 'https://github.com/NOAA-PSL/COARE-algorithm/tree/master'
     outs.noaa_ersl_marine_boundary_layer_citation = 'Dlugokencky, E.J., K.W. Thoning, X. Lan, and P.P. Tans (2021), NOAA Greenhouse Gas Reference from Atmospheric Carbon Dioxide Dry Air Mole Fractions from the NOAA GML Carbon Cycle Cooperative Global Air Sampling Network. Data Path: ftp://aftp.cmdl.noaa.gov/data/trace_gases/co2/flask/surface/'
 
     outs.createDimension('lon',lon.shape[0])
@@ -140,13 +140,17 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
             'flux_unc_wind': 'fgco2_wind_unc',
             'flux_unc_xco2atm': 'fgco2_xco2atm_unc',
         }
+
     c = Dataset(model_save_loc+'/output.nc','r')
     for i in variable_dict.keys():
-        var = outs.createVariable(variable_dict[i],'f4',('time','lat','lon'),fill_value=np.nan)
+        var = outs.createVariable(variable_dict[i],'f4',('time','lat','lon'),fill_value=np.nan,**copts)
         data = np.array(c.variables[i])
         data[data>200000] = np.nan
         var[:] = lon_switch(np.transpose(data,(2,1,0)),axis=2)
-        var.setncatts(c[i].__dict__)
+        l = c[i].__dict__;
+        if '_FillValue' in list(l.keys()):
+            l.pop('_FillValue')
+        var.setncatts(l)
         if 'flux_unc' in i:
             var.comment = "Multiple by absolute flux to get uncertainty in mol m^-2 s^-1"
         #var._FillValue = np.nan
@@ -155,7 +159,7 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
     ou = fl.load_flux_var(fluxloc,'OAPC1',start_yr,end_yr,lon.shape[0],lat.shape[0],time.shape[0])
     ou[ou == -999] = np.nan
     print(ou.shape)
-    var = outs.createVariable('fco2atm','f4',('time','lat','lon'),fill_value=np.nan)
+    var = outs.createVariable('fco2atm','f4',('time','lat','lon'),fill_value=np.nan,**copts)
     var[:] = lon_switch(np.transpose(ou,(2,0,1)),axis=2)
     var.Long_name = 'Atmospheric fCO2'
     var.units = 'uatm'
@@ -164,7 +168,7 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
 
     ou = fl.load_flux_var(fluxloc,'OK3',start_yr,end_yr,lon.shape[0],lat.shape[0],time.shape[0])
     ou[ou == -999] = np.nan
-    var = outs.createVariable('kw','f4',('time','lat','lon'),fill_value=np.nan)
+    var = outs.createVariable('kw','f4',('time','lat','lon'),fill_value=np.nan,**copts)
     var[:] = lon_switch(np.transpose(ou,(2,0,1)),axis=2)
     var.Long_name = 'Gas Transfer Velocity'
     var.Units = 'cm hr^-1'
@@ -173,7 +177,7 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
 
     ou = fl.load_flux_var(fluxloc,'FT1_Kelvin_mean',start_yr,end_yr,lon.shape[0],lat.shape[0],time.shape[0])
     ou[ou == -999] = np.nan
-    var = outs.createVariable('tos','f4',('time','lat','lon'),fill_value=np.nan)
+    var = outs.createVariable('tos','f4',('time','lat','lon'),fill_value=np.nan,**copts)
     var[:] = lon_switch(np.transpose(ou,(2,0,1)) - 273.15,axis=2) #Kelvin to degC
     var.long_name = 'Surface ocean temperature'
     var.units = 'degC'
@@ -182,7 +186,7 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
 
     ou = fl.load_flux_var(fluxloc,'ST1_Kelvin_mean',start_yr,end_yr,lon.shape[0],lat.shape[0],time.shape[0])
     ou[ou == -999] = np.nan
-    var = outs.createVariable('tos_skin','f4',('time','lat','lon'),fill_value=np.nan)
+    var = outs.createVariable('tos_skin','f4',('time','lat','lon'),fill_value=np.nan,**copts)
     var[:] = lon_switch(np.transpose(ou,(2,0,1)) - 273.15,axis=2) #Kelvin to degC
     var.long_name = 'Surface ocean skin temperature'
     var.units = 'degC'
@@ -190,7 +194,7 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
 
     ou = fl.load_flux_var(fluxloc,'OKS1',start_yr,end_yr,lon.shape[0],lat.shape[0],time.shape[0])
     ou[ou == -999] = np.nan
-    var = outs.createVariable('sos','f4',('time','lat','lon'),fill_value=np.nan)
+    var = outs.createVariable('sos','f4',('time','lat','lon'),fill_value=np.nan,**copts)
     var[:] = lon_switch(np.transpose(ou,(2,0,1)),axis=2) #Kelvin to degC
     var.long_name = 'Surface ocean salinity'
     var.units = 'psu'
@@ -199,7 +203,7 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
 
     ou = fl.load_flux_var(fluxloc,'salinity_skin',start_yr,end_yr,lon.shape[0],lat.shape[0],time.shape[0])
     ou[ou == -999] = np.nan
-    var = outs.createVariable('sos_skin','f4',('time','lat','lon'),fill_value=np.nan)
+    var = outs.createVariable('sos_skin','f4',('time','lat','lon'),fill_value=np.nan,**copts)
     var[:] = lon_switch(np.transpose(ou,(2,0,1)),axis=2) #Kelvin to degC
     var.long_name = 'Surface ocean skin salinity'
     var.units = 'psu'
@@ -207,7 +211,7 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
 
     ou = fl.load_flux_var(fluxloc,'fnd_solubility',start_yr,end_yr,lon.shape[0],lat.shape[0],time.shape[0])
     ou[ou == -999] = np.nan
-    var = outs.createVariable('alpha','f4',('time','lat','lon'),fill_value=np.nan)
+    var = outs.createVariable('alpha','f4',('time','lat','lon'),fill_value=np.nan,**copts)
     var[:] = lon_switch(np.transpose(ou,(2,0,1))/1000,axis=2) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
     var.long_name = 'Solubilty of CO2 in seawater'
     var.units = 'mol m^-3 uatm^-1'
@@ -216,7 +220,7 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
 
     ou = fl.load_flux_var(fluxloc,'skin_solubility',start_yr,end_yr,lon.shape[0],lat.shape[0],time.shape[0])
     ou[ou == -999] = np.nan
-    var = outs.createVariable('alpha_skin','f4',('time','lat','lon'),fill_value=np.nan)
+    var = outs.createVariable('alpha_skin','f4',('time','lat','lon'),fill_value=np.nan,**copts)
     var[:] = lon_switch(np.transpose(ou,(2,0,1))/1000,axis=2) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
     var.long_name = 'Skin solubilty of CO2 in seawater'
     var.units = 'mol m^-3 uatm^-1'
@@ -225,7 +229,7 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
 
     ou = fl.load_flux_var(fluxloc,'P1',start_yr,end_yr,lon.shape[0],lat.shape[0],time.shape[0])
     ou[ou == -999] = np.nan
-    var = outs.createVariable('fice','f4',('time','lat','lon'),fill_value=np.nan)
+    var = outs.createVariable('fice','f4',('time','lat','lon'),fill_value=np.nan,**copts)
     var[:] = lon_switch(np.transpose(ou,(2,0,1)),axis=2) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
     var.long_name = 'Fraction of sea ice cover'
     var.units = ''
@@ -240,7 +244,7 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
     c = Dataset(model_save_loc+'/output.nc','r')
     flux = np.array(c.variables['flux'])
     c.close()
-    var = outs.createVariable('fgco2','f4',('time','lat','lon'),fill_value=np.nan)
+    var = outs.createVariable('fgco2','f4',('time','lat','lon'),fill_value=np.nan,**copts)
     flux = lon_switch(np.transpose(flux,(2,1,0)) / (12.011) / (24*3600) * -1,axis=2) # 12 to convert grams to moles; 24*3600 to convert days to seconds; -1 to make positive flux into the ocean
     var[:] = flux
     var.long_name = 'Air-sea CO2 flux'
@@ -306,6 +310,7 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
         var = outs.createVariable(t[0],'f4',('region','time_annual'),fill_value=np.nan)
         if i == 'Net air-sea CO2 flux (Pg C yr-1)':
             var[:] = -data[i]
+            var.no_riverine_correction_applied = 'No riverine CO2 flux correction applied'
         else:
             var[:] = data[i]
         var.long_name = t[1]

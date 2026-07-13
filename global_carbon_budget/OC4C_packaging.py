@@ -312,7 +312,10 @@ def OC4C_package(model_save_loc,fluxloc,output_file,start_yr,end_yr,lon,lat,vers
             var[:] = -data[i]
             var.no_riverine_correction_applied = 'No riverine CO2 flux correction applied'
         else:
-            var[:] = data[i]
+            try:
+                var[:] = data[i]
+            except:
+                var[:] = 0
         var.long_name = t[1]
         var.units = t[2]
         if i not in ['Net air-sea CO2 flux (Pg C yr-1)', 'Area (m-2)', 'Ice-Free area (m-2)']:

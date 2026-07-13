@@ -2,18 +2,18 @@
 """
 """
 import data_utils as du
-start_yr = 2025
+start_yr = 1970
 end_yr = 2025
 
 noaa = False
 era5 = False
-era5_daily = True
-cmems = False
+era5_daily = False
+cmems = True
 cmems_daily=False
 bicep = False
 ccmp = False
 oisst = False
-cci = True
+cci = False
 gebco = False
 osisaf = False
 lon,lat = du.reg_grid()
@@ -55,7 +55,7 @@ if bicep:
 
 if ccmp:
     import ccmp_average as ccmp
-    ccmp.ccmp_temporal_average('D:/Data/CCMP/v3.1',v=3.1,var='ws')
+    ccmp.ccmp_temporal_average('F:/Data/CCMP/v3.1',v=3.1,var='ws',callaghan2008=True,start_yr=start_yr,end_yr=end_yr)
     #ccmp.ccmp_average('D:/Data/CCMP/v3.0/monthly','D:/Data/CCMP/v3.0/monthly/1DEG',start_yr=start_yr,end_yr=end_yr,res=1)
 
 if oisst:
@@ -78,7 +78,7 @@ if osisaf:
 
 if era5_daily:
     from ERA5_data_download import era5_average,era5_daily,era5_wind_time_average
-    era5_daily(loc = "F:/Data/ERA5/DAILY",start_yr=start_yr,end_yr=end_yr)
-    era5_wind_time_average(loc = "F:/Data/ERA5/DAILY",outloc = "F:/Data/ERA5/DAILY/monthly",start_yr=start_yr,end_yr=end_yr)
+    # era5_daily(loc = "F:/Data/ERA5/DAILY",start_yr=start_yr,end_yr=end_yr)
+    era5_wind_time_average(loc = "F:/Data/ERA5/DAILY",outloc = "F:/Data/ERA5/DAILY/monthly",start_yr=start_yr,end_yr=end_yr,callaghan2008=True)
 
     # era5_daily(loc = "F:/Data/ERA5/DAILY/PRESSURE",start_yr=2015,end_yr=2015,vars=["mean_sea_level_pressure"],ext='_pressure')

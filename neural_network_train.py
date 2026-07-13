@@ -38,7 +38,8 @@ matplotlib.rc('font', **font)
 tf.autograph.set_verbosity(0)
 
 def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_save_loc = None,
-    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,activ = 'sigmoid',socat_sst=False,ens=10,name='fco2',prob_ensemble=None,run_network_training=True):
+    bath = None, bath_cutoff = None, fco2_cutoff_low = None, fco2_cutoff_high = None,sea_ice=None,tot_lut_val=6000,activ = 'sigmoid',socat_sst=False,ens=10,name='fco2',prob_ensemble=None,run_network_training=True,
+    atm_rem = None):
     """
     This is the driver function to load the data from the input file, trim the data extremes(?) and then call
     the neural network package.
@@ -50,6 +51,8 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
     vars = [fco2_sst+'_reanalysed_fCO2_sw',fco2_sst+'_reanalysed_fCO2_sw_std', fco2_sst+'_reanalysed_count_obs']
     if socat_sst:
         vars.append(fco2_sst+'_reanalysed_sst')
+    if not atm_rem == None:
+        vars.append(atm_rem)
     vars.append(prov)
     if not bath_cutoff == None:
         vars.append(bath)
@@ -108,14 +111,14 @@ def driver(data_file,fco2_sst = None, prov = None,var = [],unc = None, model_sav
         net_train_var = var
     print(net_train_var)
     if run_network_training:
-        run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,activ = activ,ens=ens)
+        run_neural_network(tabl,fco2 = vars[0], prov = prov, var = net_train_var, model_save_loc = model_save_loc,unc = unc,tot_lut_val = tot_lut_val,activ = activ,ens=ens, atm_rem = atm_rem)
 
     # Next function runs the neural network ensemble to produce complete maps of fCO2(sw), alongside the network (standard dev of neural net ensembles) and parameter uncertainties
     # (propagated input parameter uncertainties)
     if prob_ensemble == None:
         mapped,mapped_net_unc,mapped_para_unc = neural_network_map(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc,ens=ens)
     else:
-        mapped,mapped_net_unc,mapped_para_unc = neural_network_map_prob(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc,ens=ens,prob_ensemble=prob_ensemble,data_file=data_file)
+        mapped,mapped_net_unc,mapped_para_unc = neural_network_map_prob(mapping_data,var=var,model_save_loc=model_save_loc,prov = prov,output_size=output_size,unc = unc,ens=ens,prob_ensemble=prob_ensemble,data_file=data_file, atm_rem = atm_rem)
     # Then we save the fCO2 data
     save_mapped_fco2(mapped,mapped_net_unc,mapped_para_unc,data_shape = output_size, model_save_loc = model_save_loc, lon = lon,lat = lat,time = time)
     # Once saved the validation can be extracted, and used to determine the validation uncertainty for each province,
@@ -366,7 +369,7 @@ def model_setup(v,var,activ,opt,min_n):
     return model
 
 def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None,plot=False, unc = None, ens = 10,tot_lut_val=6000,epochs=200,node_in = range(6,31,3),activ = 'sigmoid',
-    learning_rate =0.01):
+    learning_rate =0.01,atm_rem=None):
     """
     Function to run the nerual network training, and saving the best performing model. This function
     produces the model, scaler, uncertainty look up table and validation results for use in producing
@@ -405,7 +408,14 @@ def run_neural_network(data,fco2 = None,prov = None,var=None,model_save_loc=None
     X = np.array(data[var])
     print(X.shape)
     # Extract the fCO2(sw,subskin) data from the table, along with standard deviation.
-    y = np.transpose(np.array([data[fco2],data[fco2+'_std']]))
+
+    if not atm_rem==None:
+        print('Removing Atmospheric...')
+        y = np.transpose(np.array([data[fco2]-data[atm_rem],data[fco2+'_std']]))
+    else:
+        print('Not removing Atmospheric...')
+        y = np.transpose(np.array([data[fco2],data[fco2+'_std']]))
+
     print(y.shape)
     # Extract the province number dataset.
     prov =data[prov]
@@ -842,7 +852,7 @@ def plot_total_validation_unc(fco2_sst=False,model_save_loc=False, save_file=Fal
         c.close()
         latitude = np.reshape(latitude,(-1,1)); longitude = np.reshape(longitude,(-1,1)); time2 = np.reshape(time2,(-1,1))
         # Find where we have values for the SOCAT data, neural network data, and the province.
-        f = np.where((np.isnan(soc) == False) & (np.isnan(prov) == False) & (np.isnan(fco2) == False))
+        f = np.where((np.isnan(soc) == False) & (np.isnan(prov) == False))
         fco2 = fco2[f]; soc = soc[f]; prov=prov[f]; soc_s = soc_s[f]; fco2_unc = fco2_unc[f]; latitude = latitude[f]; longitude = longitude[f]; time2 = time2[f] # Trim the arrays.
         year = np.zeros((time2.shape));month = np.zeros((time2.shape));day = np.zeros((time2.shape))
 
@@ -1215,7 +1225,7 @@ def neural_network_map(mapping_data,var=None,model_save_loc=None,prov = None,out
     unc_para = np.reshape(unc_para,(output_size))
     return out,unc_net,unc_para
 
-def neural_network_map_prob(mapping_data,var=None,model_save_loc=None,prov = None,output_size=None,unc = None,ens=10,prob_ensemble='prov_ensemble',data_file=''):
+def neural_network_map_prob(mapping_data,var=None,model_save_loc=None,prov = None,output_size=None,unc = None,ens=10,prob_ensemble='prov_ensemble',data_file='',atm_rem=None):
     """
     Function to apply the trained neural network to the full data to produce global maps of fCO2 sw with the network unc and input parameter unc.
     """
@@ -1225,33 +1235,40 @@ def neural_network_map_prob(mapping_data,var=None,model_save_loc=None,prov = Non
     c = Dataset(data_file,'r')
     prob_data = np.array(c.variables[prob_ensemble])
     c.close()
+    print(prob_data.shape)
     prob_data = np.reshape(prob_data,(inp.shape[0],prob_data.shape[-1]))
-    print(prob_data)
+
     print(inp.shape)
     # Produce the output arrays
     out = np.zeros((inp.shape[0]))
     unc_net = np.copy(out)
     unc_para = np.copy(out)
+
     # For each province we run the neural network
     for v in np.unique(prov[~np.isnan(prov)]):
-        scalar = load(open(os.path.join(model_save_loc,'scalars',f'prov_{v}_scalar.pkl'),'rb')) # Load the scalar
-        f = np.squeeze(np.argwhere(prob_data[:,int(v)] >0)) # Find the data within the province
-        print(f'Number of samples for {v}: {len(f)}')
-        mod_inp = scalar.transform(inp[f,:]) # Transform the data using the scalar
-        #mod_inp = inp[f,:]
-        out_t = np.zeros((len(f),ens))
-        # For each ensemble run the neural network and get the output
-        for i in range(ens):
-            mod = tf.keras.models.load_model(os.path.join(model_save_loc,'networks',f'prov_{v}_model_ens{i}'),compile=False)
-            out_t[:,i] = np.squeeze(mod.predict(mod_inp))
-        out[f] = out[f]+ (np.nanmean(out_t,axis=1)*prob_data[f,int(v)]) # The output fCO2 is the mean of the ensembles
-        unc_net[f] = unc_net[f] + (np.nanstd(out_t,axis=1)*2 *prob_data[f,int(v)]) # The output fCO2 network uncertainity
-        if unc:
-            #Load the parameter uncertainty look up table and apply.
-            lut = load(open(os.path.join(model_save_loc,'unc_lut',f'prov_{v}_lut.pkl'),'rb'))
-            lut = lut[0]
-            unc_para[f] = unc_para[f] + (np.squeeze(lut_retr(lut,mod_inp))*prob_data[f,int(v)])
+        if du.checkfileexist(os.path.join(model_save_loc,'scalars',f'prov_{v}_scalar.pkl')):
+            scalar = load(open(os.path.join(model_save_loc,'scalars',f'prov_{v}_scalar.pkl'),'rb')) # Load the scalar
+            f = np.squeeze(np.argwhere(prob_data[:,int(v)] >0)) # Find the data within the province
+            print(f'Number of samples for {v}: {len(f)}')
+            mod_inp = scalar.transform(inp[f,:]) # Transform the data using the scalar
+            #mod_inp = inp[f,:]
+            out_t = np.zeros((len(f),ens))
+            # For each ensemble run the neural network and get the output
+            for i in range(ens):
+                mod = tf.keras.models.load_model(os.path.join(model_save_loc,'networks',f'prov_{v}_model_ens{i}'),compile=False)
+                out_t[:,i] = np.squeeze(mod.predict(mod_inp))
+                del mod
+            out[f] = out[f]+ (np.nanmean(out_t,axis=1)*prob_data[f,int(v)]) # The output fCO2 is the mean of the ensembles
+            unc_net[f] = unc_net[f] + (np.nanstd(out_t,axis=1)*2 *prob_data[f,int(v)]) # The output fCO2 network uncertainity
+            if unc:
+                #Load the parameter uncertainty look up table and apply.
+                lut = load(open(os.path.join(model_save_loc,'unc_lut',f'prov_{v}_lut.pkl'),'rb'))
+                lut = lut[0]
+                unc_para[f] = unc_para[f] + (np.squeeze(lut_retr(lut,mod_inp))*prob_data[f,int(v)])
     # Reshape the outputs to the correct lon,lat,time dimensions.
+    if not atm_rem==None:
+        f = np.where(out != 0.0)
+        out[f] = out[f] + np.array(mapping_data[atm_rem])[f] # Adding in the atmospheric again.
     out = np.reshape(out,(output_size))
     unc_net = np.reshape(unc_net,(output_size))
     unc_para = np.reshape(unc_para,(output_size))

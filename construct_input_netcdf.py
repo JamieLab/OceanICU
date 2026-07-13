@@ -17,7 +17,7 @@ import matplotlib.transforms
 from matplotlib.gridspec import GridSpec
 import Data_Loading.data_utils as du
 
-def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year = 1970,fill_clim=True,append = False):
+def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year = 1970,fill_clim=True,append = False,copts={}):
     #lon,lat = du.reg_grid(lat=resolution,lon=resolution)
     direct = {}
     clim = {}
@@ -33,7 +33,7 @@ def driver(out_file,vars,start_yr=1990,end_yr=2020,lon=[],lat=[],time_ref_year =
     if append:
         append_netcdf(out_file,direct,lon,lat,timesteps)
     else:
-        save_netcdf(out_file,direct,lon,lat,timesteps,time_track=time_track,ref_year = time_ref_year)
+        save_netcdf(out_file,direct,lon,lat,timesteps,time_track=time_track,ref_year = time_ref_year,copts=copts)
         save_climatology(out_file,clim)
 
 def driver8day(out_file,vars,start_yr=1990,end_yr =2022,lon=[],lat=[],time_ref_year = 1970,fill_clim=False,append=False):
@@ -63,7 +63,7 @@ def driver8day(out_file,vars,start_yr=1990,end_yr =2022,lon=[],lat=[],time_ref_y
                 out_data[:,:,i] = du.load_netcdf_var(file,a[1])
         direct[a[0]+'_'+a[1]] = out_data
 
-    save_netcdf(out_file,direct,lon,lat,len(time_track),time_track=time_track_int,ref_year=time_ref_year)
+    save_netcdf(out_file,direct,lon,lat,len(time_track),time_track=time_track_int,ref_year=time_ref_year,copts=copts)
 
 def build_timeseries(load_loc,variable,start_yr,end_yr,lon,lat,name,fill_clim=True):
     """
@@ -414,6 +414,39 @@ def fill_with_var(input_file,var_o,var_f,log,lag,mod = None,calc_anom=False):
         save_climatology(input_file,clim)
     else:
         c.close()
+
+def convert_to_mean(input_file,var,bath_file):
+    c = Dataset(input_file,'r')
+    data = np.array(c.variables[var][:])
+    c.close()
+
+    c = Dataset(bath_file,'r')
+    area = np.array(c.variables['area'][:])
+    c.close()
+
+    new_data = np.zeros((data.shape)); new_data[:] = np.nan
+    for i in range(data.shape[2]):
+        n = data[:,:,i]
+        f = np.where(np.isnan(n) == 0)
+        temp_data = np.zeros((n.shape))
+        temp_data[f] = np.average(n[f],weights=area[f])
+        new_data[:,:,i] = temp_data
+    direct = {}
+    direct[var+'_mean'] = new_data
+    append_netcdf(input_file,direct,1,1,1)
+
+def add_latitude_grid(input_file):
+    c = Dataset(input_file,'r')
+    lat = np.array(c.variables['latitude'][:])
+    lon = np.array(c.variables['longitude'][:])
+    time = np.array(c.variables['time'])
+    c.close()
+
+    b = np.transpose(np.repeat(lat[:, np.newaxis], len(lon), axis=1))
+    b = np.repeat(b[:, :, np.newaxis], len(time), axis=2)
+    direct = {}
+    direct['latitude_grid'] = b
+    append_netcdf(input_file,direct,1,1,1)
 
 def land_clear(model_save_loc):
     """

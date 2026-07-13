@@ -32,6 +32,7 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
     sst_kelvin: Is the sst_var is in kelvin (If True, then we convert to degC)
     sss_var: Variable name in aux_file for SSS
     """
+    var_out_main = ['dic','pH','saturation_aragonite','pH_free']
     var_out = [['dic','dic','umol/kg','Dissolved Inorganic Carbon in seawater',''],
         ['u_dic','dic_tot_unc','umol/kg','Dissolved Inorganic Carbon in seawater total uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ['u_dic__par2','dic_ta_unc','umol/kg','Dissolved Inorganic Carbon in seawater alkalinity uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
@@ -65,6 +66,11 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
         ['u_pH_free__total_phosphate','pH_free_phos_unc','-log([H+])','pH on free scale phosphate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ['u_pH_free__total_silicate','pH_free_sili_unc','-log([H+])','pH on free scale silicate uncertainty','Uncertainties considered 95% confidence (2 sigma)'],
         ]
+
+    constant_unc = pyco2.uncertainty_OEDG18 # These are 1 sigma uncertainties
+    # So we convert to 2 sigma uncertainties
+    for i in list(constant_unc.keys()):
+        constant_unc[i] = constant_unc[i]*2
     # var_out_list = ['dic',
     #     'u_dic',
     #     'u_dic__par2',
@@ -164,6 +170,11 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
         units[a[1]] = a[2]
         longname[a[1]] = a[3]
         comment[a[1]] = a[4]
+    for a in var_out_main:
+        direct[a + '_dissocation_unc'] = np.zeros((sss.shape)); direct[a][:] = np.nan
+        units[a + '_dissocation_unc'] = units[a]
+        longname[a + '_dissocation_unc'] = longname[a] + ' dissociation uncertainty'
+        comment[a + '_dissocation_unc'] = 'Uncertainties considered 95% confidence (2 sigma)'
     print('Running CO2sys...')
     for i in range(sst.shape[2]):
         print('Timestep: '+str(i))
@@ -177,11 +188,21 @@ def run_pyCO2sys(data_file,aux_file,fco2_var='fco2',ta_var = 'ta',sst_var = 'CCI
             total_phosphate=phosphate[:,:,i],
             total_silicate=silicate[:,:,i],
             uncertainty_into = ['dic','pH','saturation_aragonite','pH_free'],
-            uncertainty_from = {'par2':ta_unc[:,:,i], 'par1':fco2_unc[:,:,i], 'temperature': sst_unc[:,:,i],'salinity': sss_unc[:,:,i],'total_phosphate': phosphate_unc[:,:,i],
-                'total_silicate':silicate_unc[:,:,i]})
-        #print(py_out)
+            uncertainty_from = { **{'par2':ta_unc[:,:,i], 'par1':fco2_unc[:,:,i], 'temperature': sst_unc[:,:,i],'salinity': sss_unc[:,:,i],'total_phosphate': phosphate_unc[:,:,i],
+                'total_silicate':silicate_unc[:,:,i]},**constant_unc})
+        # print(py_out)
         for a in var_out:
             direct[a[1]][:,:,i] = py_out[a[0]]
+        for a in var_out_main:
+            temp = np.zeros((sst[:,:,i].shape))
+            for d in list(constant_unc.keys()):
+                try:
+                    temp = temp + py_out['u_'+a+'__'+d]**2
+                except:
+                    print(d + ' constant does not impact ' + a)
+            temp = np.sqrt(temp)
+            temp[np.isnan(py_out[a])==1] = np.nan
+            direct[a + '_dissocation_unc'][:,:,i] = temp
 
 
     cinp.append_netcdf(data_file,direct,1,1,1,units=units,longname=longname,comment=comment)
@@ -412,7 +433,7 @@ def plot_carbonate_validation(model_save_loc,insitu_file,insitu_var,nn_file,nn_v
 
 
 def montecarlo_mean_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[2000,200],flux_var = '',flux_variable='flux',
-    inp_file=False,single_output=False,ens=100,bath_cutoff=False,output_file = 'annual_flux.csv',mask_file=False,mask_var = '',):
+    inp_file=False,single_output=False,ens=100,bath_cutoff=False,output_file = 'annual_flux.csv',mask_file=False,mask_var = '',convert_pH=False):
     """
     Code to evaluate the effect of uncertainties that decorrelate over a specified length scale.
     The pre-calculated flux uncertainties are loaded from the framework output, and then a random grid
@@ -478,6 +499,7 @@ def montecarlo_mean_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
     print(land.shape)
 
     if mask_file:
+        print('Loading mask')
         c = Dataset(mask_file,'r')
         mask = np.array(c.variables[mask_var])
         time_mask = np.array(c.variables['time'])
@@ -595,6 +617,8 @@ def montecarlo_mean_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
 
         # Were dealing with a precomputed flux uncertainty, so we multiple by the perturbation vlaue and add to the flux
         e_flux = c_flux + (unc*c_flux_unc)
+        if convert_pH:
+            e_flux = 10**-e_flux
         temp_area = np.repeat((land*area)[:, :, np.newaxis], 12, axis=2)
         t = 0
         for i in range(0,c_flux.shape[2],12):# Cycle through the flux array, in annual increments and sum the flux thats in Pg C mon-1 into a Pg C yr-1
@@ -602,10 +626,18 @@ def montecarlo_mean_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
             # print(flu)
             f = np.where(np.isnan(flu) == 0)
             # print(f)
-            print(np.average(flu[f],weights=temp_area[f]))
+
             c_flu = c_flux[:,:,i:i+12] # Extract the unperturbed values - I think this only applies when we are doing a single output... so we have the actual calulated flux and the uncertainty
-            out[t,j] = np.average(flu[f],weights=temp_area[f])
-            out2[t] = np.average(c_flu[f],weights=temp_area[f])
+            if convert_pH:
+                c_flu = 10**-c_flu
+            if len(f[0]) >1:
+                out[t,j] = np.average(flu[f],weights=temp_area[f])
+                out2[t] = np.average(c_flu[f],weights=temp_area[f])
+                print(np.average(flu[f],weights=temp_area[f]))
+            else:
+                out[t,j] =np.nan
+                out2[t] = np.nan
+                print(np.nan)
 
             t = t+1# Keep a count so we can put the annual values in the right output row
 
@@ -613,4 +645,4 @@ def montecarlo_mean_testing(model_save_loc,start_yr = 1985,end_yr = 2022,decor=[
     st = np.std(out,axis=1) # Calcualte the standard devaiiton of the ensembles
     data['std'] = st# Save these into the table
     data[flux_variable] = out2 # This is our calcualted ocena carbon sink with no perturbations (so flux as is calculated)
-    data.to_csv(os.path.join(model_save_loc,output_file),index=False,na_rep='nan') # save the data back on to the file.
+    data.to_csv(output_file,index=False,na_rep='nan') # save the data back on to the file.

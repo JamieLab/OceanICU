@@ -14,7 +14,7 @@ import gebco_resample as geb
 import glob
 import matplotlib.pyplot as plt
 
-def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0.25,var='w',v=3,area_wei=True,gebco_file = False,gebco_out=False,land_mask=False):
+def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0.25,var='w',v=3,area_wei=True,gebco_file = False,gebco_out=False,land_mask=False,callaghan2008=False):
     du.makefolder(outloc)
     res = np.round(np.abs(log[0]-log[1]),2)
     yr = start_yr
@@ -39,10 +39,14 @@ def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0
             c = Dataset(file,'r')
             va_da = np.squeeze(np.array(c.variables[var][:])); va_da[va_da < -100] = np.nan
             va_da2 = np.squeeze(np.array(c.variables[var+'^2'][:])); va_da2[va_da2 < -100] = np.nan
+            if callaghan2008:
+                va_da3 = np.squeeze(np.array(c.variables['whitecapping_callaghan2008'][:])); va_da2[va_da2 < -100] = np.nan
             print(va_da.shape)
             lon2 = np.copy(lon)
             lon,va_da = du.grid_switch(lon,va_da)
             lon2,va_da2 = du.grid_switch(lon2,va_da2)
+            if callaghan2008:
+                lon2,va_da3 = du.grid_switch(lon2,va_da3)
 
             c.close()
             # if t2 == 0:
@@ -66,6 +70,8 @@ def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0
                 # va_da[ocean == 0.0] = np.nan; va_da2[ocean == 0.0] = np.nan;
                 va_da_out = du.grid_average(va_da,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei,gebco_file=gebco_file,gebco_out=gebco_out,land_mask=land_mask)
                 va_da_out2 = du.grid_average(va_da2,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei,gebco_file=gebco_file,gebco_out=gebco_out,land_mask=land_mask)
+                if callaghan2008:
+                    va_da_out3 = du.grid_average(va_da3,lo_grid,la_grid,lon=lon,lat=lat,area_wei=area_wei,gebco_file=gebco_file,gebco_out=gebco_out,land_mask=land_mask)
             else:
                 print('Interpolation')
 
@@ -74,6 +80,8 @@ def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0
 
             du.netcdf_create_basic(outfile,va_da_out,var,lag,log)
             du.netcdf_append_basic(outfile,va_da_out2,var+'^2')
+            if callaghan2008:
+                du.netcdf_append_basic(outfile,va_da_out3,'whitecapping_callaghan2008')
             c = Dataset(outfile,'a')
             if res > orgi_res:
                 if area_wei:
@@ -100,7 +108,7 @@ def ccmp_average(loc,outloc,start_yr=1990,end_yr=2023,log='',lag='',orgi_res = 0
             yr = yr+1
             mon=1
 
-def ccmp_temporal_average(loc,start_yr=1990,end_yr=2023,var='ws',v=3):
+def ccmp_temporal_average(loc,start_yr=1990,end_yr=2023,var='ws',v=3,callaghan2008=False):
     du.makefolder(os.path.join(loc,'monthly'))
     if start_yr <= 1993:
         ye = 1993
@@ -155,7 +163,11 @@ def ccmp_temporal_average(loc,start_yr=1990,end_yr=2023,var='ws',v=3):
                 # plt.pcolor(wind[:,:,cou])
                 # plt.show()
                 cou = cou+4
-
+            if callaghan2008:
+                whitecapping = np.zeros((wind.shape)); whitecapping[:] = np.nan
+                whitecapping[wind<=10.18] = 0.0000318*(wind[wind<=10.18]-3.7)**3
+                whitecapping[wind>10.18] = 0.00000482*(wind[wind>10.18]+1.98)**3
+                whitecapping = np.mean(whitecapping,axis=2)
             wind_o = np.nanmean(wind,axis=2)
             print(wind_o.shape)
             # plt.figure()
@@ -167,6 +179,8 @@ def ccmp_temporal_average(loc,start_yr=1990,end_yr=2023,var='ws',v=3):
                 du.makefolder(os.path.join(loc,'monthly',str(ye)))
             du.netcdf_create_basic(outfile,wind_o,var,lat,lon)
             du.netcdf_append_basic(outfile,wind_o2,var+'^2')
+            if callaghan2008:
+                du.netcdf_append_basic(outfile,whitecapping,'whitecapping_callaghan2008')
         mon = mon+1
         if mon == 13:
             mon = 1

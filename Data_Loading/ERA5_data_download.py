@@ -100,7 +100,7 @@ def era5_daily(loc,start_yr,end_yr,vars=['10m_u_component_of_wind', '10m_v_compo
             client.retrieve(dataset, request, target)
         d = d + datetime.timedelta(days=int(day[-1]))
 
-def era5_wind_time_average(loc,outloc,start_yr,end_yr):
+def era5_wind_time_average(loc,outloc,start_yr,end_yr,callaghan2008=False):
     du.makefolder(outloc)
     yr = start_yr
     mon = 1
@@ -120,13 +120,25 @@ def era5_wind_time_average(loc,outloc,start_yr,end_yr):
             ws = np.sqrt(u**2 + v**2)
             print(ws.shape)
             ws2 = ws**2
+            if callaghan2008:
+                whitecapping = np.zeros((ws.shape))
+                whitecapping[ws<=10.18] = 0.0000318*(ws[ws<=10.18]-3.7)**3
+                whitecapping[ws>10.18] = 0.00000482*(ws[ws>10.18]+1.98)**3
+                whitecapping = np.transpose(np.mean(whitecapping,axis=0))
+
             ws = np.transpose(np.mean(ws,axis=0))
             ws2 = np.transpose(np.mean(ws2,axis=0))
+
             print(ws.shape)
             lon,ws = du.grid_switch(lon,ws)
             l,ws2 = du.grid_switch(np.array(180),ws2)
+            if callaghan2008:
+                l,whitecapping = du.grid_switch(np.array(180),whitecapping)
             du.netcdf_create_basic(outfile,ws,'ws',lat,lon)
             du.netcdf_append_basic(outfile,ws2,'ws2')
+            if callaghan2008:
+                du.netcdf_append_basic(outfile,whitecapping,'whitecapping_callaghan2008')
+
         mon = mon+1
         if mon == 13:
             yr = yr+1

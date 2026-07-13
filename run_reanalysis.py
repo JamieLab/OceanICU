@@ -114,7 +114,7 @@ def load_prereanalysed(input_file,output_file,start_yr=1990, end_yr = 2020,name=
     fco2_nobs = np.transpose(fco2_nobs[f[0],:,:],(2,1,0))
     sst = np.transpose(sst[f[0],:,:],(2,1,0))
 
-    if time[-1] != end_yr:
+    if time[-1] < end_yr:
         #If the end_year of the SOCAT data is not the end year we want to extrapolate to then pad the end,
         #so the data can be included in the netcdf. For example this is used by the UoE to prepare input
         #datasets for the GCB release, and allows running of an addiitonal year in preparation

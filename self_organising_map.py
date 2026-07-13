@@ -108,7 +108,7 @@ def som_feed_forward(model_save_loc,data_file,inp_vars,ref_year = 1970,o_var = '
             for i in range(map.shape[2]):
                 print(i)
                 map_filtered[:,:,i] = mode_smooth(map_filtered[:,:,i],box=j)
-    else:
+    elif box != None:
         for i in range(map.shape[2]):
             print(i)
             map_filtered[:,:,i] = mode_smooth(map[:,:,i],box=j)
@@ -259,7 +259,7 @@ def som_feed_forward_probability(model_save_loc,data_file,inp_vars,ref_year = 19
             for i in range(map.shape[2]):
                 print(i)
                 map_filtered[:,:,i] = mode_smooth(map_filtered[:,:,i],box=j)
-    else:
+    elif box != None:
         for i in range(map.shape[2]):
             print(i)
             map_filtered[:,:,i] = mode_smooth(map_main[:,:,i],box=j)

@@ -19,10 +19,20 @@ def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
     Renalaysis/Forecast Dataset DOI: https://doi.org/10.48670/moi-00016
     """
     OUTPUT_DIRECTORY = loc
+    du.makefolder(OUTPUT_DIRECTORY)
     # Year reanalysis ends - check https://doi.org/10.48670/moi-00021 for year
     # After this year we use the forecast dataset from: https://doi.org/10.48670/moi-00016
     #transition_yr = 2023
-
+    id = "cmems_mod_glo_phy_my_0.083deg_P1M-m"
+    dataset_info = cmmarine.describe(dataset_id=id,contains=[variable])
+    dataset_info = dataset_info.model_dump(exclude_none=True,
+    # exclude_unset=True,
+    # exclude={"products": {"__all__": {"datasets": True, "description": True, "keywords": True}}}
+    )
+    released = dataset_info['products'][-1]['datasets'][0]['versions'][0]['parts'][0]['released_date']
+    print(released)
+    label = dataset_info['products'][-1]['datasets'][0]['versions'][0]['label']
+    print(label)
     yr = start_yr
     mon = 1
     while yr <= end_yr:
@@ -34,8 +44,7 @@ def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
         date_min = date_min_v.strftime('%Y-%m-%dT%H:%M:%S')
         print(OUTPUT_FILENAME)
         if not du.checkfileexist(os.path.join(OUTPUT_TEMP,OUTPUT_FILENAME)):
-            id = "cmems_mod_glo_phy_my_0.083deg_P1M-m"
-            cmmarine.subset(
+            dataset = cmmarine.subset(
               dataset_id=id,
               #dataset_version="202311",
               variables=[variable],
@@ -51,7 +60,10 @@ def load_glorysv12_monthly(loc,start_yr = 1993,end_yr = 2020,variable=None):
               output_directory=OUTPUT_TEMP,
               #force_download=True
             )
-            
+            c = Dataset(os.path.join(OUTPUT_TEMP,OUTPUT_FILENAME),'a')
+            c.release_date = released
+            c.label = label
+            c.close()
         mon = mon+1
         if mon == 13:
             yr = yr+1

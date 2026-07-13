@@ -22,7 +22,7 @@ matplotlib.rc('font', **font)
 let = ['a','b','c','d','e','f','g','h']
 
 def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws2=None,ws3=None,seaice=None,sal=None,msl=None,xCO2=None,coolskin='Donlon02',start_yr=1990, end_yr = 2020,
-    coare_out=None,tair=None,dewair=None,rs=None,rl=None,zi=None,t_skin_in=None):
+    coare_out=None,tair=None,dewair=None,rs=None,rl=None,zi=None,t_skin_in=None,extra_vars = [],extra_vars_name=[]):
     """
     Function to create a netcdf file with all variables required for the Fluxengine calculations using
     standard names.
@@ -32,8 +32,8 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws
     print('Generating fluxengine netcdf files...')
     lon,lat = du.load_grid(input_file)
     timesteps =((end_yr-start_yr)+1)*12
-    vars = [tsub,ws,seaice,sal,msl,xCO2]
-    vars_name = ['t_subskin','wind_speed','sea_ice_fraction','salinity','air_pressure','xCO2_atm']
+    vars = [tsub,ws,seaice,sal,msl,xCO2]+extra_vars
+    vars_name = ['t_subskin','wind_speed','sea_ice_fraction','salinity','air_pressure','xCO2_atm']+extra_vars_name
     comment = {}
     if ws2 != None:
         vars.append(ws2)
@@ -44,13 +44,15 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws
         vars_name.append('wind_speed_3')
         comment['wind_speed_3'] = 'Variable = ' + ws3
     direct = {}
+    for i in range(len(vars)):
+        comment[vars_name[i]] = 'Variable = ' + vars[i]
+    # comment['t_subskin'] = 'Variable = ' + tsub
+    # comment['wind_speed'] = 'Variable = ' + ws
+    # comment['sea_ice_fraction'] = 'Variable = ' + seaice
+    # comment['salinity'] = 'Variable = ' + sal
+    # comment['air_pressure'] = 'Variable = ' + msl
+    # comment['xCO2_atm'] = 'Variable = ' + xCO2
 
-    comment['t_subskin'] = 'Variable = ' + tsub
-    comment['wind_speed'] = 'Variable = ' + ws
-    comment['sea_ice_fraction'] = 'Variable = ' + seaice
-    comment['salinity'] = 'Variable = ' + sal
-    comment['air_pressure'] = 'Variable = ' + msl
-    comment['xCO2_atm'] = 'Variable = ' + xCO2
 
 
     for i in range(len(vars)):
@@ -58,33 +60,33 @@ def fluxengine_netcdf_create(model_save_loc,input_file=None,tsub=None,ws=None,ws
 
     if t_skin_in != None:
         direct['t_skin'] = du.load_netcdf_var(input_file,t_skin_in)
-        comment['t_skin'] = 'Varibale = ' + t_skin_in
-
-    if coolskin == 'Donlon02':
-        coolskin_dt = (-0.14 - 0.30 * np.exp(- (direct['wind_speed'] / 3.7)))
-        direct['t_skin'] = direct['t_subskin'] + coolskin_dt
-        comment['t_skin'] = 'Variable generated from "' + tsub + '" with the Donlon et al. (2002) wind speed parameteriation for the cool skin'
-    elif coolskin == 'Donlon98':
-        direct['t_skin'] = direct['t_subskin'] - 0.17
-        comment['t_skin'] = 'Variable generated from "' + tsub + '" with the Donlon et al. (1998) fixed cool skin'
-    elif coolskin == 'COARE3.5':
-        import coare_cool_skin as ccs
-        dt_coare = ccs.calc_coare(input_file,coare_out,ws = ws,tair = tair, dewair = dewair, sst = tsub, msl = msl,
-            rs = rs, rl = rl, zi = zi,start_yr=start_yr,end_yr=end_yr)
-        direct['t_skin'] = direct['t_subskin'] - dt_coare
-        comment['t_skin'] = 'Variable generated from "' + tsub + '" with the NOAA-COARE3.5 cool skin. NOAA-COARE 3.5 inputs; wind speed: ' + ws + '; temperature air = ' + tair + '; dewpoint temperature = ' + dewair +'; sea surface temperature = ' + tsub +'; sea level pressure: ' + msl + '; downward shortwave radiation = ' + rs + '; downward longwave radiation = ' + rl + '; boundary layer height = ' + zi
-        #direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
-    elif coolskin == 'COARE3.6':
-        import coare_cool_skin as ccs
-        dt_coare = ccs.calc_coare_36(input_file,coare_out,ws = ws,tair = tair, dewair = dewair, sst = tsub, msl = msl,
-            rs = rs, rl = rl, zi = zi,sal=sal,start_yr=start_yr,end_yr=end_yr)
-        direct['t_skin'] = direct['t_subskin'] - dt_coare
-        comment['t_skin'] = 'Variable generated from "' + tsub + '" with the NOAA-COARE3.6 cool skin. NOAA-COARE 3.6 inputs; wind speed: ' + ws + '; temperature air = ' + tair + '; dewpoint temperature = ' + dewair +'; sea surface temperature = ' + tsub +'; sea level pressure: ' + msl + '; downward shortwave radiation = ' + rs + '; downward longwave radiation = ' + rl + '; boundary layer height = ' + zi+'; salinity = '+sal
-        #direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
-    elif coolskin == 'None':
-        # No coolskin effect applied (so Tskin == Tsubskin)
-        direct['t_skin'] = direct['t_subskin']
-        comment['t_skin'] = 'No cool skin applied'
+        comment['t_skin'] = 'Variable = ' + t_skin_in
+    else:
+        if coolskin == 'Donlon02':
+            coolskin_dt = (-0.14 - 0.30 * np.exp(- (direct['wind_speed'] / 3.7)))
+            direct['t_skin'] = direct['t_subskin'] + coolskin_dt
+            comment['t_skin'] = 'Variable generated from "' + tsub + '" with the Donlon et al. (2002) wind speed parameteriation for the cool skin'
+        elif coolskin == 'Donlon98':
+            direct['t_skin'] = direct['t_subskin'] - 0.17
+            comment['t_skin'] = 'Variable generated from "' + tsub + '" with the Donlon et al. (1998) fixed cool skin'
+        elif coolskin == 'COARE3.5':
+            import coare_cool_skin as ccs
+            dt_coare = ccs.calc_coare(input_file,coare_out,ws = ws,tair = tair, dewair = dewair, sst = tsub, msl = msl,
+                rs = rs, rl = rl, zi = zi,start_yr=start_yr,end_yr=end_yr)
+            direct['t_skin'] = direct['t_subskin'] - dt_coare
+            comment['t_skin'] = 'Variable generated from "' + tsub + '" with the NOAA-COARE3.5 cool skin. NOAA-COARE 3.5 inputs; wind speed: ' + ws + '; temperature air = ' + tair + '; dewpoint temperature = ' + dewair +'; sea surface temperature = ' + tsub +'; sea level pressure: ' + msl + '; downward shortwave radiation = ' + rs + '; downward longwave radiation = ' + rl + '; boundary layer height = ' + zi
+            #direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
+        elif coolskin == 'COARE3.6':
+            import coare_cool_skin as ccs
+            dt_coare = ccs.calc_coare_36(input_file,coare_out,ws = ws,tair = tair, dewair = dewair, sst = tsub, msl = msl,
+                rs = rs, rl = rl, zi = zi,sal=sal,start_yr=start_yr,end_yr=end_yr)
+            direct['t_skin'] = direct['t_subskin'] - dt_coare
+            comment['t_skin'] = 'Variable generated from "' + tsub + '" with the NOAA-COARE3.6 cool skin. NOAA-COARE 3.6 inputs; wind speed: ' + ws + '; temperature air = ' + tair + '; dewpoint temperature = ' + dewair +'; sea surface temperature = ' + tsub +'; sea level pressure: ' + msl + '; downward shortwave radiation = ' + rs + '; downward longwave radiation = ' + rl + '; boundary layer height = ' + zi+'; salinity = '+sal
+            #direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
+        elif coolskin == 'None':
+            # No coolskin effect applied (so Tskin == Tsubskin)
+            direct['t_skin'] = direct['t_subskin']
+            comment['t_skin'] = 'No cool skin applied'
 
     direct['t_skin'][direct['t_skin'] < 271.36] = 271.36 #Here we make sure the skin temperature isn't below the freezing point of seawater...
 
